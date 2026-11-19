@@ -11,7 +11,7 @@
     // and the images are apache/airflow:2.10.4-python3.11 and python:3.11. A
     // suite run on another interpreter tests something else -- a bare pytest
     // under 3.14 is what sent us looking for a missing psycopg.
-    "python.defaultInterpreterPath": "${userHome}/miniconda3/envs/ml4fd/python.exe",
+    "python.defaultInterpreterPath": "${userHome}/miniconda3/envs/aia-ml4fd/python.exe",
 
     // The test panel finds the suite without being told where it is.
     // "." rather than "tests": pyproject.toml already carries testpaths, and
