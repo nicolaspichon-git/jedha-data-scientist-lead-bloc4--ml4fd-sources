@@ -1,0 +1,15 @@
+# The dashboard of S6 (lot R4). Python 3.11, like the other images.
+#
+# WHAT IS NOT HERE MATTERS AS MUCH. No MLflow, no scikit-learn, no Airflow:
+# ml4fd.dashboard imports only db, notify and report, and those import only
+# psycopg and PyYAML at load time (score and health are imported inside
+# functions the dashboard never calls -- measured). Every package left out is
+# a surface the one container open to a browser does not carry.
+#
+# FLOORS, NOT PINS, for the reason airflow/requirements.txt gives: written
+# without access to the package index, an exact pin would be a version somebody
+# BELIEVES exists. 1.37 is the floor because the pages use st.navigation and
+# st.Page, which appeared in Streamlit 1.36.
+streamlit>=1.37,<2
+psycopg[binary]>=3.1
+PyYAML>=6.0

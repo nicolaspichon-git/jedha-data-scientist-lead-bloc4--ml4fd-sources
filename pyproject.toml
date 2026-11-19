@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml4fd"
+version = "0.1.0"
+description = "Machine Learning for Fraud Detection -- AIA RNCP 38777 / BC04"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary]>=3.1",
+    "pandas==2.3.3",
+    "requests>=2.31,<3",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[tool.setuptools]
+packages = ["ml4fd"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# A deprecation in our own code is a defect, not a note: 221 of them went by
+# unnoticed because the suite only printed them. Third-party deprecations stay
+# warnings -- we do not control their schedule.
+filterwarnings = ["error::DeprecationWarning:ml4fd.*"]
+
+[tool.ruff]
+line-length = 100

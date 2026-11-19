@@ -1,0 +1,55 @@
+# The integration half of C4: every change is built, linted and tested before
+# it can reach the main branch.
+# Covers: EC24, EC25, EC26   Lot: L2   Competency: C4
+#
+# WHAT MAKES THIS BLOCKING is not this file. A workflow only produces a check;
+# refusing a merge on a red check is a branch protection rule, set on the
+# repository. Both are needed for EC26.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 3.11, like the images -- apache/airflow:2.10.4-python3.11 and
+      # python:3.11 -- and like requires-python in pyproject.toml. A suite run
+      # on a newer interpreter than production tests something else: the local
+      # run under 3.14 is what sent us looking for a missing psycopg.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      # THE DECLARED DEPENDENCIES ARE THE CONTRACT: psycopg, pandas, requests
+      # and PyYAML, plus pytest and ruff. No airflow, no mlflow, no
+      # scikit-learn -- ml4fd/ imports those inside the functions that need
+      # them, so importing a module does not pull them in. If that ever
+      # changes, this step is where it will be noticed.
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      # LF IS LOAD-BEARING: see .gitattributes. That file should keep CRLF out
+      # of the repository; this step fails the build if it ever gets through,
+      # because the symptom appears far from the cause -- a cluster missing two
+      # databases, hours later.
+      - name: Shell scripts keep their LF endings
+        run: |
+          if grep -rlU $'\r' sql/initdb/; then
+            echo "CRLF found under sql/initdb/ -- see .gitattributes"
+            exit 1
+          fi
+
+      # python -m pytest, not pytest: the module form puts the working
+      # directory on sys.path, which is what makes `import ml4fd` resolve from
+      # a checkout. fd-manager.ps1 test does the same.
+      - name: Tests
+        run: python -m pytest -q

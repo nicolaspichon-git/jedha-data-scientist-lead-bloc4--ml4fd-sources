@@ -1,0 +1,31 @@
+# Streamlit configuration of the dashboard (S6, lot R4).
+
+[server]
+# Inside the container. The HOST side is bound to 127.0.0.1 only, in
+# docker-compose.yml: the page is reachable from this machine, not the network.
+address = "0.0.0.0"
+port = 8501
+headless = true
+# The defaults, written down so that nobody "fixes" them away: the dashboard
+# has no form, but a later page might.
+enableXsrfProtection = true
+enableCORS = true
+
+[browser]
+# The page does not report its usage to anybody.
+gatherUsageStats = false
+
+[client]
+# NO TRACEBACK IN THE BROWSER: "none" shows a generic message, and the type,
+# the message and the stack stay in the container's log (fd-manager logs
+# -Service dashboard), where an operator reads them and an analyst does not.
+#
+# NOT `false`, which the first version used: it is deprecated and means
+# "stacktrace" -- the message is redacted but the STACK is still drawn in the
+# page, file paths and lines of code included. Seen on 2026-11-17, on the
+# rejections page, by the first error the dashboard ever raised.
+showErrorDetails = "none"
+# The navigation is declared in app.py with st.navigation, which is what shows
+# it in the sidebar. (With st.navigation, Streamlit does not ALSO scan pages/
+# as an automatic multipage app.)
+showSidebarNavigation = true

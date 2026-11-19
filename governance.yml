@@ -1,0 +1,500 @@
+# Governance policy and parameterised durations.
+# Covers: EI12, EC16, EC18
+#
+# Durations that outlast the demonstration itself live here, and nowhere else in
+# the code. No secret belongs in this file: those live in .env.
+
+verdicts:
+  # Which of the two delays below is in force. ONE switch, read by S1 and by S3
+  # alike: the historical labels and the real-time ones must sit on the same
+  # delay, or the blind band before the cut-off differs between training and
+  # scoring and the measured recall means nothing.
+  #   nominal -- delay_days, the real-world figure
+  #   demo    -- demo_delay_seconds, so a verdict falls due during a recording
+  mode: nominal
+
+  # Delay between a transaction and the moment its verdict becomes known.
+  # Sets the width of the blind band before the cut-off.
+  delay_days: 30
+  demo_delay_seconds: 300        # demonstration value (F13.1, EI12)
+
+retention:
+  # EVERY STORE OF THE PROJECT IS DECLARED HERE, purged or not (S5/Q0). A store
+  # missing from this section is one nobody decided about, and the missing one
+  # is always the one that holds the most: fd_quarantine kept the raw payload of
+  # every REJECTED record with no duration at all, while the accepted ones were
+  # purged at 90 days -- the opposite of what limiting retention is for.
+  # tests/test_retention.py reads the DDL and refuses a table that appears
+  # neither below nor under `kept`.
+
+  # --- stores carrying the cardholder's personal data: purged ---------------
+  raw_events_days: 90
+  # THE SAME DURATION AS THE RAW ZONE, and config.load() refuses a longer one.
+  # fd_quarantine.payload is the raw payload of a rejected record: the same
+  # personal data as fd_raw_events.payload. A rejected record has no less right
+  # to limited retention than an accepted one, and a rejection is examined in
+  # the days that follow, not in the months.
+  quarantine_days: 90
+  # Airflow's logs carry rejection reasons and stack traces, and a stack trace
+  # can quote a line of data. They must not outlive the raw data they may quote,
+  # which config.load() also refuses. 30 days is ample to diagnose a failure.
+  airflow_logs_days: 30
+
+  # --- stores that are NOT purged, and why. A reason is mandatory. -----------
+  kept:
+    fd_transactions: >-
+      Carries no identifying column: client_key is an HMAC pseudonym and the
+      identifying fields were dropped or minimised in L3 (personal_data below).
+      Kept for training and for audit.
+    fd_ground_truth: >-
+      A verdict per txn_id and a date; no personal field. It is the training
+      target, and the delay it encodes is the product's own.
+    fd_scores: >-
+      txn_id, score, threshold, model version: the record of what was decided
+      and by which model. No personal field.
+    fd_frauds: >-
+      txn_id, score and the state of the notification. No personal field; the
+      notification channels refuse them (notify.FORBIDDEN_FIELDS).
+    fd_pipeline_runs: >-
+      Measured rather than assumed (S5/Q4): an identifier, a DAG name, dates,
+      a state, counters and the fingerprints of Q1. No personal field, so
+      there is nothing to empty -- and its rows must not be deleted either,
+      since those fingerprints are all that remains of a purged batch. The
+      role that purges holds no DELETE on this table.
+    fd_ops_state: >-
+      One row per control of the chain, holding its state and the date it
+      changed. Operational, no transaction data.
+    fd_ops_notifications: >-
+      The journal of the operations channel (S6/R9): one row per message sent,
+      holding a control name, a state and counts. No transaction data -- the
+      payload is checked against FORBIDDEN_FIELDS before it leaves -- and a
+      few rows per incident, not per run. Append-only, like fd_purges.
+    fd_datasets: >-
+      The catalogue of the training sets: recipe digest, paths, counts. No
+      personal field; it is the row that ties a model to the data it learned
+      from, which is what M8's lineage rests on.
+    datasets_directory: >-
+      The parquet training sets under runtime/datasets/. MEASURED RATHER THAN ASSUMED
+      (S5/Q6): they carry no identifying field -- features and the
+      pseudonymised client_key -- so limiting their retention is not what this
+      policy is for, and they are the other half of M8's lineage: a registered
+      model must stay tied to the set that produced it. About 830 MB a year at
+      a weekly cadence, which is a housekeeping question and not a governance
+      one. A first version of this file declared "the five latest versions"
+      here among the purged stores, and nothing deleted a file: a rule of disk
+      hygiene dressed as a retention rule, which is how a declared duration
+      comes to be a duration nobody applies. Trimming the directory, if it
+      ever matters, is a manual act outside S5.
+    fd_purges: >-
+      The journal of the purges (S5/Q6): counts, instants and store names, one
+      row per store and per execution. No personal field -- and it is the proof
+      that the declared durations are APPLIED, which EC18 asks for. Deleting it
+      would destroy the evidence that the policy exists in fact; the role that
+      purges may insert into it and nothing else.
+    fd_reports: >-
+      The journal of the morning reports: counts and a digest, one row per
+      day. The counts are what the audit of S4 re-reads.
+    mlflow_registry: >-
+      Not purged by S5. Models and their metrics hold no personal data; their
+      retention is a registry decision, and a model in service must be
+      reproducible, which a purge would break.
+    reports_directory: >-
+      The Markdown morning reports. They name transactions by identifier and
+      amount, never the cardholder. Kept: each is the document its digest in
+      fd_reports vouches for.
+    local_cache: >-
+      The downloaded historical CSV. It carries personal data but it is the
+      SOURCE and downloads again; its place is outside the repository, and it
+      is not something S5 destroys.
+
+purge:
+  # WHEN THE PURGE RUNS. Weekly, Sunday, at an hour when nothing else does:
+  # dag_ingest_verdicts holds 02:00, dag_train Monday 03:00, dag_daily 06:00.
+  #
+  # WEEKLY AND NOT DAILY, which is the one cadence decision of this project
+  # taken for the opposite of the usual reason: a purge at 90 days has no daily
+  # urgency, and a destructive task that runs rarely is a task whose failure is
+  # NOTICED. A daily purge that breaks on a Tuesday is a line in a log.
+  #
+  # IT MUST NOT MEET THE VERDICT WRITER. The purge deletes batches of the raw
+  # zone; dag_ingest_verdicts READS the raw zone to write the verdicts that
+  # fell. At the same instant the purge would take batches out from under it.
+  schedule: "0 4 * * 0"
+
+  # THE GUARD AGAINST A TOO-WIDE PURGE (S5/Q2, Q5). A purge that would delete
+  # more than this share of a store stops and demands an explicit confirmation:
+  # a purge of 90 % of a table may be legitimate, but it is never a routine.
+  # Strictly between 0 and 1: at 1 the guard never fires.
+  max_share: 0.5
+
+scoring:
+  # A FALLBACK, AND NOTHING ELSE. Measured in the code rather than assumed:
+  # ml4fd/train.py line 285 overwrites this value with choice.threshold as soon
+  # as threshold_policy is set, and it is set (capacity, below). So this number
+  # decides a report only in a configuration where no policy is declared.
+  #
+  # IT IS NOT THE SCORING THRESHOLD. N4 reads the operating threshold from the
+  # manifest of the model version it loads, never from here, for a reason that
+  # is not a matter of taste: a threshold is only meaningful for the score
+  # distribution of the model it was chosen on. The model is retrained every
+  # week, so a constant in this file would go stale every week -- and the stale
+  # value would be 0.5, which on the measured distribution floods the analysts
+  # instead of alerting them.
+  #
+  # What this file declares is the DECISION: the policy, the capacity, the cost
+  # of a false alert. The value is the measurement that follows from them, and
+  # it travels with the model, in run.json.
+  decision_threshold: 0.5
+
+  # HOW THE OPERATING THRESHOLD IS CHOSEN (M6). 0.5 is the default of a
+  # library, never a business decision.
+  #
+  # cost     : minimise the money lost. The cost of a missed fraud is ITS OWN
+  #            AMOUNT, measured per transaction rather than assumed; the cost of
+  #            a false alert is the analyst minutes below.
+  # capacity : the highest recall that stays within what an analyst can review
+  #            in a morning. This is the policy G2 actually constrains.
+  #
+  # Both are computed and reported at every run; this switch says which one
+  # decides. A policy nobody can see is a number nobody can challenge.
+  threshold_policy: capacity
+  alert_capacity_per_day: 60
+  cost_false_alert: 4.0          # euros of analyst time for one review
+
+  # The threshold is chosen on the LAST SLICE OF THE TRAINING PERIOD, never on
+  # the test set: a threshold tuned on the test set makes the published recall
+  # and precision optimistic by construction.
+  validation_share: 0.2
+
+  # THE TRUST PLACED IN THE MODEL REGISTRY.
+  #
+  # MLflow serialises the model with skops, which refuses to load a type it has
+  # not been told to trust. ml4fd/registry.py declares three of them, one being
+  # the tree structure of HistGradientBoosting -- whose node indices scikit-learn
+  # reads without bounds checking, so a crafted model file can crash the process
+  # that scores with it.
+  #
+  # That declaration is sound only while THIS condition holds:
+  model_registry_trust: own-pipeline-only
+  # meaning: a model is loaded only if this pipeline produced it, in this
+  # infrastructure, and write access to the registry is controlled. If models
+  # could ever arrive from elsewhere -- a shared registry, an upload, a partner
+  # -- the trusted-type list in ml4fd/registry.py has to be revisited BEFORE
+  # that happens, not after.
+
+  # THE CALENDAR COLUMNS THE MODEL DOES NOT USE. Decided 2026-11-16, by
+  # measurement, and this is the place for it: governance.yml holds decisions,
+  # ml4fd/datasets.py holds the catalogue of columns that EXIST.
+  #
+  # WHY. txn_hour and txn_weekday mean the hour of the PAYMENT in the historical
+  # data and the hour of OUR OWN CALL on the stream: the API draws a row at
+  # random from 2020 -- measured over the N0 campaign, indices spread over
+  # 16,227..553,065 with 29 of 56 gaps positive, a coin flip -- and stamps it
+  # with the instant our call returned. So on the stream the two columns are
+  # independent of the label BY CONSTRUCTION, while in training they are
+  # anything but: the 22:00-03:59 band carries a fraud rate of 1.389 % against
+  # 0.079 % elsewhere, a ratio of 17.5.
+  #
+  # THE MEASUREMENT THAT DECIDED IT. A recipe trained without them was compared
+  # with the recipe in service, both read at threshold 0.89, over the SAME 205
+  # frauds of the test set, 20 clock permutations:
+  #
+  #     the amputated recipe catches 21 frauds the other misses,
+  #     against 3 in the other direction -- p = 2.8e-4,
+  #     +18 frauds in median, significant in 20 draws out of 20,
+  #     and never once in favour of the recipe in service.
+  #
+  # (datasets/fraud_scoring/8813b096e2e4/comparaison-appariee.md)
+  #
+  # The price is stated rather than hidden: precision falls from 0.595 to 0.529
+  # and the volume rises from 31 to 41.6 alerts a day, under the ceiling of 60.
+  #
+  # IT IS A DEFECT OF THIS TEST BENCH, NOT OF THE DESIGN. "Arrival time = payment
+  # time" holds in a real payment application, where the authorisation message
+  # arrives seconds after the card is swiped -- N0 measured that latency, median
+  # 5.1 s. What this simulator does not do, and cannot do since it ignores the
+  # drawn row's own timestamp, is preserve the time-of-day structure. On a real
+  # payment stream these two columns should come back, and this comment is where
+  # that is recorded.
+  #
+  # An experiment overrides this list with --conf drop_features, and
+  # --conf drop_features=none drops nothing -- which is how the 7-feature recipe
+  # stays rebuildable.
+  drop_features: [txn_hour, txn_weekday]
+
+  # THE RULE A HUMAN ANALYST WOULD WRITE, and the baseline the model must beat.
+  #
+  # Measured on this source: 84 % of frauds fall between 22:00 and 03:59, at
+  # 0.9-1.9 % against 0.05-0.13 % elsewhere; the median fraudulent amount is
+  # 371.94 against 47.29 overall. Two conditions therefore carry most of the
+  # signal, and a model that merely matches them has earned nothing.
+  #
+  # Declared here rather than written into the code: it is a decision about what
+  # counts as a worthwhile model, not an implementation detail.
+  rule_baseline:
+    min_amount: 300
+    night_hours: [22, 23, 0, 1, 2, 3]
+
+# HOW A FLAGGED TRANSACTION REACHES SOMEBODY. Lot N5, decided 2026-11-16.
+notifications:
+  # The channel is a function taking (payload, settings), declared in
+  # ml4fd/notify.py. Two are realised:
+  #
+  #   log  : a structured line in the service journal
+  #   file : one JSON line appended to the path below
+  #
+  # Neither can fail for a reason outside this stack, which is what makes the
+  # demonstration reproducible. A real channel -- a webhook, a mail service --
+  # plugs into the same three-line interface without touching the lifecycle.
+  # None is claimed here: there is no mail service in the stack, and whether
+  # SMTP would be reachable from the container has not been measured.
+  #
+  # An unknown name is REFUSED rather than defaulted: a typo would otherwise
+  # send every alert to whichever channel happened to be first.
+  channel: file
+
+  # Under runtime/, with everything this stack PRODUCES -- the documents, the
+  # datasets, the two channels -- and no longer under ws/, which carries the
+  # plans and the measurements. One directory to mount, back up or wipe.
+  # The parent directory is created rather than assumed: 28 real observations
+  # were once lost to a directory that was not mounted.
+  file: runtime/channels/frauds/frauds.jsonl
+
+  # DELIVERY SEMANTICS: send, then record. At least once.
+  #
+  # With an external channel the send and its recording cannot be made atomic,
+  # so the choice is which failure to prefer. A crash between them re-sends on
+  # the next run, and txn_id travels as an idempotency key so a receiver can
+  # discard the duplicate. The reverse order would lose a fraud notification in
+  # silence while the table claimed it had gone out. A fraud notified twice is
+  # better than a fraud never notified.
+  #
+  # Declared rather than left in the code because it is a business decision
+  # about which risk is acceptable, not an implementation detail.
+  delivery: at-least-once
+
+  # scoring.alert_capacity_per_day is ENFORCED here, not merely used to pick a
+  # threshold. Beyond it, in a ROLLING 24 hours, alerts are still RAISED and
+  # notification stops with a loud line: a bad retrain becomes visible instead
+  # of drowning the analyst. A calendar day would let 60 go out at 23:50 and 60
+  # more at 00:10, so the window rolls.
+  enforce_capacity: true
+
+# ------------------------------------------------------------------ operations
+# THE CHANNEL OF THE PIPELINE OWNER, which diagram 3.3 specifies as "(3c)
+# dag_ingest : check" -> "ops channel". The development plan of S3 listed five
+# tasks for N7 and none of them was that stage, so it was built in N9 after the
+# omission was found by reading the diagram against the code.
+#
+# A DIFFERENT AUDIENCE FROM notifications ABOVE, and that is the whole reason
+# this section exists rather than reusing it. The analyst is told about a
+# flagged TRANSACTION, under a capacity of 60 a day. The pipeline owner is told
+# about a state of the CHAIN. Routing one into the other would poison exactly
+# the queue the capacity policy exists to protect: an analyst who receives
+# pipeline messages stops reading alerts. ml4fd/config.py REFUSES two equal
+# destinations.
+ops:
+  # Same interface as a notification channel -- a function taking
+  # (payload, settings) -- declared in ml4fd/health.py. An unknown name is
+  # refused rather than defaulted.
+  channel: file
+
+  # A DISTINCT FILE, not a section of the analyst's, and a distinct directory:
+  # runtime/channels/ holds one subdirectory per channel -- named for what they
+  # ARE, destinations, and not for what either of them carries -- so a reader
+  # of one is never handed the other. config.load() still refuses them equal.
+  file: runtime/channels/ops/ops.jsonl
+
+  # THE WINDOW THE SHARES ARE MEASURED OVER. One hour is 60 runs at this
+  # cadence: enough for a share to mean something, short enough that an
+  # incident shows inside the hour. A day's window would dilute a fresh
+  # incident among 1,440 healthy runs and the shares would barely move.
+  window_minutes: 60
+
+  # FRESHNESS: minutes allowed since the last SUCCESSFUL run.
+  #
+  # Ten, and the number comes from the measurements. The cadence is one run a
+  # minute and the worst realistic run is about 47 s, so ten consecutive lost
+  # minutes is not a statistical accident: N0 measured about 5 % of calls
+  # failing, and a run makes five, so an entirely empty run needs all five to
+  # fail. Ten empty minutes in a row therefore means the API, the network or
+  # the chain is down -- not bad luck. It also bounds what is lost before
+  # anyone is told: ten minutes is about 50 transactions never seen.
+  freshness_minutes: 10
+
+  # EMPTY RUNS: the share of ended runs that stored nothing.
+  #
+  # An empty run is one with n_read null or zero, which covers two different
+  # events on purpose -- the API returning nothing for all five calls, and the
+  # chain stopping before close_run recorded the counters. Both mean the same
+  # thing to an operator: that minute stored nothing. The expected share is
+  # near zero by the arithmetic above, so 10 % -- six runs in the hour -- is a
+  # wide margin that still catches an outage within the hour.
+  max_empty_run_share: 0.10
+
+  # REJECTION RATE: the share of read lines sent to quarantine.
+  #
+  # Five per cent, and the floor is measured rather than chosen: N0 saw one
+  # call in 57 (1.75 %) with an 818 s gap -- our own process suspended, not the
+  # server -- and such a reading goes to quarantine on the clock tolerance. So
+  # the normal rate is NOT zero, and a threshold at zero would hold this
+  # control in permanent alert. Above five per cent the stream has changed
+  # shape -- a renamed field, a clock drifting -- and the transactions
+  # concerned are not scored at all, which is the silent failure this control
+  # exists to make loud.
+  max_rejection_rate: 0.05
+
+# --------------------------------------------------------------------- reports
+# S4 produces a DATED DOCUMENT each morning, not a page to refresh. Everything
+# here is read by sql/reports/*.sql and by ml4fd/report.py.
+report:
+  # THE ZONE THE CALENDAR DAY IS COUNTED IN, and it is not a detail. The hourly
+  # breakdown of section 1 is read against the night fraud peak measured in M5
+  # -- 84 per cent of the frauds between 22h and 03h -- and a report whose
+  # hours were UTC would place that peak two hours off in summer and one in
+  # winter. The window bounds themselves are passed by the DAG as absolute
+  # instants, so this zone only names the hour buckets and the calendar day.
+  #
+  # Declared here rather than left in a DAG argument: a value that lives only
+  # in code is a decision nobody can find.
+  timezone: Europe/Paris
+
+  # WHERE THE DOCUMENTS LIVE, under the project like every other declared path.
+  # One file per covered day, named by that day:
+  # runtime/reports/2026-11-16.md.
+  #
+  # Declared because something outside this stack will read it. The short-term
+  # intention is a Streamlit server in docker-compose presenting the daily
+  # report, and that container will need THIS directory mounted. A path chosen
+  # in code would be found by whoever mounts the wrong one -- which this project
+  # has already paid for twice, 28 real observations and a whole dataset lost to
+  # a directory that was not mounted.
+  root: runtime/reports
+
+  # WHEN THE MORNING REPORT IS PRODUCED, and the hour answers a dependency
+  # before a preference: section 3 reads the verdicts that fell, written at
+  # 02:00 by dag_ingest_verdicts, so the report must pass after. And a report
+  # produced at 08:00 would keep the analyst who arrives at 08:00 waiting.
+  #
+  # BEWARE WHAT THIS HOUR MEANS FOR THE WINDOW. Airflow's interval for this
+  # cadence runs from 06:00 to 06:00, which is NOT a calendar day. The covered
+  # day is DERIVED from data_interval_start -- see airflow/dags/dag_daily.py --
+  # and the report always covers midnight to midnight in the zone above.
+  schedule: "0 6 * * *"
+
+labels:
+  # The fraud generator stops injecting on this date: the 38,147 later
+  # transactions carry is_fraud = 0 because nobody labelled them, not because
+  # they are not fraud. They are false negatives, and a cut-off beyond this
+  # point would train a model on them.
+  #
+  # Measured: last labelled fraud 2020-12-22 23:13:39, last transaction
+  # 2020-12-31 23:59:34, nine days and 38,147 rows apart. Over the usable
+  # horizon the corpus holds 517,572 transactions and 2,145 frauds, a base rate
+  # of 0.414 % -- not the 0.386 % of the whole file.
+  horizon: 2020-12-22T23:13:39Z
+
+  # A window holding no positive stops the training DAG, exactly as a window
+  # holding no run does (EC14 applied to labels).
+  min_positives: 1
+
+datasets:
+  # Relative, and resolved against the PROJECT by config.load() -- never
+  # against the process's working directory. An Airflow task runs from
+  # /opt/airflow, where this would land outside the mounted volume.
+  root: runtime/datasets
+  family: fraud_scoring
+  # v2 stores txn_ts alongside the features: M6 chooses the threshold on a
+  # temporal validation slice of the TRAINING period, and a slice cannot be cut
+  # without the time. Bumping this changes the recipe digest, which is the whole
+  # point -- a dataset of the old shape is not reused and silently found short.
+  schema_version: v2
+  # Deterministic and explicit, never random_state: a library version change
+  # would otherwise make the split irreproducible and the audit worthless.
+  split_rule: "temporal:train<=2020-10-31,test<=2020-11-30"
+
+realtime:
+  # Measured in N0 (ws/fraud-project--n0-mesure-api--20261116-0826.md), on a
+  # campaign of 60 calls run ALONE -- three overlapping campaigns had reported
+  # 13 % failures that were our own load.
+  endpoint: https://sdacelo-real-time-fraud-detection.hf.space/current-transactions
+
+  # A 502 costs 25 s and is the expensive failure; a 429 costs 0.23 s. A timeout
+  # under 26 s would cut off calls that were about to succeed.
+  timeout_seconds: 35
+
+  # HOW OFTEN N7's DAG RUNS. Decided 2026-11-16.
+  #
+  # The plan framed this as a latency question. It is not. N0 established there
+  # is no journal to consume: one call returns ONE transaction, the present
+  # instant, with no queue behind it. So the cadence does not set the detection
+  # delay -- it sets THE SHARE OF THE STREAM THAT IS SEEN, and what is not seen
+  # is never scored.
+  #
+  # That makes the cadence a constraint of the calibration, not a comfort
+  # setting: ml4fd/threshold.py works at API_TXN_PER_DAY = 7200, five a minute,
+  # and both the threshold 0.93 and the capacity of 60 alerts/day rest on it. At
+  # one run a minute of five calls we observe 7,200 a day and the figures mean
+  # what they say. At one run every five minutes we would observe 1,152 -- 16 %
+  # of the traffic -- and the capacity would be wrong by a factor of six while
+  # every number still looked plausible.
+  schedule: "* * * * *"
+  calls_per_run: 5
+
+  # Five, not four. Four was chosen in N1 for margin under the limiter, which
+  # fired at 13 calls/minute and never below -- and five keeps a factor of 2.6
+  # there. What moved the number is coverage, measured against the announced
+  # rate above, and not the limiter.
+  #
+  # The time budget, from N0: median latency 5.4 s, so five sequential calls take
+  # about 27 s of the minute. One 502 costs 25 s, which brings the worst
+  # realistic run to roughly 47 s -- still inside the minute. TWO 502s would
+  # overrun it, so N7 sets max_active_runs=1: a slow run must delay the next,
+  # never run beside it, or two collectors would write the same batch.
+  spacing_seconds: 0
+
+  # current_time IS the txn_ts of a real-time transaction. One call in 57 showed
+  # a gap of +818 s -- our own process suspended, not the server -- and the
+  # remedy is the same either way: beyond this tolerance the reading goes to
+  # quarantine rather than carrying a timestamp into the ordering that L4 proved.
+  clock_tolerance_seconds: 120
+
+validation:
+  # Measured on fraudTest.csv: max amount 22,768.11. The bound leaves room
+  # without becoming meaningless. Not a magic number in the code (EC20).
+  max_amount: 50000
+  # A gap shared by more than this share of rows is a SOURCE defect, documented
+  # and ruled on once -- not a per-record rejection. See checks.profile_gap.
+  systematic_share: 0.99
+
+sources:
+  historical_csv: >-
+    https://lead-program-assets.s3.eu-west-3.amazonaws.com/M05-Projects/fraudTest.csv
+  realtime_api: https://huggingface.co/spaces/sdacelo/real-time-fraud-detection
+
+personal_data:
+  # Fields that identify a person. None of them reaches the exploited layer.
+  identifying_fields:
+    [first, last, street, city, state, zip, lat, long, job, dob, cc_num]
+
+  # Pseudonymised rather than dropped: the history features need a key that is
+  # stable for one cardholder. -> client_key, HMAC with a secret pepper.
+  pseudonymized: [cc_num]
+
+  # Minimised rather than dropped, which EC17 allows. lat/long are the
+  # cardholder's home and are constant for each of the 924 cardholders; only the
+  # derived distance to the merchant is stored.
+  minimized:
+    f_home_distance_km: [lat, long, merch_lat, merch_long]
+
+  # Dropped, each for a reason of its own. Argued in D9.
+  excluded:
+    city_pop: >-
+      Quasi-identifier. 835 distinct values, of which 791 (94.7 %) designate a
+      single city, and the value is constant per cardholder. Keeping it would
+      undo the removal of city, state, zip, lat and long.
+    gender: >-
+      Protected characteristic. Not identifying on its own (250,833 M for
+      304,886 F), but it would feed a scoring model, and a fraud score that
+      differs by gender raises an equity question this dossier does not
+      undertake to answer.

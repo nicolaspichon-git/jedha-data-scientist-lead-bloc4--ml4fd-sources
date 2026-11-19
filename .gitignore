@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -221,3 +222,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+=======
+.env
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.local_cache/
+# Parquet datasets: data, not code. The registry in fd_datasets is what makes
+# them findable again, and the recipe digest is what makes them rebuildable.
+runtime/datasets/
+
+>>>>>>> 1bd9a38 (AIA RNCP38777/BC04 : ci/cd source code workflow demonstration : BC03 base)

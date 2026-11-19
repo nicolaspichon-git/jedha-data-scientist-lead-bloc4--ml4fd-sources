@@ -1,0 +1,28 @@
+
+# Python is 3.11
+
+# Core MLOps Framework
+mlflow==3.14.0
+
+# Data Science Stack
+numpy==2.4.6
+pandas==2.3.3
+xgboost==3.2.0
+lightgbm==4.6.0
+scikit-learn==1.9.0
+requests>=2.31.0,<3
+
+# AWS SDK
+boto3
+
+# Testing
+pytest
+
+# More
+psycopg2-binary
+jupyter
+openpyxl
+gunicorn
+matplotlib 
+seaborn 
+plotly

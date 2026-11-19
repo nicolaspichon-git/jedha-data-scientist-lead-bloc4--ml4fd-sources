@@ -1,0 +1,20 @@
+# Python 3.11, aligne sur mlflow/requirements.txt
+apache-airflow==2.10.4
+psycopg[binary]>=3.1
+pandas==2.3.3
+requests>=2.31,<3
+PyYAML>=6.0
+
+# S2: training, dataset storage and model registry.
+#
+# FLOORS, NOT PINS, and deliberately so. These were written without being able
+# to reach PyPI, so an exact pin here would be a version somebody BELIEVES
+# exists -- and a build that fails on a phantom version is worse than one that
+# resolves. M8 is where reproducibility is settled: it records what pip actually
+# resolved, from pip freeze, and those become the pins.
+mlflow>=3.0,<4
+scikit-learn>=1.5,<2
+pyarrow>=16            # Parquet, the second store technology (EC05)
+# numpy is left to pandas and scikit-learn to agree on: pinning it between two
+# packages that both constrain it is how a resolver deadlock is built.
+# lightgbm            # uncomment if a later lot picks it over scikit-learn

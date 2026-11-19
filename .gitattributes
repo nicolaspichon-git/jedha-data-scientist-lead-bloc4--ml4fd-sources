@@ -1,0 +1,16 @@
+# Line endings are load-bearing in two places, and git must not negotiate them.
+# Covers: EC24   Lot: L2   Competency: C4
+
+* text=auto
+
+# sql/initdb/*.sh RUNS INSIDE THE POSTGRES CONTAINER. A CRLF copy fails there
+# with "bad interpreter: /bin/bash^M", and the cluster is then initialised
+# WITHOUT the airflow and mlflow databases. The entrypoint never replays that
+# directory, so the only way back is to drop the volume -- twenty minutes to
+# diagnose the first time it happened.
+*.sh    text eol=lf
+
+# The Windows side of the project is CRLF and strict ASCII by convention.
+*.ps1   text eol=crlf
+
+*.png   binary

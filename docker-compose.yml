@@ -1,0 +1,227 @@
+# A deployed, non-interactive configuration -- what EC27 requires for D3.
+# Covers: EC27
+#
+# Airflow as three services, following the official layout: init, scheduler,
+# webserver. "airflow standalone" was ruled out: it builds its own admin user
+# with a random password, and Airflow's own documentation calls it unsuitable
+# outside development. More importantly, a scheduler started in the background
+# of another process can die unnoticed -- and it is the scheduler that carries
+# the demonstration of C3.
+
+# Docker Compose prefixes containers AND volumes with this name, so pgdata
+# here is aia-ml4fd_pgdata and NOT the aia-fraud-detection_pgdata of BC03
+# (that project keeps its name: it is BC03's, and it still exists).
+# Renaming it is what keeps this stack off BC03's data; the volume names
+# below need no change. The published ports are still BC03's, so the two
+# stacks must not run at the same time.
+name: aia-ml4fd
+
+x-airflow-common: &airflow-common
+  build: ./airflow
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    # L1: THE METADATA HAS ITS OWN DATABASE AND ITS OWN ROLE. Neither
+    # ${POSTGRES_DB} nor the owner any more: fd_airflow owns the airflow
+    # database and is refused CONNECT on the business one
+    # (sql/initdb/010_databases.sh, sql/ddl/150_database_connect.sql).
+    # Whoever can run a DAG no longer holds owner rights on the ml4fd
+    # tables through this connection string.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+      postgresql+psycopg2://fd_airflow:${AIRFLOW_DB_PASSWORD}@postgres/airflow
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    # Fixed, so webserver sessions survive a restart. A demonstration value:
+    # to be externalised if the infrastructure ever leaves this machine.
+    AIRFLOW__WEBSERVER__SECRET_KEY: aia-ml4fd-demo
+    PYTHONPATH: /opt/project
+    # THE BUSINESS DATABASE, and it shares nothing with the metadata
+    # connection above any more (L1). These three are what the ml4fd/
+    # package builds its own connection from: as the owner, to
+    # ${POSTGRES_DB}, where it then issues SET ROLE. Airflow's scheduler
+    # reaches its metadata as fd_airflow, and fd_airflow cannot open a
+    # connection here at all.
+    POSTGRES_HOST: postgres
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: ${POSTGRES_DB}
+    ML4FD_PEPPER: ${ML4FD_PEPPER}
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+    # MLflow looks for a git SHA to tag the run with and prints three paragraphs
+    # when git is absent. There is no repository in this image and the chain of
+    # provenance is carried by run.json, not by a commit.
+    GIT_PYTHON_REFRESH: quiet
+  volumes: &airflow-volumes
+    # SHARED by the three services. Under LocalExecutor the tasks run in the
+    # scheduler, which writes its logs there; without the share the webserver
+    # looks in its own filesystem and finds nothing -- the interface then
+    # reports that it cannot fetch the log.
+    - airflow-logs:/opt/airflow/logs
+    - ./airflow/dags:/opt/airflow/dags
+    - ./ml4fd:/opt/project/ml4fd
+    - ./sql:/opt/project/sql
+    - ./tools:/opt/project/tools
+    # NO ws/ MOUNT, and the five minutes of real API calls that its absence
+    # once cost are why this line is worth a comment. N0 wrote its measurement
+    # there; since R13 it writes under runtime/observations/, which the
+    # runtime/ mount covers. ws/ now holds only what is written by hand -- the
+    # plans, the mockups -- which no container reads.
+    - ./governance.yml:/opt/project/governance.yml:ro
+    # Local cache, hidden and named as such: it holds the downloaded CSV and
+    # the conf files handed to airflow dags trigger. Nothing here is a source --
+    # fetch_csv re-downloads on a sha256 mismatch.
+    - ./.local_cache:/opt/project/.local_cache
+    # runtime/ holds everything this stack PRODUCES: the datasets, the morning
+    # documents, and the two notification channels. ONE mount covers the four
+    # declared paths, which is the point -- each of them had to be mounted
+    # separately, and each omission cost something.
+    # DECLARED IN governance.yml IS NOT ENOUGH, and this line is why:
+    # /opt/project is a directory of the IMAGE, not a volume, so a path
+    # declared under it without a mount here fails with
+    # "PermissionError: [Errno 13] /opt/project/runtime/reports" the first time
+    # the report is produced. Three directories were paid for that way -- 28
+    # real observations, a whole dataset, then the reports.
+    # tests/test_mounts.py holds every declared path to this list.
+    - ./runtime:/opt/project/runtime
+    # NO mlruns mount here, deliberately. The mlflow server now proxies the
+    # artifacts (--serve-artifacts in mlflow/Dockerfile), so the Airflow
+    # container POSTs them over HTTP and never touches that filesystem.
+    #
+    # Mounting the volume here WAS the first attempt, and it failed on uids: a
+    # directory created by the mlflow container is not writable by uid 50000.
+    # Sharing a filesystem between two images is a permissions problem waiting
+    # to happen; proxying removes the filesystem from the question.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Read by sql/initdb/010_databases.sh, which runs before the server
+      # accepts an outside connection. Nowhere else: the two service roles
+      # are created once, at first boot.
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql:/work/sql:ro               # for psql -f /work/sql/...
+      # FIRST BOOT ONLY. The entrypoint plays this directory when the data
+      # directory is empty, which is early enough for airflow-init to find
+      # its database during `up`. sql/ddl would be too late: `init` runs
+      # after.
+      - ./sql/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"                      # the PostgreSQL protocol, not HTTP
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  # Migrates Airflow's schema and creates the user. Exits once done.
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - bash
+      - -c
+      - |
+        set -e
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname admin --lastname admin --role Admin \
+          --email admin@example.com || true
+
+  airflow-scheduler:
+    <<: *airflow-common
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    command: scheduler
+
+  airflow-webserver:
+    <<: *airflow-common
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    command: webserver
+    ports:
+      - "8080:8080"
+
+  mlflow:
+    build: ./mlflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # The CMD in mlflow/Dockerfile requires these two variables: left empty,
+      # the first flag swallows the second and the server never starts.
+      #
+      # L1: A POSTGRESQL STORE. It was SQLite, and the comment that justified
+      # it had gone stale -- psycopg2-binary IS in mlflow/requirements.txt,
+      # so the import it feared cannot fail. SQLite would still hold at this
+      # scale; the move is for what comes next, since L3 makes the registry
+      # the point of contact between the code loop and the model loop.
+      #
+      # THE ARTIFACTS DO NOT MOVE. They stay on the mlruns volume, served by
+      # this container; only the metadata changes store.
+      MLFLOW_BACKEND_STORE_URI: postgresql+psycopg2://fd_mlflow:${MLFLOW_DB_PASSWORD}@postgres/mlflow
+      MLFLOW_ARTIFACT_ROOT: /mlruns/artifacts
+    volumes:
+      - mlruns:/mlruns
+    ports:
+      - "5000:5000"
+
+  # THE DASHBOARD OF S6 (lot R4). The one container a browser talks to, so it
+  # is built to be UNABLE rather than careful:
+  #
+  #   - it does NOT reuse x-airflow-common. That anchor carries the owner's
+  #     POSTGRES_PASSWORD and ML4FD_PEPPER; the dashboard receives neither.
+  #     It gets fd_dashboard's credentials UNDER THE SAME VARIABLE NAMES, so
+  #     ml4fd/config.py reads them unchanged -- and ml4fd/dashboard.py refuses
+  #     to serve if PostgreSQL says the session is anybody else;
+  #   - every mount is READ-ONLY. It reads runtime/reports/ and could not
+  #     alter one, and it mounts nothing else of runtime/;
+  #   - the port is bound to 127.0.0.1: this machine, not the network. The day
+  #     it leaves this machine it needs an authenticating front end first;
+  #   - no Linux capability, no privilege escalation, a non-root user.
+  #
+  # The documents are mounted at THE SAME PATH as in Airflow
+  # (/opt/project/runtime/reports):
+  # report.path_for() then names the same file in both containers. A different
+  # mount is the defect that cost 28 observations and a dataset, and the
+  # morning page reports it if it ever happens.
+  dashboard:
+    build: ./dashboard
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: fd_dashboard
+      POSTGRES_PASSWORD: ${FD_DASHBOARD_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PYTHONPATH: /opt/project:/opt/project/dashboard
+    volumes:
+      - ./dashboard:/opt/project/dashboard:ro
+      - ./ml4fd:/opt/project/ml4fd:ro
+      - ./sql:/opt/project/sql:ro
+      - ./governance.yml:/opt/project/governance.yml:ro
+      - ./runtime/reports:/opt/project/runtime/reports:ro
+    ports:
+      - "127.0.0.1:8501:8501"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mlruns:
+  airflow-logs:
