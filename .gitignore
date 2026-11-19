@@ -235,3 +235,4 @@ __pycache__/
 runtime/datasets/
 
 >>>>>>> 1bd9a38 (AIA RNCP38777/BC04 : ci/cd source code workflow demonstration : BC03 base)
+*.bak
