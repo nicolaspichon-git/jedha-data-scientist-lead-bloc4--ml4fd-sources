@@ -91,6 +91,14 @@ retention:
       that the declared durations are APPLIED, which EC18 asks for. Deleting it
       would destroy the evidence that the policy exists in fact; the role that
       purges may insert into it and nothing else.
+    fd_promotions: >-
+      The journal of the promotion decisions (L3): a model version, the figures
+      that decided, and the policy in force at the time. No personal field,
+      and nothing to empty. Its rows must not go either: it is the only record
+      of why one version is served and another was refused -- a question asked
+      long after any retention window, by a jury or by an auditor, and the
+      alias in MLflow answers only the first half of it. The role that
+      promotes may insert into it and nothing else.
     fd_reports: >-
       The journal of the morning reports: counts and a digest, one row per
       day. The counts are what the audit of S4 re-reads.
@@ -234,6 +242,48 @@ scoring:
   rule_baseline:
     min_amount: 300
     night_hours: [22, 23, 0, 1, 2, 3]
+
+# WHETHER A NEWLY TRAINED MODEL EVER REACHES PRODUCTION. Lot L3.
+promotion:
+  # REGISTERING AND PROMOTING ARE TWO DIFFERENT ACTS, and before L3 only the
+  # first existed. Every run of S2 registers a version; the scoring path
+  # resolved the HIGHEST version number, so a retraining served its own result
+  # whether or not it was any good. Automating the retraining on top of that
+  # would have automated the serving of an unvetted model -- which is the
+  # defect this section closes.
+  #
+  # The alias the scoring path resolves. Exactly one version carries it.
+  champion_alias: champion
+
+  # IS THE CANDIDATE WORSE THAN THE CHAMPION? Decided by the paired test of
+  # ml4fd/paired.py, over the SAME held-out frauds, never by two aggregate
+  # recalls: the test set holds 205 frauds, and the difference of two recalls
+  # measured on them carries +/-0.048 of noise -- enough to make a gain of
+  # nine frauds read as 0.9 sigma. That module's header carries the arithmetic.
+  #
+  # The gate refuses when the CHAMPION catches significantly more frauds than
+  # the candidate, at this level. It does NOT require the candidate to be
+  # significantly BETTER: a retraining on fresher data that merely holds the
+  # line is worth serving, and demanding significance in its favour would
+  # freeze the model in place for good.
+  significance: 0.05
+
+  # THE OPERATIONAL CEILING. scoring.alert_capacity_per_day above is what an
+  # analyst can review in a morning, and it is the constraint G2 actually
+  # places on the system. A candidate that exceeds it is refused however good
+  # its recall: alerts nobody reads are not detections.
+  respect_alert_capacity: true
+
+  # WITH NO CHAMPION YET there is nothing to compare against, and refusing
+  # would leave the scoring path with no model to load at all. The first
+  # candidate is promoted, and the journal records that it was promoted
+  # UNOPPOSED -- which is a different statement from having won.
+  promote_first_unopposed: true
+
+  # WHY THE DECISION IS JOURNALLED IN THE DATABASE (fd_promotions) rather than
+  # left in a log line. A promotion changes what the system serves; a refusal
+  # explains why it did not. Both have to be answerable months later, to a
+  # jury or to an auditor, and a log that rotates answers nothing.
 
 # HOW A FLAGGED TRANSACTION REACHES SOMEBODY. Lot N5, decided 2026-11-16.
 notifications:

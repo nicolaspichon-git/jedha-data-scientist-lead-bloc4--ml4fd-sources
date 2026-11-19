@@ -378,3 +378,55 @@ def log_run(model, payload: dict, report: str, lock: str,
         log.info("run %s logged, model registered as %s",
                  run.info.run_id, REGISTERED_NAME)
         return run.info.run_id
+
+
+# THE ALIAS THE SCORING PATH RESOLVES (L3). "champion" by default, and
+# governance.yml declares the name under promotion.champion_alias -- callers
+# pass settings.champion_alias rather than relying on this default.
+CHAMPION_ALIAS = "champion"
+
+
+def champion(client, name: str = REGISTERED_NAME,
+             alias: str = CHAMPION_ALIAS):
+    """The version carrying the alias, or None when nothing carries it.
+
+    AN ALIAS AND NOT A STAGE. MLflow 3 deprecated the stage transitions, and
+    ml4fd/score.py already records what the move from 2 to 3 did to
+    latest_versions. An alias is a pointer with a name: moving it is one call,
+    it is visible in the interface, and nothing about it is implicit.
+
+    None rather than an exception when the alias is unset: having no champion
+    is an ordinary state -- the first training has not been promoted yet -- and
+    the caller decides what it means (ml4fd/promote.py, promote_first_unopposed).
+
+    READ FROM THE MODEL'S OWN aliases TABLE rather than through
+    get_model_version_by_alias, which signals an unset alias by raising. The
+    difference is not style: catching that exception would mean importing
+    mlflow.exceptions, and mlflow is NOT a declared dependency -- the suite and
+    the integration chain install psycopg, pandas, requests and PyYAML and
+    nothing else. Every module of this package imports mlflow inside the
+    functions that need it, for that reason, and a gate nobody can test is a
+    gate nobody should trust.
+
+    A registry holding no such model at all raises MLflow's own error, which
+    says exactly that. It is not dressed up here: S2 has never run, and no
+    wording of ours would be clearer.
+    """
+    table = getattr(client.get_registered_model(name), "aliases", None) or {}
+    number = table.get(alias)
+    if number is None:
+        return None
+    return client.get_model_version(name, number)
+
+
+def set_champion(client, version, name: str = REGISTERED_NAME,
+                 alias: str = CHAMPION_ALIAS) -> None:
+    """Move the alias to this version. THE ONLY WAY A MODEL REACHES PRODUCTION.
+
+    Deliberately NOT called from log_run: registering records what was
+    produced, promoting decides what is served, and the gate of
+    ml4fd/promote.py sits between the two. A promotion that happened as a side
+    effect of logging would be the defect L3 exists to close.
+    """
+    client.set_registered_model_alias(name, alias, str(version))
+    log.info("alias %s deplace sur la version %s de %s", alias, version, name)

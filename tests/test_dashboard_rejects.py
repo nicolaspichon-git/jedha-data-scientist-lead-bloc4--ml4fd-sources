@@ -40,7 +40,7 @@ def settings():
 
 
 def _code(relative):
-    return "\n".join(l.split("--")[0] for l in
+    return "\n".join(line.split("--")[0] for line in
                      (ROOT / "sql" / relative).read_text(encoding="utf-8").splitlines())
 
 
@@ -174,7 +174,7 @@ def page(monkeypatch):
     monkeypatch.setattr(dashboard, "connect", connected)
 
     def run(view):
-        monkeypatch.setattr(dashboard, "rejects_view", lambda c, s, f, l: view)
+        monkeypatch.setattr(dashboard, "rejects_view", lambda c, s, f, last: view)
         try:
             runpy.run_path(str(APP / "pages" / "rejects.py"))
         except Stop:

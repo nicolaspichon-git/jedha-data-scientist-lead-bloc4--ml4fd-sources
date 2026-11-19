@@ -21,7 +21,6 @@ from __future__ import annotations
 import datetime as dt
 import os
 import re
-import uuid
 from pathlib import Path
 
 import pytest
@@ -367,7 +366,7 @@ def test_the_retention_purge_still_names_no_batch():
 # --- the SQL -------------------------------------------------------------------
 
 def _code(path):
-    return "\n".join(l.split("--")[0] for l in
+    return "\n".join(line.split("--")[0] for line in
                      path.read_text(encoding="utf-8").splitlines())
 
 

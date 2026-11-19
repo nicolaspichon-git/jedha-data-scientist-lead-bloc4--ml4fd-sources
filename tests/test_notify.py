@@ -14,7 +14,6 @@ from __future__ import annotations
 import datetime as dt
 import json
 import types
-from pathlib import Path
 
 import pytest
 
@@ -207,8 +206,8 @@ def test_the_query_does_not_select_the_pseudonym():
     from ml4fd import db
 
     body = db.sql_path(notify.PENDING_SQL).read_text(encoding="utf-8")
-    body = "\n".join(l for l in body.splitlines()
-                     if not l.strip().startswith("--"))
+    body = "\n".join(line for line in body.splitlines()
+                     if not line.strip().startswith("--"))
     assert "client_key" not in body
 
 

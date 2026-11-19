@@ -125,7 +125,7 @@ def test_the_average_is_an_exact_decimal():
 
 def test_the_backfill_uses_range_and_excludes_the_peer_group():
     sql = (SQL / "backfill" / "features_window.sql").read_text(encoding="utf-8")
-    body = "\n".join(l for l in sql.split("\n") if not l.strip().startswith("--"))
+    body = "\n".join(line for line in sql.split("\n") if not line.strip().startswith("--"))
     assert "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW" in body
     assert "EXCLUDE GROUP" in body
     assert "ROWS BETWEEN" not in body
@@ -133,7 +133,7 @@ def test_the_backfill_uses_range_and_excludes_the_peer_group():
 
 def test_the_real_time_function_uses_a_strict_bound():
     sql = (SQL / "functions" / "fd_client_features.sql").read_text(encoding="utf-8")
-    body = "\n".join(l for l in sql.split("\n") if not l.strip().startswith("--"))
+    body = "\n".join(line for line in sql.split("\n") if not line.strip().startswith("--"))
     assert "txn_ts < p_ts" in body
     assert "txn_ts <= p_ts" not in body
 
@@ -148,7 +148,7 @@ def test_both_expressions_read_the_same_table():
 
 def test_the_reconciliation_is_stratified_not_random():
     sql = (SQL / "checks" / "reconcile_features.sql").read_text(encoding="utf-8")
-    body = "\n".join(l for l in sql.split("\n") if not l.strip().startswith("--"))
+    body = "\n".join(line for line in sql.split("\n") if not line.strip().startswith("--"))
     assert "tied" in body and "firsts" in body
     assert "IS DISTINCT FROM" in body
 

@@ -65,7 +65,6 @@ def main(argv=None) -> int:
 
     sys.path.insert(0, "/opt/project")
 
-    import pandas as pd
 
     from ml4fd import (clock, config, paired, registry, threshold as th,
                        train)

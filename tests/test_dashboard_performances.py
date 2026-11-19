@@ -146,7 +146,7 @@ def test_the_day_series_is_cut_in_the_declared_zone(state):
 # --- the SQL --------------------------------------------------------------------
 
 def _code(relative):
-    return "\n".join(l.split("--")[0] for l in
+    return "\n".join(line.split("--")[0] for line in
                      (ROOT / "sql" / relative).read_text(encoding="utf-8").splitlines())
 
 

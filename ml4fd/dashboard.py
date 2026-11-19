@@ -713,7 +713,8 @@ def performances_view(conn, settings, first: dt.date | None = None,
         ("Fraudes manquées", report._count(seen["false_negatives"])),
         ("Fausses alertes", report._count(seen["false_positives"])),
     ]
-    reference_of = (lambda key: report._percent(ref[key]) if ref else "indisponible")
+    def reference_of(key):
+        return report._percent(ref[key]) if ref else "indisponible"
     comparison = [
         {"Indicateur": "Fraudes retrouvées (rappel)",
          "Observé": report._percent(seen["recall_observed"]),

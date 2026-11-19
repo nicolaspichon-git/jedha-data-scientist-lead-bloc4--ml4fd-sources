@@ -22,7 +22,7 @@ import hmac
 import logging
 import math
 from decimal import Decimal, ROUND_HALF_UP
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, Iterable
 
 from ml4fd import checks, db
 

@@ -205,7 +205,7 @@ def test_the_head_of_the_page_counts_what_it_shows():
 def _granted() -> tuple[set[str], dict[str, set[str]]]:
     """(tables granted whole, {table: columns granted one by one})."""
     ddl = (ROOT / "sql" / "ddl" / "140_dashboard_role.sql").read_text(encoding="utf-8")
-    code = "\n".join(l.split("--")[0] for l in ddl.splitlines())
+    code = "\n".join(line.split("--")[0] for line in ddl.splitlines())
     tables = re.search(r"GRANT\s+SELECT\s+ON\s+(.+?)\s+TO\s+fd_dashboard", code,
                        re.I | re.S).group(1)
     columns = {table: {c.strip() for c in cols.split(",")}
@@ -244,7 +244,7 @@ def test_every_query_the_dashboard_runs_stays_inside_its_grants():
     assert {"train_path", "test_recall"} <= table_columns["fd_datasets"]
     for relative in files:
         sql = (ROOT / "sql" / relative).read_text(encoding="utf-8")
-        code = "\n".join(l.split("--")[0] for l in sql.splitlines())
+        code = "\n".join(line.split("--")[0] for line in sql.splitlines())
         used = set(re.findall(r"\b(fd_[a-z_]+)\b", code))
         assert used <= whole | set(by_column), "%s reads %s" % (
             relative, used - whole - set(by_column))

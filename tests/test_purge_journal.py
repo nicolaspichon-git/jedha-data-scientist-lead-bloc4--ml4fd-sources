@@ -35,7 +35,6 @@ os.environ.setdefault("POSTGRES_USER", "test_user")
 os.environ.setdefault("POSTGRES_PASSWORD", "test_password")
 os.environ.setdefault("POSTGRES_DB", "test_db")
 
-from ml4fd import purge  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DDL = ROOT / "sql" / "ddl" / "130_purges.sql"

@@ -2,7 +2,6 @@
 without a database -- which is the point of separating inspect from verdict."""
 import datetime as dt
 
-import pytest
 
 from ml4fd.guard import WindowReport, verdict
 

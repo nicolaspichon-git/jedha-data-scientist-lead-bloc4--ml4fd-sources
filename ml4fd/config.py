@@ -81,6 +81,12 @@ class Settings:
     alert_capacity_per_day: int
     cost_false_alert: float
     validation_share: float
+    # L3, the promotion gate. Read here like every other decision
+    # of governance.yml, so a caller asks a field and not a file.
+    champion_alias: str
+    promotion_significance: float
+    promotion_respects_capacity: bool
+    promote_first_unopposed: bool
     max_amount: float
     systematic_share: float
     csv_url: str
@@ -494,6 +500,13 @@ def load(path: Path | None = None) -> Settings:
         clock_tolerance_s=float(g["realtime"]["clock_tolerance_seconds"]),
         threshold_policy=_policy(g["scoring"]["threshold_policy"]),
         alert_capacity_per_day=int(g["scoring"]["alert_capacity_per_day"]),
+        champion_alias=str(g["promotion"]["champion_alias"]),
+        promotion_significance=_share_under_one(
+            g["promotion"]["significance"], "promotion.significance"),
+        promotion_respects_capacity=bool(
+            g["promotion"]["respect_alert_capacity"]),
+        promote_first_unopposed=bool(
+            g["promotion"]["promote_first_unopposed"]),
         cost_false_alert=float(g["scoring"]["cost_false_alert"]),
         validation_share=_share(g["scoring"]["validation_share"]),
         max_amount=float(g["validation"]["max_amount"]),

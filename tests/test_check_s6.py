@@ -34,7 +34,7 @@ OWNER = "owner-secret-0123"
 
 
 def _code(text):
-    return "\n".join(l.split("--")[0] for l in text.splitlines())
+    return "\n".join(line.split("--")[0] for line in text.splitlines())
 
 
 # --- the catalogue ------------------------------------------------------------

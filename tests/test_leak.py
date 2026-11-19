@@ -25,7 +25,7 @@ import ast
 import re
 from pathlib import Path
 
-from ml4fd import datasets, db, transform
+from ml4fd import datasets, transform
 
 ROOT = Path(__file__).resolve().parents[1]
 

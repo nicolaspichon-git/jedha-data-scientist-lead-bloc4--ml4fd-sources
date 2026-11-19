@@ -311,7 +311,8 @@ def check_fields(record: dict[str, str], line_no: int, max_amount: float,
     Competency: C5
     """
     out: list[Reject] = []
-    add = lambda code, detail=None: out.append(Reject(line_no, FIELD, code, detail))
+    def add(code, detail=None):
+        out.append(Reject(line_no, FIELD, code, detail))
 
     for name in profile.mandatory:
         if name not in record:
@@ -370,7 +371,8 @@ def check_record(record: dict[str, str], line_no: int,
     Competency: C5
     """
     out: list[Reject] = []
-    add = lambda code, detail=None: out.append(Reject(line_no, RECORD, code, detail))
+    def add(code, detail=None):
+        out.append(Reject(line_no, RECORD, code, detail))
 
     cc = record.get("cc_num", "").strip()
     if cc and cc.isdigit() and not luhn_ok(cc):

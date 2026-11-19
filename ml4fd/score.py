@@ -200,6 +200,12 @@ def agrees_with_registry(payload: dict, params: dict) -> list[str]:
 def latest_version(client, name: str = registry.REGISTERED_NAME):
     """The highest version of the registered model.
 
+    NO LONGER WHAT THE SCORING PATH RESOLVES. Until L3 it was, and that was the
+    defect: a retraining registered a version and the next cycle served it,
+    better or worse. Serving now goes through champion_version() below. This
+    one stays as a diagnostic -- "what is the newest version" is still a
+    question somebody asks -- and answers nothing about what is in production.
+
     search_model_versions rather than get_registered_model().latest_versions:
     the latter is deprecated and its meaning changed between MLflow 2 and 3,
     while a version number is an integer and the largest one is unambiguous.
@@ -213,13 +219,46 @@ def latest_version(client, name: str = registry.REGISTERED_NAME):
     return max(versions, key=lambda version: int(version.version))
 
 
+def champion_version(client, name: str = registry.REGISTERED_NAME,
+                     alias: str = registry.CHAMPION_ALIAS):
+    """The version the promotion gate put in production -- never the newest.
+
+    Covers: EC36
+    Lot: L3
+    Competency: C5
+
+    NO FALLBACK TO THE NEWEST VERSION, and that absence is the whole point. A
+    fallback would restore exactly what L3 removes: a retraining serving its
+    own result without having been judged. Refusing, and naming the remedy, is
+    the honest failure -- the same choice as a dashboard that will not start
+    rather than one that is open.
+    """
+    version = registry.champion(client, name, alias)
+    if version is None:
+        raise LookupError(
+            "no version of model %r carries the alias %r, so nothing is in "
+            "production. A model is registered by S2 and promoted by the gate "
+            "of ml4fd/promote.py -- registering is not promoting. Run:\n"
+            "    .\\fd-manager.ps1 promote\n"
+            "which judges the newest version against the champion and, if it "
+            "passes, moves the alias." % (name, alias))
+    return version
+
+
 def load(settings, tracking_uri: str | None = None,
          name: str = registry.REGISTERED_NAME) -> Scorer:
-    """The current model version, loaded once and kept.
+    """The model in production -- the one carrying the champion alias.
 
-    Covers: EE09, EC24
-    Lot: N4
-    Competency: C3
+    Covers: EE09, EC24, EC36
+    Lot: N4, L3
+    Competency: C3, C5
+
+    THE CACHE NEEDS NO INVALIDATION, and this is why. The version is resolved
+    from the registry BEFORE the cache is consulted, and the key is
+    (name, version). So a promotion that moves the alias yields a different
+    key, a miss, and the new model -- without anybody having to remember to
+    clear anything. forget() exists for the tests and for a deliberate reload,
+    not for promotions.
     """
     import mlflow
     import mlflow.sklearn
@@ -228,7 +267,7 @@ def load(settings, tracking_uri: str | None = None,
         mlflow.set_tracking_uri(tracking_uri)
 
     client = mlflow.MlflowClient()
-    version = latest_version(client, name)
+    version = champion_version(client, name, settings.champion_alias)
     key = (name, str(version.version))
     if key in _CACHE:
         return _CACHE[key]

@@ -127,7 +127,7 @@ def test_a_percent_sign_in_these_files_is_always_a_parameter(path):
     saying "50 %" would raise at run time, in the one place nobody reads."""
     text = path.read_text(encoding="utf-8")
     stray = re.sub(r"%\(\w+\)s", "", text)
-    assert "%" not in stray, "%s has a % that is not a named parameter" % path.name
+    assert "%" not in stray, "%s has a %% that is not a named parameter" % path.name
 
 
 def test_a_batch_is_covered_by_any_run_that_carries_its_fingerprint():

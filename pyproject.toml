@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.5"]
+dev = ["pytest>=8.0", "ruff>=0.17.5,<0.18"]
 
 [tool.setuptools]
 packages = ["ml4fd"]
@@ -30,3 +30,15 @@ filterwarnings = ["error::DeprecationWarning:ml4fd.*"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+# THE RULES ARE NAMED HERE, not inherited from whatever ruff is installed.
+# This set -- E4, E7, E9, F -- was ruff's default selection and therefore the
+# project's implicit contract. "ruff>=0.5" let the integration chain install a
+# newer ruff whose defaults are wider: 972 findings appeared on code that had
+# not changed, against 32 locally. A linter whose rule set depends on the day
+# it ran is not a contract, so the set is stated and the version is bounded.
+#
+# Widening it is a real improvement and a separate decision: ISC and E501
+# have plenty to say about this code. Not three days before the exam.
+select = ["E4", "E7", "E9", "F"]

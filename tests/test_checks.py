@@ -1,5 +1,4 @@
 """The two validation classes, and the trap that separates them."""
-import pytest
 
 from ml4fd import checks
 

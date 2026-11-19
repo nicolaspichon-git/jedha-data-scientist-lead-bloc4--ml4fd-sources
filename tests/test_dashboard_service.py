@@ -101,10 +101,10 @@ def test_it_holds_no_privilege():
 def test_the_image_carries_nothing_it_does_not_import():
     """ml4fd.dashboard imports psycopg and PyYAML at load time, and nothing
     else of weight -- score and health only inside functions it never calls."""
-    wanted = [l.split(">")[0].split("[")[0].split("=")[0].strip().lower()
-              for l in (ROOT / "dashboard" / "requirements.txt")
+    wanted = [line.split(">")[0].split("[")[0].split("=")[0].strip().lower()
+              for line in (ROOT / "dashboard" / "requirements.txt")
               .read_text(encoding="utf-8").splitlines()
-              if l.strip() and not l.startswith("#")]
+              if line.strip() and not line.startswith("#")]
     assert set(wanted) == {"streamlit", "psycopg", "pyyaml"}
 
 

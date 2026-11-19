@@ -297,6 +297,7 @@ def load_history():
             log.info("%d quarantined line(s) to skip", len(skip))
             inserted = transform.load_transactions(
                 write_conn, bid, raw.read_batch(read_conn, bid), s.pepper, skip)
+            log.info("%d transaction(s) inserted", inserted)
 
             # The acceptance criteria of L3, verified rather than assumed.
             with write_conn.cursor() as cur:
@@ -316,7 +317,7 @@ def load_history():
         Lot: L4
         Competency: C5
         """
-        from ml4fd import config, db, features
+        from ml4fd import db, features
 
         with db.connect("fd_ingest") as conn:
             rows = features.backfill(conn)

@@ -1,6 +1,5 @@
 """Reading the CSV: the properties that typing must not destroy later."""
 import hashlib
-import io
 
 import pytest
 

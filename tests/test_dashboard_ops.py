@@ -117,7 +117,7 @@ def test_lengths_are_said_in_the_largest_units(seconds, text):
 # --- the SQL --------------------------------------------------------------------
 
 def _code(relative):
-    return "\n".join(l.split("--")[0] for l in
+    return "\n".join(line.split("--")[0] for line in
                      (ROOT / "sql" / relative).read_text(encoding="utf-8").splitlines())
 
 

@@ -26,7 +26,6 @@ import importlib.util
 import types
 from pathlib import Path
 
-import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = ROOT / "tools" / "check_s4.py"

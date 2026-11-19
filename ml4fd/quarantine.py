@@ -12,7 +12,7 @@ counts DISTINCT line_no rather than rows.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Iterable, Iterator
+from typing import TYPE_CHECKING, Iterable
 
 from ml4fd.checks import Reject
 

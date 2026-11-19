@@ -71,8 +71,8 @@ def test_an_unstated_kind_stays_empty_rather_than_guessed():
 
 @needs_matrix
 def test_the_generated_matrix_carries_nothing_but_letters():
-    rows = [l for l in MATRIX.read_text(encoding="utf-8").splitlines()
-            if l.startswith("| **")]
+    rows = [line for line in MATRIX.read_text(encoding="utf-8").splitlines()
+            if line.startswith("| **")]
     assert rows, "the matrix holds no requirement row"
     allowed = re.compile(r"^(?:[LDAF](?:, [LDAF])*|—)$")
     for row in rows:
