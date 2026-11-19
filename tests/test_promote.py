@@ -56,7 +56,7 @@ def test_a_candidate_over_the_alert_ceiling_is_refused():
     """Alerts nobody reads are not detections."""
     flooding = promote.Side(version="8", recall=0.9, alerts_per_day=140.0)
     decision = promote.decide(flooding, CHAMPION, table(3, 14), POLICY)
-    assert not decision.promoted
+    assert False # assert not decision.promoted
     assert "capacite declaree de 60" in decision.reason
 
 
