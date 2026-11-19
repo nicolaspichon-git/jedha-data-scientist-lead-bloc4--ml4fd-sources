@@ -38,6 +38,7 @@ param(
                  'batches',
                  'digests',
                  'purge',
+                 'promote',
                  'replay', 'forget', 'dashboard',
                  'tasklog', 'dag-test', 'accept', 'test', 'lint', 'traceability',
                  'typology',
@@ -103,6 +104,10 @@ param(
     # explicit confirmation the guard asks for beyond the declared share.
     [string]$Before,
     [switch]$Verify,
+    # Used by 'promote'. Without it the gate judges the NEWEST registered
+    # version, which is what the scheduler will do; naming one is for
+    # re-judging a version by hand, after a policy change for instance.
+    [string]$Candidate,
     [switch]$Force
 )
 
@@ -154,6 +159,37 @@ function Invoke-Step {
         Write-Host "La chaine s'arrete ici." -ForegroundColor Red
         Write-Host ""
         exit 1
+    }
+}
+
+function Enable-Dag {
+    <#  Make a DAG active, before anything triggers it.
+
+        A trigger on a paused DAG is not an error, and that is the whole
+        problem. Airflow creates the run, prints it, and returns 0; the
+        scheduler then ignores it, because it skips paused DAGs. The run sits
+        in 'queued' for ever. So `load` reported success, the chain carried on,
+        and the database stayed empty -- the failure was silent on both sides
+        (2026-11-19).
+
+        Nothing in docker-compose.yml sets DAGS_ARE_PAUSED_AT_CREATION, so
+        Airflow's default applies and every DAG arrives paused. That is the
+        normal state of a first run, not an accident, which is why this is
+        handled here rather than reported as a problem to fix by hand.
+
+        Unpausing is idempotent, so it is done unconditionally instead of
+        after reading the state: one call to the container instead of two, and
+        no parsing of an output whose shape changes between versions.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$DagId,
+        [string]$Cadence
+    )
+    Invoke-Step "activation de $DagId" {
+        & docker compose exec -T airflow-scheduler airflow dags unpause $DagId
+    }
+    if ($Cadence) {
+        Write-Host "    $DagId is active from now on: $Cadence" -ForegroundColor DarkGray
     }
 }
 
@@ -271,17 +307,17 @@ switch ($Task) {
             @{ n = 'pepper';       d = 'print an ML4FD_PEPPER without touching .env' }
             @{ n = 'up';           d = 'start postgres, airflow, mlflow, streamlit' }
             @{ n = 'down';         d = 'stop everything' }
-            @{ n = 'reset';        d = 'DESTROYS the volumes and starts over' }
-            @{ n = 'status';       d = 'state of the services, and logs of those that exited' }
+            @{ n = 'reset';        d = 'destroys the volumes and starts over' }
+            @{ n = 'status';       d = 'state of the services and of the DAGs, with the logs of what exited' }
             @{ n = 'logs';         d = 'logs: .\fd-manager.ps1 logs -Service airflow-scheduler [-Follow]' }
             @{ n = 'psql';         d = 'interactive psql session on the database' }
             @{ n = 'airflow-user'; d = 'list the Airflow accounts and reset admin / admin' }
             @{ n = 'init';         d = 'apply the DDL and the function (replayable)' }
-            @{ n = 'load';         d = 'trigger S1 (history loading)' }
-            @{ n = 'train';        d = 'trigger S2: .\fd-manager.ps1 train [-CutOff 2020-11-30] [-Drop none]' }
+            @{ n = 'load';         d = 'trigger the loading of the labelled history' }
+            @{ n = 'train';        d = 'trigger a training: .\fd-manager.ps1 train [-CutOff 2020-11-30] [-Drop none]' }
             @{ n = 'cleanup';      d = 'drop the roles and tables of the old naming (no prefix)' }
             @{ n = 'progress';     d = 'where the runs stand, task by task' }
-            @{ n = 'observe';      d = 'observe and measure the API [R4], reporting under runtime/observations/' }
+            @{ n = 'observe';      d = 'observe and measure the payment API, reporting under runtime/observations/' }
             @{ n = 'ingest';       d = 'trigger one real-time cycle: .\fd-manager.ps1 ingest [-Corrupt]' }
             @{ n = 'alerts';       d = 'state of the alerts and of their notification' }
             @{ n = 'health';       d = 'the four pipeline controls (-Notify to send)' }
@@ -291,7 +327,7 @@ switch ($Task) {
             @{ n = 'check-leak';   d = 'require the same score with is_fraud=0 and is_fraud=1' }
             @{ n = 'realtime';     d = 'state of the per-minute DAG: .\fd-manager.ps1 realtime [-Start|-Stop]' }
             @{ n = 'backfill';     d = 'recompute the stored features and reconcile the two modes' }
-            @{ n = 'reference';    d = 'copy the M5 measurements of run.json files older than R10 into the database (-- --dry-run)' }
+            @{ n = 'reference';    d = 'copy the measurements of the older run.json files into the database (-- --dry-run)' }
             @{ n = 'measure-hour'; d = 'what txn_hour does to the model on the stream' }
             @{ n = 'rechoose-threshold'; d = 'rechoose the threshold on the stream distribution' }
             @{ n = 'compare-recipes';    d = 'compare two recipes: --against <version>' }
@@ -300,6 +336,7 @@ switch ($Task) {
             @{ n = 'batches';      d = 'list the raw-zone batches and their run' }
             @{ n = 'digests';      d = 'batches with no digest (-Apply to record it)' }
             @{ n = 'purge';        d = 'dry-run purge (-Before; -Apply to delete)' }
+            @{ n = 'promote';      d = 'judge the newest model against the champion (-Candidate <v>; -Apply to move the alias)' }
             @{ n = 'replay';       d = 'replay a batch: .\fd-manager.ps1 replay -Batch <uuid>' }
             @{ n = 'forget';       d = 'forget a failed batch: forget -Batch <uuid> [-Apply]' }
             @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8501) [-Stop]' }
@@ -308,23 +345,15 @@ switch ($Task) {
             @{ n = 'test';         d = 'unit tests, with no database and no Airflow' }
             @{ n = 'lint';         d = 'ruff' }
             @{ n = 'traceability'; d = 'regenerate TRACEABILITY.md' }
-            @{ n = 'accept';       d = 'the quantified acceptance criteria of S1' }
+            @{ n = 'accept';       d = 'the quantified acceptance criteria of the history loading' }
             @{ n = 'check';        d = 'everything: acceptance, traceability, tests, concordance' }
         ) | ForEach-Object { Write-Host ("  {0,-13} {1}" -f $_.n, $_.d) }
 
-        <#  The codes above are the dossier's own, and mean nothing on their
-            own to a reader who has not opened it. Spelled out here rather than
-            inside each line, which has to stay one line wide.  #>
-        Write-Host "`nExternal references`n" -ForegroundColor Yellow
-        @(
-            @{ n = 'S1';  d = 'the process that loads the labelled history' }
-            @{ n = 'S2';  d = 'the process that trains the model and registers it' }
-            @{ n = 'R4';  d = 'the real-time payment API, reference R4 of the D0 introduction' }
-            @{ n = 'M5';  d = 'the work package that measured the model on the test set' }
-            @{ n = 'R10'; d = 'the work package that moved those measurements into the database' }
-        ) | ForEach-Object { Write-Host ("  {0,-13} {1}" -f $_.n, $_.d) }
-        Write-Host ''
-        Write-Host "  Defined in step-0 of the dossier." -ForegroundColor DarkGray
+        <#  No dossier codes here. The help is read at the prompt by somebody
+            who wants to run a task, not by somebody holding the dossier: a
+            line that says what the task does is worth more than a line that
+            says which work package asked for it. The codes stay in the source,
+            above each task, where the traceability tool looks for them.  #>
         Write-Host ''
     }
     'setup' {
@@ -516,6 +545,68 @@ switch ($Task) {
             Write-Host "(airflow-init apparait << Exited (0) >> : travail fini.)" -ForegroundColor DarkGray
             Write-Host ""
         }
+
+        <#  THE PAUSE STATE, which no other task showed and which is the one
+            thing that explains a chain reporting success over work that never
+            began. A trigger on a paused DAG returns 0, so the run is created
+            and the scheduler never picks it up: `load` looked like it had
+            worked and the database stayed empty (2026-11-19).
+
+            Read through the Airflow CLI rather than by querying the dag table
+            of the metadata database. That database belongs to fd_airflow, and
+            L1 exists precisely so that the business role cannot reach it --
+            reading it from here would spend the separation it set up.
+
+            The listing is matched line by line against the DAGs this project
+            declares, so a DAG that fails to import is reported as absent
+            instead of silently missing from the output. The trailing \s in the
+            pattern matters: without it dag_ingest would match
+            dag_ingest_verdicts as well.  #>
+        Write-Host "DAGs" -ForegroundColor Cyan
+        $declared = @(
+            @{ id = 'dag_load_history';    note = 'on trigger only, no cadence' }
+            @{ id = 'dag_train';           note = 'Monday 03:00' }
+            @{ id = 'dag_ingest';          note = 'every minute' }
+            @{ id = 'dag_ingest_verdicts'; note = 'daily 02:00' }
+            @{ id = 'dag_daily';           note = 'daily 06:00, catches up missed days' }
+            @{ id = 'dag_purge';           note = 'Sunday 04:00, the only one that deletes' }
+        )
+        $listing = @(& docker compose exec -T airflow-scheduler `
+                        airflow dags list -o plain 2>&1)
+        if ($listing.Count -eq 0) {
+            Write-Host "  listing unavailable: the scheduler did not answer." -ForegroundColor Red
+        }
+        else {
+            $paused = 0
+            foreach ($d in $declared) {
+                $line = $listing |
+                        Where-Object { $_ -match ('^\s*' + $d.id + '\s') } |
+                        Select-Object -First 1
+                if (-not $line) {
+                    $state = 'not loaded'; $colour = 'Red'
+                }
+                elseif ($line -match '\bTrue\b') {
+                    $state = 'paused'; $colour = 'Yellow'; $paused++
+                }
+                elseif ($line -match '\bFalse\b') {
+                    $state = 'active'; $colour = 'Green'
+                }
+                else {
+                    $state = 'unknown'; $colour = 'DarkGray'
+                }
+                Write-Host ("  {0,-20} {1,-11} {2}" -f $d.id, $state, $d.note) `
+                    -ForegroundColor $colour
+            }
+            Write-Host ""
+            if ($paused -gt 0) {
+                Write-Host "A paused DAG accepts a trigger and never runs it: the run stays" -ForegroundColor DarkGray
+                Write-Host "'queued' with no start_date. load, train and replay now make their" -ForegroundColor DarkGray
+                Write-Host "DAG active first; the others are started by hand:" -ForegroundColor DarkGray
+                Write-Host "  docker compose exec -T airflow-scheduler airflow dags unpause <dag_id>" -ForegroundColor Cyan
+                Write-Host "  .\fd-manager.ps1 realtime -Start        # dag_ingest" -ForegroundColor Cyan
+                Write-Host ""
+            }
+        }
     }
 
     'logs' {
@@ -641,6 +732,12 @@ switch ($Task) {
             $values += $dropped
             $label = "$label, sans $dropped"
         }
+
+        # Unlike dag_load_history, this one carries a cadence: making it
+        # active also lets it run on its own every Monday. Said rather than
+        # done quietly -- a command that triggers one training should not
+        # silently sign up for a weekly one.
+        Enable-Dag 'dag_train' 'Monday, 03:00'
 
         if ($keys.Count -gt 0) {
             $confPath = Write-ConfFile 'train-conf.json' $keys $values
@@ -1161,6 +1258,47 @@ LIMIT  10;
         Write-Host ""
     }
 
+    'promote' {
+        Assert-Env
+        Assert-Docker
+        Write-Host ""
+        Write-Host "The promotion gate." -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Registering is not promoting. Every training leaves a version in the" -ForegroundColor DarkGray
+        Write-Host "registry; only this gate moves the 'champion' alias, which is what the" -ForegroundColor DarkGray
+        Write-Host "scoring service actually loads." -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "The two models are compared on the rows neither of them has seen: the" -ForegroundColor DarkGray
+        Write-Host "candidate's test split, restricted to the transactions later than the" -ForegroundColor DarkGray
+        Write-Host "end of the champion's training period. The decision itself is taken by" -ForegroundColor DarkGray
+        Write-Host "ml4fd/promote.py, and journalled in fd_promotions." -ForegroundColor DarkGray
+        Write-Host ""
+        $promoteArgs = @()
+        if ($Apply)     { $promoteArgs += '--apply' }
+        if ($Candidate) { $promoteArgs += @('--candidate', $Candidate) }
+        # Inside the container: the gate needs the registry, the datasets
+        # volume and the database, and the container already has the three.
+        & docker compose exec -T airflow-scheduler `
+            python3 /opt/project/tools/promote.py @promoteArgs
+        $promoteCode = $LASTEXITCODE
+        if ($promoteCode -eq 1) {
+            # 1 is the refusal to decide on too thin a window, not a failure of
+            # the tool: the champion stays in service, which is the safe
+            # direction. Throwing here would stop a chain for a working guard.
+            Write-Host ""
+            Write-Host "No decision taken: the comparison window is too thin." -ForegroundColor Yellow
+            Write-Host "The champion stays in service. Try again after a load." -ForegroundColor Yellow
+            Write-Host ""
+        }
+        elseif ($promoteCode -ne 0) { throw "promote : code $promoteCode" }
+        elseif (-not $Apply) {
+            Write-Host ""
+            Write-Host "Dry run. To apply the decision:" -ForegroundColor Cyan
+            Write-Host "  .\fd-manager.ps1 promote -Apply" -ForegroundColor Cyan
+            Write-Host ""
+        }
+    }
+
     'psql' {
         Assert-Env
         Assert-Docker
@@ -1212,6 +1350,9 @@ LIMIT  10;
 
     'load' {
         Assert-Env; Assert-Docker
+        # schedule=None: making it active adds no cadence, only the right to
+        # run when it is triggered.
+        Enable-Dag 'dag_load_history'
         Invoke-Step 'declenchement de S1' {
             & docker compose exec -T airflow-scheduler airflow dags trigger dag_load_history
         }
@@ -1338,6 +1479,7 @@ LIMIT  10;
         #
         # batch_id is the only key the DAG reads. A key it ignores would read as
         # a setting that does something.
+        Enable-Dag 'dag_load_history'
         $confPath = Write-ConfFile 'replay-conf.json' @('batch_id') @($Batch)
         $script = 'airflow dags trigger dag_load_history --conf $(cat ' +
                   $confPath + ')'

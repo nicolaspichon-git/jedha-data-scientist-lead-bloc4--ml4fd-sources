@@ -28,7 +28,7 @@ os.environ.setdefault("POSTGRES_USER", "test_user")
 os.environ.setdefault("POSTGRES_PASSWORD", "test_password")
 os.environ.setdefault("POSTGRES_DB", "test_db")
 
-from ml4fd import config, paired, promote, registry, score  # noqa: E402
+from ml4fd import datasets, config, paired, promote, registry, score  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -232,6 +232,37 @@ def test_the_gate_imports_no_mlflow_at_load_time(module):
         assert not any(n.startswith("mlflow") or n.startswith("sklearn")
                        for n in names), "%s imports %s at load time" % (
                            module, names)
+
+
+def test_the_entry_point_only_reads_columns_the_splits_carry():
+    """THE TEST THAT WOULD HAVE CAUGHT is_fraud.
+
+    Every other test here hands decide() a table that is already built, so not
+    one of them touches a column name. tools/promote.py is where the names are
+    read, and it read frame["is_fraud"] -- which is what the payment API and
+    fd_transactions call the label, while the Parquet splits call it label
+    (datasets.LABEL). A KeyError, on the first real run, after a retraining.
+
+    So the names are checked against the only list that says what a split
+    holds. build.py writes exactly STORED_COLUMNS, deliberately including the
+    features a recipe dropped, which is why scoring the champion on the
+    candidate's split works at all.
+    """
+    source = (ROOT / "tools" / "promote.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    read = set()
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Subscript)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "frame"
+                and isinstance(node.slice, ast.Constant)
+                and isinstance(node.slice.value, str)):
+            read.add(node.slice.value)
+    assert read, "no column read found: the check has stopped checking"
+    unknown = sorted(read - set(datasets.STORED_COLUMNS))
+    assert not unknown, (
+        "tools/promote.py reads %s, which no split carries. The columns are %s"
+        % (unknown, list(datasets.STORED_COLUMNS)))
 
 
 # --- resolving the champion ----------------------------------------------------

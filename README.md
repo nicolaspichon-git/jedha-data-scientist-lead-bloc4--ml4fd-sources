@@ -76,8 +76,8 @@ Un environnement conda dédié, en 3.11, puis les dépendances que le projet
 déclare lui-même :
 
 ```powershell
-conda create -n ml4fd python=3.11
-conda activate ml4fd
+conda create -n aia-ml4fd python=3.11
+conda activate aia-ml4fd
 python -m pip install -e ".[dev]"
 ```
 
@@ -91,7 +91,7 @@ L'extra `dev` ajoute `pytest` et `ruff`. Le `-e` installe `ml4fd` en mode
 éditable, ce qui rend `import ml4fd` résoluble sans passer par `python -m`.
 
 VS Code retient cet environnement à l'ouverture du dossier :
-`.vscode/settings.json` le désigne par `${userHome}/miniconda3/envs/ml4fd`. Si
+`.vscode/settings.json` le désigne par `${userHome}/miniconda3/envs/aia-ml4fd`. Si
 votre miniconda est installé ailleurs, c'est la ligne à corriger.
 
 ## Démarrage
