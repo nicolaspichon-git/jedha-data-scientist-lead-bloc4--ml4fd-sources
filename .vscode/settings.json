@@ -1,0 +1,39 @@
+{
+    // THE INTERPRETER THIS FOLDER USES, applied as long as no interpreter has
+    // been picked by hand for the workspace -- which is what "by default"
+    // means here.
+    //
+    // ${userHome} and not an absolute path: C:\Users\nicolas written into a
+    // versioned file would be wrong for anybody else who clones the
+    // repository. If miniconda sits elsewhere, this is the line to change.
+    //
+    // 3.11 and not newer. pyproject.toml declares requires-python = ">=3.11"
+    // and the images are apache/airflow:2.10.4-python3.11 and python:3.11. A
+    // suite run on another interpreter tests something else -- a bare pytest
+    // under 3.14 is what sent us looking for a missing psycopg.
+    "python.defaultInterpreterPath": "${userHome}/miniconda3/envs/ml4fd/python.exe",
+
+    // The test panel finds the suite without being told where it is.
+    // "." rather than "tests": pyproject.toml already carries testpaths, and
+    // repeating it here would be a second source of truth for the same fact.
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": ["."],
+    "python.testing.unittestEnabled": false,
+
+    // What .gitattributes enforces at commit time, applied while editing
+    // instead of discovered afterwards. Markdown is excluded because two
+    // trailing spaces are a line break there.
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+    "[markdown]": {
+        "files.trimTrailingWhitespace": false
+    },
+
+    // 100, like [tool.ruff] in pyproject.toml.
+    "editor.rulers": [100],
+
+    // NO files.eol HERE, deliberately. .gitattributes decides per file type
+    // -- LF for sql/initdb/*.sh, CRLF for *.ps1 -- and a global setting would
+    // fight it.
+    "python.analysis.typeCheckingMode": "off"
+}
