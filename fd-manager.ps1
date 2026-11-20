@@ -1168,6 +1168,32 @@ LIMIT  10;
         Write-Host "Le fichier produit ne contient AUCUNE donnee nominative :" -ForegroundColor DarkGray
         Write-Host "seules les formes sont relevees (type, longueur, decompte)." -ForegroundColor DarkGray
         Write-Host ""
+
+        # THE INGESTION IS A CAMPAIGN TOO, and nobody counted it until a
+        # measurement said so. Under the LocalExecutor dag_ingest runs in this
+        # same container, and the producer keys its limiter on the client
+        # address: one bucket for both. Measured on 2026-11-20 -- 20 calls back
+        # to back found 8 slots of 13, the other 5 being the running DAG's. It
+        # cuts the other way as well, and worse: the ingestion asks for up to
+        # 10 of the 13 (5 calls, each retried once on a 429), so a campaign run
+        # beside it can starve the very chain it is measuring.
+        $ingest = @(& docker compose exec -T airflow-scheduler `
+                       airflow dags list -o plain 2>&1) |
+                  Where-Object { $_ -match '^\s*dag_ingest\s' } |
+                  Select-Object -First 1
+        if ($ingest -and $ingest -match '\bFalse\b') {
+            Write-Host "dag_ingest est actif, et il partage le limiteur du producer" -ForegroundColor Yellow
+            Write-Host "avec cette campagne : meme conteneur, donc meme adresse." -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "Deux consequences. Le plafond releve ici sera celui qui reste," -ForegroundColor DarkGray
+            Write-Host "soit treize moins les cinq appels de l'ingestion. Et la" -ForegroundColor DarkGray
+            Write-Host "campagne peut affamer l'ingestion, qui demande jusqu'a dix" -ForegroundColor DarkGray
+            Write-Host "creneaux sur treize une fois les reessais comptes." -ForegroundColor DarkGray
+            Write-Host ""
+            Write-Host "Pour une mesure seule :  .\fd-manager.ps1 realtime -Stop" -ForegroundColor Cyan
+            Write-Host ""
+        }
+
         & docker compose exec -T airflow-scheduler `
             python3 /opt/project/tools/observe_api.py @Rest
         Write-Host ""

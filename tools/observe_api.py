@@ -278,10 +278,15 @@ def main(argv=None) -> int:
                     "Writes a report under runtime/observations/ and a raw "
                     "log, one line per "
                     "call. No personal data is ever recorded.",
-        epilog="One campaign at a time: two clients from the same address "
-               "falsify the latency, the error rate and the rate limiter. "
-               "Ctrl+C loses nothing -- the log is already on disk and "
-               "--from-log rebuilds the report.")
+        epilog="One campaign at a time, AND THE INGESTION IS A CAMPAIGN: "
+               "dag_ingest runs in this same container under the LocalExecutor "
+               "and the producer keys its limiter on the client address, so it "
+               "and this script share one bucket. Measured on 2026-11-20: 20 "
+               "back-to-back calls found 8 slots free of 13, the other 5 being "
+               "the running DAG's. Stop it first with `fd-manager realtime "
+               "-Stop`, or read the ceiling as what was LEFT. Ctrl+C loses "
+               "nothing -- the log is already on disk and --from-log rebuilds "
+               "the report.")
     parser.add_argument("--calls", type=int, default=20,
                         help="spaced calls (default 20)")
     parser.add_argument("--burst", type=int, default=8,
@@ -350,8 +355,15 @@ def main(argv=None) -> int:
                  record.get("headers") or ""))
 
     # How long until a call succeeds again.
+    #
+    # EVERY PHASE AND NOT ONLY THE RAFALE, since 2026-11-20. The limiter does
+    # not care which loop a call came from: `--calls 20 --spacing 0 --burst 0`
+    # fires it from the spaced phase, and the old condition then skipped the
+    # reopening entirely -- the report said "non observee" about the very run
+    # designed to measure the limiter. The condition now asks what happened,
+    # not which loop it happened in.
     reopened_after = None
-    if any(r["status"] == 429 for r in burst):
+    if any(r["status"] == 429 for r in spaced + burst):
         print("\n  attente de la reouverture :")
         waited = 0
         while waited < 180:
