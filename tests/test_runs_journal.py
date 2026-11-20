@@ -13,10 +13,19 @@ when the real-time DAG still closed its failures with a task carrying
 trigger_rule="one_failed", which cannot be scheduled while the RUN itself is
 being killed.
 
+THE VERDICT USED TO COME FROM AIRFLOW, and these tests used to require it. L1
+gave Airflow a database of its own -- so that running a DAG grants no owner
+rights on the ml4fd tables -- and PostgreSQL does not join across databases:
+the join raised on its own guard on 2026-11-20, a day later. The tests below
+were part of the defect, because test_the_verdict_comes_from_airflow asserted
+the premise that L1 had just falsified and stayed green on a broken check.
+A test that encodes a premise must be revisited when the premise moves.
+
 These tests read the SQL rather than running it -- PostgreSQL is not in the
-authoring environment -- and check the decisions: the verdict comes from
-Airflow and not from an age, the closure is a failure and not a success, a
-check does not write, and the journal keeps the time the run actually stopped.
+authoring environment -- and check the decisions: the rule is one rule, no file
+reads a table of Airflow's, the closure is a failure and not a success, a
+duration nobody measured is null rather than invented, and a check does not
+write.
 """
 from __future__ import annotations
 
@@ -30,34 +39,49 @@ CHECK = ROOT / "sql" / "checks" / "abandoned_runs.sql"
 CLOSE = ROOT / "sql" / "maintenance" / "030_close_abandoned_runs.sql"
 
 
-def test_the_verdict_comes_from_airflow_and_not_from_an_age():
-    """AN AGE WOULD HAVE TO BE WRONG for one DAG or the other: five minutes is
-    generous for a run of the minute DAG and absurd for a historical load that
-    takes twenty. The project and Airflow share one database, so dag_run is
-    right there -- "Airflow says this run is over" is a fact, not a guess.
+def code_of(path: Path) -> str:
+    """The file without its comment lines.
 
-    AN AGE SURVIVES IN ONE PLACE ONLY, added in Q6: a run Airflow never heard
-    of. tools/ingest_once.py and the digest backfill open runs of their own,
-    and for those there is no verdict to have and no other signal -- the old
-    inner join simply hid them, so `abandoned` reported nothing to close while
-    the acceptance of S3 counted one.
+    Every test about what a file READS must look at the code alone. These
+    headers deliberately recount what they used to read and why they stopped,
+    so a plain `"dag_run" in text` would fail on the very explanation that
+    makes the change understandable.
+    """
+    return "\n".join(line
+                     for line in path.read_text(encoding="utf-8").splitlines()
+                     if not line.lstrip().startswith("--"))
+
+
+def test_the_rule_is_an_age_and_reads_no_table_of_airflows():
+    """ONE RULE, AND NOT TWO. Reading dag_run where it happens to exist and
+    falling back to an age where it does not would restore the defect Q6 was
+    spent on: two readings of one rule, disagreeing, with `abandoned`
+    reporting nothing to close while the acceptance of S3 counted one.
+
+    AND NOT BY A SIDE DOOR EITHER. dblink and postgres_fdw would reach the
+    other database, at the price of undoing the privilege boundary L1 built --
+    a boundary traded away to tidy a journal would be a poor bargain.
     """
     for path in (CHECK, CLOSE):
-        text = path.read_text(encoding="utf-8")
-        assert "dag_run" in text, path.name
-        assert "d.state <> 'running'" in text, path.name
-        # The age, where it is allowed, sits beside the absence of a dag_run
-        # row and nowhere else.
-        for match in re.finditer(r"interval '([^']+)'", text):
-            window = text[max(0, match.start() - 400):match.end()]
-            assert ("NOT EXISTS" in window or "d.run_id IS NULL" in window), \
-                "%s : un age sans absence de dag_run" % path.name
+        code = code_of(path)
+        for table in ("dag_run", "task_instance", "dblink", "postgres_fdw"):
+            assert table not in code, "%s : %s" % (path.name, table)
+        assert "interval '1 hour'" in code, path.name
+        assert "interval '5 minutes'" not in code, path.name
+
+    # The age is not presented as free: the header says what it costs, so a
+    # reader finds the loss without having to run the file.
+    assert "WHAT IS LOST" in CHECK.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("path", [CHECK, CLOSE])
-def test_a_run_airflow_still_reports_as_running_is_spared(path):
-    """The one case that must never be touched: a live execution."""
-    assert "r.state = 'running'" in path.read_text(encoding="utf-8")
+def test_a_run_younger_than_an_hour_is_spared(path):
+    """The one case that must never be touched: a live execution. Nothing in
+    this database distinguishes a run that is still going from one that died,
+    so the age is the whole protection -- and it protects by being generous."""
+    code = code_of(path)
+    assert "r.state = 'running'" in code
+    assert "now() - interval '1 hour'" in code
 
 
 def test_the_listing_shows_every_open_run_and_not_only_the_closable_ones():
@@ -65,35 +89,34 @@ def test_the_listing_shows_every_open_run_and_not_only_the_closable_ones():
     the acceptance of S3 failed on one open run. The inner join hid the two
     cases an operator most needs to see -- a run with no dag_run row, and a run
     Airflow itself holds open."""
-    text = CHECK.read_text(encoding="utf-8")
-    assert "LEFT   JOIN dag_run" in text or "LEFT JOIN dag_run" in text
-    assert "aucune ligne dag_run" in text
-    assert "intouchable" in text          # and it says so, rather than hiding
-    decision = text[text.index("SELECT r.run_id"):]
-    assert "d.state <> 'running'" not in decision.split("CASE")[0]
+    code = code_of(CHECK)
+    # THE AGE DECIDES THE VERDICT AND NEVER THE WHERE. A filter there hides the
+    # rows an operator most needs to see, which is what the inner join did.
+    assert "interval" not in code[code.index("WHERE"):], "un age dans le WHERE"
+    assert "fermable" in code and "attendre" in code
 
 
-def test_the_closer_handles_a_run_airflow_never_heard_of():
-    """Nothing else can close it: tools/ingest_once.py and the digest backfill
-    open runs of their own."""
-    text = CLOSE.read_text(encoding="utf-8")
-    assert text.count("UPDATE fd_pipeline_runs") == 2
-    assert "NOT EXISTS (SELECT 1 FROM dag_run d" in text
-    # and each statement says which evidence closed the run
-    assert text.count("AS motif") == 2
+def test_the_closer_rests_on_one_evidence():
+    """TWO STATEMENTS BECAME ONE, and that is a consequence and not a tidy-up.
+    The first closed what Airflow declared over, the second the orphans Airflow
+    never heard of -- two cases on two pieces of evidence, which is why they
+    were two statements. Without dag_run there is one piece of evidence left:
+    nobody closed this row and it is old enough that nobody will. Two
+    statements would now leave a reader wondering which one closed a row."""
+    code = code_of(CLOSE)
+    assert code.count("UPDATE fd_pipeline_runs") == 1
+    assert code.count("AS motif") == 1      # and it still says why
 
 
 def test_the_acceptance_of_s3_asks_the_same_question():
     """Two readings of one rule must not disagree: that is what left an
     operator with a red check and no way out."""
-    text = (ROOT / "sql" / "checks" / "s3_acceptance.sql").read_text(
-        encoding="utf-8")
-    criterion = text.split("N7 aucune execution que personne ne peut fermer")[1]
+    code = code_of(ROOT / "sql" / "checks" / "s3_acceptance.sql")
+    criterion = code.split("N7 aucune execution que personne ne peut fermer")[1]
     criterion = criterion.split("UNION ALL")[0]
-    assert "d.state <> 'running'" in criterion
-    assert "NOT EXISTS" in criterion
     assert "interval '1 hour'" in criterion
     assert "interval '5 minutes'" not in criterion
+    assert "dag_run" not in criterion
 
 
 def test_the_closure_is_a_failure_and_never_a_success():
@@ -105,12 +128,18 @@ def test_the_closure_is_a_failure_and_never_a_success():
     assert "'success'" not in text.split("UPDATE fd_pipeline_runs")[1]
 
 
-def test_the_journal_keeps_when_the_run_actually_stopped():
-    """ended_at takes Airflow's end_date when there is one. Measured to now(),
-    the duration would grow with the delay before somebody tidied up."""
-    text = CLOSE.read_text(encoding="utf-8")
-    assert "coalesce(d.end_date, now())" in text
-    assert text.count("coalesce(d.end_date, now())") == 2   # ended_at AND duration
+def test_a_duration_nobody_measured_is_null_and_not_invented():
+    """ended_at USED TO TAKE AIRFLOW'S end_date, with now() as a fallback only.
+    With no end_date to be had, now() is the moment somebody tidied up and not
+    the moment the run stopped: written into duration_s it would measure our
+    own delay, in a column every reader takes for a duration. NULL states what
+    is true, and `duration_s IS NULL` is how a reader tells these rows from the
+    ones runs.abandon() closed at the instant of failure, where now() really
+    was the end. ended_at keeps now(): when we closed it is a fact."""
+    code = code_of(CLOSE)
+    assert "duration_s = NULL" in code
+    assert "coalesce(d.end_date" not in code
+    assert "ended_at   = now()" in code
 
 
 def test_the_check_writes_nothing():
@@ -137,17 +166,6 @@ def test_no_check_in_the_repository_writes_to_a_project_table():
                          r"[^;]*\bfd_\w+", line, re.IGNORECASE):
                 offenders.append("%s:%d" % (path.name, number))
     assert not offenders, "ecriture dans un controle : %s" % ", ".join(offenders)
-
-
-@pytest.mark.parametrize("path", [CHECK, CLOSE])
-def test_a_missing_airflow_table_names_itself(path):
-    """Without the guard the file fails on "relation dag_run does not exist",
-    which reads as a defect of the project rather than an uninitialised
-    Airflow."""
-    text = path.read_text(encoding="utf-8")
-    assert "to_regclass('public.dag_run')" in text
-    assert "RAISE EXCEPTION" in text
-    assert "USING HINT" in text
 
 
 def test_the_closure_is_replayable():

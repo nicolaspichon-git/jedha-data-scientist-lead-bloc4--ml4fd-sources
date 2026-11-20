@@ -112,27 +112,22 @@ criteria AS (
                       AND n_read <> n_valid + n_rejected)
                 THEN '0 ecart' ELSE 'OUVERT' END
     UNION ALL
-    -- THE SAME RULE AS sql/checks/abandoned_runs.sql, which is the point:
-    -- this criterion counted on an age of five minutes while the tool that
-    -- closes these runs asked Airflow -- so `abandoned` could report nothing
-    -- to do while this failed, and an operator had no way out. Two readings of
-    -- one rule, disagreeing. Airflow's verdict first; an age only for a run
-    -- Airflow never heard of, where there is no verdict to have.
+    -- THE SAME RULE AS sql/checks/abandoned_runs.sql, which is the point: two
+    -- readings of one rule must not disagree. Before Q6 this criterion rested
+    -- on an age of five minutes while the tool that closes these runs asked
+    -- Airflow, so `abandoned` could report nothing to do while this failed and
+    -- an operator had no way out. Q6 aligned both on dag_run. L1 then gave
+    -- Airflow a database of its own, which put dag_run out of reach from here
+    -- and broke the two of them at once -- consistently, at least. Both now
+    -- rest on the age alone, and abandoned_runs.sql carries the reasoning.
     SELECT 4, 'N7 aucune execution que personne ne peut fermer',
            '0',
            (SELECT count(*)::text FROM stream_runs r
              WHERE r.state = 'running'
-               AND (EXISTS (SELECT 1 FROM dag_run d
-                             WHERE d.run_id = r.run_id AND d.dag_id = r.dag_id
-                               AND d.state <> 'running')
-                 OR (NOT EXISTS (SELECT 1 FROM dag_run d
-                                  WHERE d.run_id = r.run_id
-                                    AND d.dag_id = r.dag_id)
-                     AND r.started_at < now() - interval '1 hour')))
-    -- AND WHAT AIRFLOW ITSELF HOLDS OPEN, reported and not enforced: nothing
-    -- here may close such a run, since Airflow may really be running it. It is
-    -- unblocked from Airflow's interface, and until then an operator must at
-    -- least see it.
+               AND r.started_at < now() - interval '1 hour')
+    -- AND WHAT IS OPEN ON EVERY DAG, reported and not enforced: this one is not
+    -- restricted to dag_ingest, so a historical load or a hand-run tool that
+    -- left a row behind shows up here even though criterion 4 cannot see it.
     UNION ALL
     SELECT 5, 'info executions ouvertes depuis plus d''une heure', 'mesure',
            (SELECT CASE WHEN count(*) = 0 THEN 'aucune'

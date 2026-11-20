@@ -45,6 +45,12 @@ x-airflow-common: &airflow-common
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     POSTGRES_DB: ${POSTGRES_DB}
     ML4FD_PEPPER: ${ML4FD_PEPPER}
+    # The corpora's private bucket, and the credentials boto3 reads by
+    # itself. Empty when the cache is warm, which is the usual case.
+    ML4FD_CORPUS_BUCKET: ${ML4FD_CORPUS_BUCKET:-}
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
     MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
     # MLflow looks for a git SHA to tag the run with and prints three paragraphs
     # when git is absent. There is no repository in this image and the chain of
@@ -94,6 +100,21 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:16
+    # SHARED MEMORY, and 64 MB is not enough. Docker gives a container that
+    # much /dev/shm by default, and PostgreSQL's parallel workers allocate
+    # their segments there: a parallel VACUUM on fd_transactions asked for
+    # 67,145,248 bytes and was refused with "No space left on device"
+    # (2026-11-19). The number is the default, to the byte.
+    #
+    # It did not show on the former corpus: 555,719 rows planned without
+    # parallel workers. At 1,296,675 the planner reaches for them, and the
+    # limit it meets has nothing to do with the disk the message names.
+    #
+    # One gigabyte rather than a tight fit: the segments are transient, the
+    # host reclaims what is unused, and the next corpus should not bring this
+    # back. Recreating this container does NOT touch pgdata -- the data lives
+    # in a named volume.
+    shm_size: '1gb'
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -196,6 +217,79 @@ services:
   # report.path_for() then names the same file in both containers. A different
   # mount is the defect that cost 28 observations and a dataset, and the
   # morning page reports it if it ever happens.
+  # ----------------------------------------------------------- the producer
+  # THE STREAM THIS PROJECT READS. producer/ is derived from the exercise's own
+  # application, which vendor/realtime-transactions-producer holds untouched:
+  # the FastAPI route, the slowapi limiter, the df.sample() and above all the
+  # df.to_json(orient="split") that produces the response are theirs. That last
+  # one is why there is no fidelity to argue about -- the shape is not
+  # reproduced, it is produced by the same call.
+  #
+  # ITS THREE DEFECTS ARE REPAIRED, and producer/app.py carries the detail: it
+  # re-read 150 MB from a public mirror on every call (750 MB a minute of
+  # somebody else's egress, and the +5.1 s clock gap N0 measured -- since
+  # measured at +0.0 s against the producer, the stamp and our call being
+  # read off the same clock), it sampled
+  # the whole corpus so the periods averaged together and no drift could ever
+  # show, and its "/" route answered 500 on a directory named in the singular.
+  #
+  # AND IT SERVES fraudTest.csv, which since the corpora were swapped is the
+  # right file: the stream must serve what the model was NOT trained on. The
+  # original exercise had it the other way round, and sampled the very file it
+  # trained on.
+  producer:
+    build: ./producer
+    environment:
+      PORT: "4000"
+      # THE SERVED WINDOW. 0 starts just after the training cut-off -- June and
+      # July 2020, the quietest baseline the corpus offers -- so an injected
+      # drift is the signal. 400000 lands in the December tail, where the base
+      # rate falls to 0.1849 % on its own: C6 demonstrated on a shift nobody
+      # forced. Changing either needs this service recreated.
+      PRODUCER_SKIP_ROWS: "${PRODUCER_SKIP_ROWS:-0}"
+      PRODUCER_MAX_ROWS: "${PRODUCER_MAX_ROWS:-100000}"
+      # 13/MINUTE, WHICH IS WHAT N0 MEASURED, not the 5/minute the original's
+      # source declares: the hosted Space let twelve through and refused the
+      # thirteenth, never below. governance.realtime calibrated calls_per_run
+      # on that figure and check_s3 makes it a criterion.
+      #
+      # IT WAS SET TO 5 AND THE INGESTION DIED ON IT, 2026-11-19 23:41 UTC.
+      # The comment here used to read "the ingestion sits ON the limit and
+      # fetch_one's 429 retry earns its place", which was wrong on its own
+      # terms: sitting on the limit is what makes the retry impossible. Five
+      # calls each retried once is up to ten requests a minute against a
+      # budget of five, and the overflow carried into the following run, which
+      # was refused on its FIRST call at 0.0 s. Ten under thirteen restores
+      # the margin dag_ingest's docstring claims. Empty disables the limiter,
+      # at the cost of EC25's 429 path becoming unreachable.
+      PRODUCER_RATE_LIMIT: "${PRODUCER_RATE_LIMIT-13/minute}"
+      # The corpus's bucket and the credentials boto3 reads by itself. Needed
+      # for the FIRST start only: fetch_csv caches the file with its sha256 and
+      # every later start takes the cache.
+      ML4FD_CORPUS_BUCKET: ${ML4FD_CORPUS_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
+    volumes:
+      # THE CACHE IS WRITABLE, and it is the only thing this service writes.
+      # It fetches its own corpus through ml4fd.fetch, into the same cache S1
+      # uses -- one acquisition path, one checksum discipline, one directory an
+      # operator can look at.
+      - ./.local_cache:/opt/project/.local_cache
+      # ml4fd/ MOUNTED rather than copied into the image: the service imports
+      # ml4fd.fetch, and a copy baked in would be a second version of the
+      # acquisition path.
+      - ./ml4fd:/opt/project/ml4fd:ro
+      # Read-only: the drift switch is read on every call, never written.
+      - ./runtime:/opt/project/runtime:ro
+      - ./governance.yml:/opt/project/governance.yml:ro
+    ports:
+      # Published to the loopback only: nothing outside this machine has
+      # business reading a stream of cardholder names. The scheduler reaches it
+      # on the CONTAINER port, 4000, inside the compose network.
+      - "127.0.0.1:8801:4000"
+    restart: unless-stopped
+
   dashboard:
     build: ./dashboard
     depends_on:

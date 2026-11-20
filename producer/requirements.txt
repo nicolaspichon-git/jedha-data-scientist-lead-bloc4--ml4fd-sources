@@ -1,0 +1,15 @@
+# The producer's own dependencies. Pinned loosely, like the Airflow image's,
+# and for the same reason: these were written without being able to reach PyPI.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+gunicorn>=21.2
+slowapi>=0.1.9
+pandas>=2.0
+PyYAML>=6.0
+jinja2>=3.1
+
+# For ml4fd.fetch, which this service reuses rather than downloading on its
+# own: requests for an http(s) source, boto3 for an S3 object key. fetch.py
+# imports boto3 lazily, so a stack whose cache is warm never loads it.
+requests>=2.31,<3
+boto3>=1.34

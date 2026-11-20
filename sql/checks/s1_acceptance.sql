@@ -2,10 +2,24 @@
 -- Covers: EC01, EC12, EC17, EC20, EC23, EE08, EI01, EI04   Lot: L8
 -- Competency: C1, C2, C4, C5
 --
--- The expected values are MEASURED on the source, not chosen: 555,719 rows,
--- 2,145 frauds, 924 distinct cardholders, amounts totalling 38,562,903.11. A
--- figure that stops matching means either the source changed or the pipeline
--- lost something -- and either way it is worth knowing which.
+-- THE EXPECTED VALUES ARE DERIVED AND NOT WRITTEN DOWN, and that is the rule
+-- this file now follows. Each one is read from the raw zone, from the run
+-- journal, or from another column of the exploited layer -- never from a
+-- number measured once on a corpus.
+--
+-- It used to hold four: 555,719 rows, 2,145 frauds, 924 cardholders, amounts
+-- totalling 38,562,903.11. They were true of fraudTest.csv, which this project
+-- trained on until 2026-11-19. Swapping the corpora -- training on
+-- fraudTrain.csv and serving the other as the stream -- turned eight of these
+-- seventeen criteria red at once, and not one of them had found a defect.
+-- A criterion that fails when the source changes legitimately is not a
+-- criterion, it is a coupling.
+--
+-- So: six lines became invariants between tables, three became informative.
+-- A corpus property that no other table can recompute -- the number of
+-- cardholders, the number of frauds -- is reported rather than judged, and
+-- the figures live where they are measured: tools/profile_corpus.py, and the
+-- comments of governance.yml it feeds.
 --
 -- Everything is cast to text so that one column can hold counts, sums and
 -- intervals side by side. Comparing text is enough: these are exact values, not
@@ -91,9 +105,19 @@ criteria AS (
     -- adds a batch and the table legitimately grows. Comparing the total with
     -- 555,719 was wrong -- three loads give 1,667,157 and that is the raw zone
     -- working as designed, not a defect.
-    SELECT 1 AS ord, 'L1 lignes par lot en zone brute' AS criterion,
-           '555719' AS expected,
-           CASE WHEN min(n) = 555719 AND max(n) = 555719 THEN '555719'
+    -- The property is that the batches are IDENTICAL IN SIZE -- the same file
+    -- loaded N times giving N equal batches -- and never that they hold a
+    -- particular number.
+    --
+    -- NOTHING BUT THE VERDICT IN actual, and the first version of this line
+    -- got it wrong: it returned 'tous egaux (1296675)' against an expected
+    -- 'tous egaux', and the verdict below compares the two AS TEXT -- so the
+    -- criterion failed on a raw zone that was perfectly healthy. A count added
+    -- for the reader's benefit is a count that breaks the comparison. The
+    -- counts are on the lines that judge them; this one judges the equality.
+    SELECT 1 AS ord, 'L1 lots de taille identique en zone brute' AS criterion,
+           'tous egaux' AS expected,
+           CASE WHEN min(n) = max(n) THEN 'tous egaux'
                 ELSE min(n)::text || '..' || max(n)::text END AS actual
     FROM  (SELECT count(*) AS n FROM historical_raw GROUP BY batch_id) b
     UNION ALL
@@ -116,13 +140,57 @@ criteria AS (
 
     -- L3 -- typing and pseudonymisation
     UNION ALL
-    SELECT 5, 'L3 transactions typees', '555719', count(*)::text
+    -- AGAINST THE JOURNAL, which is a stronger statement than against a
+    -- number: n_valid is what validation declared it had passed, and L2 above
+    -- has already proved the counters close (n_read = n_valid + n_rejected).
+    -- So this line now says "the exploited layer holds exactly what the
+    -- pipeline said it accepted" -- and it ties two stores together instead of
+    -- tying one store to a memory. max() because the raw zone keeps every
+    -- load: the runs are N, the transactions one set.
+    SELECT 5, 'L3 transactions typees = n_valid du journal',
+           (SELECT max(n_valid)::text FROM historical_runs
+             WHERE state = 'success'),
+           count(*)::text
     FROM   historical_txn
     UNION ALL
-    SELECT 6, 'L3 porteurs distincts', '924', count(DISTINCT client_key)::text
+    -- INFORMATIVE: a property of the corpus, which no other table can
+    -- recompute. Judging it would couple this file to one source again.
+    SELECT 6, 'L3 porteurs distincts (informatif)',
+           count(DISTINCT client_key)::text, count(DISTINCT client_key)::text
     FROM   historical_txn
     UNION ALL
-    SELECT 7, 'L3 somme des montants', '38562903.11', coalesce(sum(amt), 0)::text
+    -- THE BEST INVARIANT OF THE TABLE: typing must not change the total. The
+    -- expected value is read from the raw zone, so this compares the exploited
+    -- layer with what was received rather than with a figure.
+    --
+    -- ONE BATCH, because the raw zone is append-only: N loads of the same file
+    -- hold N copies while the exploited layer holds one set. Any batch serves,
+    -- since L1 above has just proved them equal in size; the ORDER BY only
+    -- makes the choice deterministic.
+    --
+    -- ORDER BY ... LIMIT 1 AND NOT min(batch_id): PostgreSQL 16 has no min()
+    -- aggregate for the uuid type -- "function min(uuid) does not exist", and
+    -- the hint about casts sends the reader the wrong way. uuid does have its
+    -- ordering operators, so a sort answers where an aggregate cannot.
+    --
+    -- THE EXISTS IS NOT A REFINEMENT, it is what makes the comparison exact
+    -- when a line was quarantined. A rejected line is in the raw zone and not
+    -- in fd_transactions, so its amount must not be counted -- and it must not
+    -- even be CAST: an unreadable amount is one of the reasons a line gets
+    -- rejected, and "beaucoup"::numeric raises. WHERE is applied before the
+    -- select list, so the cast never sees it.
+    --
+    -- trans_num IS the txn_id for this source: checks.CSV_PROFILE sets
+    -- event_id_includes_time=False, so event_id() returns the trimmed
+    -- trans_num and nothing else. S1 stores the row itself as the payload.
+    SELECT 7, 'L3 somme des montants = zone brute',
+           (SELECT coalesce(sum((r.payload->>'amt')::numeric), 0)::text
+            FROM   historical_raw r
+            WHERE  r.batch_id = (SELECT batch_id FROM historical_batch
+                                 ORDER BY batch_id LIMIT 1)
+              AND  EXISTS (SELECT 1 FROM historical_txn t
+                            WHERE t.txn_id = trim(r.payload->>'trans_num'))),
+           coalesce(sum(amt), 0)::text
     FROM   historical_txn
     UNION ALL
     SELECT 8, 'L3 colonnes nominatives dans la couche exploitee',
@@ -133,7 +201,10 @@ criteria AS (
                            'lat', 'long', 'job', 'dob', 'cc_num', 'gender',
                            'city_pop')
     UNION ALL
-    SELECT 9, 'L3 distance domicile renseignee', '555719', count(*)::text
+    -- The property is "every transaction has one", so the expected value is
+    -- the count of transactions.
+    SELECT 9, 'L3 distance domicile renseignee',
+           (SELECT count(*)::text FROM historical_txn), count(*)::text
     FROM   historical_txn WHERE f_home_distance_km IS NOT NULL
 
     -- L4 -- features
@@ -141,15 +212,28 @@ criteria AS (
     SELECT 10, 'L4 lignes sans features', '0', count(*)::text
     FROM   historical_txn WHERE f_tx_count IS NULL
     UNION ALL
-    SELECT 11, 'L4 premieres transactions a 0 et NULL', '924', count(*)::text
+    -- EXACTLY ONE FIRST TRANSACTION PER CARDHOLDER, which is ruling 6 stated
+    -- as a count. The expected value is the number of cardholders, so the line
+    -- holds whatever the corpus is -- and it still catches the defect it was
+    -- written for: a feature window that leaked a client's own row would give
+    -- fewer firsts than clients.
+    SELECT 11, 'L4 une premiere transaction par porteur',
+           (SELECT count(DISTINCT client_key)::text FROM historical_txn),
+           count(*)::text
     FROM   historical_txn WHERE f_tx_count = 0 AND f_avg_amount IS NULL
 
     -- L5 -- ground truth
     UNION ALL
-    SELECT 12, 'L5 verdicts', '555719', count(*)::text
+    -- One verdict per transaction, which is the property. A verdict missing
+    -- or a verdict too many both show, and neither needs a constant.
+    SELECT 12, 'L5 un verdict par transaction',
+           (SELECT count(*)::text FROM historical_txn), count(*)::text
     FROM   historical_truth
     UNION ALL
-    SELECT 13, 'L5 fraudes', '2145', count(*)::text
+    -- INFORMATIVE, like the cardholders above: the number of frauds is the
+    -- corpus's, and the base rate it implies is what fd_datasets stores beside
+    -- every dataset so that a precision can be read at all.
+    SELECT 13, 'L5 fraudes (informatif)', count(*)::text, count(*)::text
     FROM   historical_truth WHERE label
     UNION ALL
     SELECT 14, 'L5 delai de verdict uniforme',
@@ -170,10 +254,14 @@ criteria AS (
     -- of transactions: the upsert on txn_id did its work. No test states EC23
     -- as plainly as this ratio does.
     UNION ALL
+    -- STATED AS THE RATIO ITS OWN COMMENT DESCRIBES. The 555,719 added
+    -- nothing to the property and coupled the most telling line of the table
+    -- to one corpus: it read "non" on a pipeline that was working perfectly.
     SELECT 16, 'L6 idempotence : N lots ingeres, un seul jeu de transactions',
            'ok',
-           CASE WHEN (SELECT count(*) FROM historical_txn) = 555719
-                 AND (SELECT count(*) FROM historical_raw) >= 555719
+           CASE WHEN (SELECT count(*) FROM historical_txn) > 0
+                 AND (SELECT count(*) FROM historical_raw)
+                     >= (SELECT count(*) FROM historical_txn)
                 THEN 'ok' ELSE 'non' END
 
     -- L7 -- journal

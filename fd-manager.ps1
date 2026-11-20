@@ -39,6 +39,7 @@ param(
                  'digests',
                  'purge',
                  'promote',
+                 'monitor',
                  'replay', 'forget', 'dashboard',
                  'tasklog', 'dag-test', 'accept', 'test', 'lint', 'traceability',
                  'typology',
@@ -337,6 +338,7 @@ switch ($Task) {
             @{ n = 'digests';      d = 'batches with no digest (-Apply to record it)' }
             @{ n = 'purge';        d = 'dry-run purge (-Before; -Apply to delete)' }
             @{ n = 'promote';      d = 'judge the newest model against the champion (-Candidate <v>; -Apply to move the alias)' }
+            @{ n = 'monitor';      d = 'drift, performance and the retraining they ask for; -Apply triggers the run' }
             @{ n = 'replay';       d = 'replay a batch: .\fd-manager.ps1 replay -Batch <uuid>' }
             @{ n = 'forget';       d = 'forget a failed batch: forget -Batch <uuid> [-Apply]' }
             @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8501) [-Stop]' }
@@ -478,6 +480,12 @@ switch ($Task) {
         Write-Host "Airflow    : http://localhost:8080   (admin / admin)" -ForegroundColor Cyan
         Write-Host "MLflow     : http://localhost:5000" -ForegroundColor Cyan
         Write-Host "Streamlit  : http://localhost:8501   (fd_dashboard, lecture seule)" -ForegroundColor Cyan
+        # THE PUBLISHED PORT AND NOT THE CONTAINER'S. The producer listens on
+        # 4000 and compose publishes 8801 to the loopback; the scheduler reaches
+        # it on producer:4000 inside the network, a browser on 8801 outside.
+        # Printing both is the point: confusing the two costs a quarter of an hour.
+        Write-Host "Producer   : http://localhost:8801/current-transactions" -ForegroundColor Cyan
+        Write-Host "             (producer:4000 depuis les conteneurs)" -ForegroundColor DarkGray
         if (-not $env:FD_DASHBOARD_PASSWORD) {
             Write-Host "  FD_DASHBOARD_PASSWORD est vide : le tableau de bord ne pourra pas se connecter." -ForegroundColor Yellow
             Write-Host "  .\fd-manager.ps1 setup   puis   .\fd-manager.ps1 init" -ForegroundColor Yellow
@@ -527,7 +535,8 @@ switch ($Task) {
         # status=running, whose support varies.
         # airflow-init is absent from this list: it migrates the schema and
         # then exits. Seeing it as "Exited (0)" is the expected behaviour.
-        $expected = @('postgres', 'airflow-scheduler', 'airflow-webserver', 'mlflow', 'dashboard')
+        $expected = @('postgres', 'airflow-scheduler', 'airflow-webserver',
+                      'mlflow', 'producer', 'dashboard')
         $up = 0
         foreach ($svc in $expected) {
             $id = @(& docker compose ps -q $svc) -join ''
@@ -568,6 +577,7 @@ switch ($Task) {
             @{ id = 'dag_train';           note = 'Monday 03:00' }
             @{ id = 'dag_ingest';          note = 'every minute' }
             @{ id = 'dag_ingest_verdicts'; note = 'daily 02:00' }
+            @{ id = 'dag_monitor';         note = 'hourly, at 17 past' }
             @{ id = 'dag_daily';           note = 'daily 06:00, catches up missed days' }
             @{ id = 'dag_purge';           note = 'Sunday 04:00, the only one that deletes' }
         )
@@ -1015,10 +1025,11 @@ ORDER BY state DESC, control;
         Write-Host "donc ce n'est pas un echec qu'elle voit -- c'est une execution" -ForegroundColor DarkGray
         Write-Host "qui n'a silencieusement jamais eu lieu." -ForegroundColor DarkGray
         Write-Host ""
-        Write-Host "Le verdict vient d'Airflow et non d'un age : la base est la meme," -ForegroundColor DarkGray
-        Write-Host "donc dag_run dit si l'execution est terminee. Cinq minutes serait" -ForegroundColor DarkGray
-        Write-Host "genereux pour le DAG a la minute et absurde pour un chargement" -ForegroundColor DarkGray
-        Write-Host "historique de vingt minutes." -ForegroundColor DarkGray
+        Write-Host "Le verdict est un age : une heure. Depuis L1, Airflow a sa" -ForegroundColor DarkGray
+        Write-Host "propre base, donc dag_run n'est pas lisible d'ici. Le callback" -ForegroundColor DarkGray
+        Write-Host "du DAG ferme deja chaque echec qu'Airflow sait rapporter ; il" -ForegroundColor DarkGray
+        Write-Host "reste les executions tuees avec leur conteneur, qui attendent" -ForegroundColor DarkGray
+        Write-Host "donc une heure avant d'etre fermables." -ForegroundColor DarkGray
         Write-Host ""
         & docker @Psql -f '/work/sql/checks/abandoned_runs.sql'
         if ($LASTEXITCODE -ne 0) {
@@ -1150,6 +1161,8 @@ LIMIT  10;
         Assert-Docker
         Write-Host ""
         Write-Host "N0 : observation de l'API temps reel." -ForegroundColor Cyan
+        Write-Host "L'adresse mesuree est realtime.endpoint, celle que lit" -ForegroundColor DarkGray
+        Write-Host "l'ingestion. --endpoint <url> mesure une autre adresse." -ForegroundColor DarkGray
         Write-Host "Environ 5 minutes. La mesure est ecrite sous runtime/observations/." -ForegroundColor DarkGray
         Write-Host ""
         Write-Host "Le fichier produit ne contient AUCUNE donnee nominative :" -ForegroundColor DarkGray
@@ -1295,6 +1308,64 @@ LIMIT  10;
             Write-Host ""
             Write-Host "Dry run. To apply the decision:" -ForegroundColor Cyan
             Write-Host "  .\fd-manager.ps1 promote -Apply" -ForegroundColor Cyan
+            Write-Host ""
+        }
+    }
+
+    'monitor' {
+        Assert-Env
+        Assert-Docker
+        Write-Host ""
+        Write-Host "The monitoring of the model in service." -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Four controls: the inputs moving away from the training reference," -ForegroundColor DarkGray
+        Write-Host "the flag rate moving, the measured performance against the floor the" -ForegroundColor DarkGray
+        Write-Host "specification declares, and the quality of what the stream delivers." -ForegroundColor DarkGray
+        Write-Host "Every figure lands in fd_monitoring; one state per control lands in" -ForegroundColor DarkGray
+        Write-Host "fd_ops_state, and only a change of state is announced." -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "A drift alert asks dag_train for a candidate. It cannot put it in" -ForegroundColor DarkGray
+        Write-Host "service: the gate decides that, which is why the trigger is allowed" -ForegroundColor DarkGray
+        Write-Host "to fire on a drift that turns out harmless." -ForegroundColor DarkGray
+        Write-Host ""
+
+        if ($Apply) {
+            Enable-Dag 'dag_monitor' 'hourly, at 17 past'
+            Invoke-Step 'declenchement de dag_monitor' {
+                & docker compose exec -T airflow-scheduler `
+                    airflow dags trigger dag_monitor
+            }
+            Write-Host ""
+            Write-Host "Follow it:  .\fd-manager.ps1 tasklog -TaskId measure" -ForegroundColor Cyan
+            Write-Host ""
+        }
+
+        Write-Host "Current state of the four controls:" -ForegroundColor Cyan
+        & docker @Psql -c @'
+SELECT control, state, since::timestamp(0) AS depuis, left(detail, 54) AS detail
+FROM   fd_ops_state
+WHERE  control IN ('input_drift', 'prediction_drift', 'performance',
+                   'data_quality')
+ORDER  BY state DESC, control;
+'@
+        Write-Host ""
+        Write-Host "Last measurements, most recent first:" -ForegroundColor Cyan
+        & docker @Psql -c @'
+SELECT measured_at::timestamp(0) AS mesure, control, metric,
+       round(value, 6) AS valeur, round(threshold, 6) AS limite, state,
+       n_rows, n_labelled
+FROM   fd_monitoring
+ORDER  BY measurement_id DESC
+LIMIT  14;
+'@
+        Write-Host ""
+        Write-Host "The series one control draws over the long run (EC45):" -ForegroundColor DarkGray
+        Write-Host "  SELECT window_end, value FROM fd_monitoring" -ForegroundColor DarkGray
+        Write-Host "   WHERE metric = 'recall_flagged' ORDER BY window_end;" -ForegroundColor DarkGray
+        Write-Host ""
+        if (-not $Apply) {
+            Write-Host "Read only. To take a measurement now:" -ForegroundColor Cyan
+            Write-Host "  .\fd-manager.ps1 monitor -Apply" -ForegroundColor Cyan
             Write-Host ""
         }
     }

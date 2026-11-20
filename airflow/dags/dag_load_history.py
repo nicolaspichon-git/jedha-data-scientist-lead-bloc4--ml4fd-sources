@@ -155,7 +155,8 @@ def load_history():
 
         from ml4fd import config, fetch
         s = config.load()
-        return str(fetch.fetch_csv(s.csv_url, Path("/opt/project/.local_cache")))
+        return str(fetch.fetch_csv(s.csv_source,
+                                   Path("/opt/project/.local_cache")))
 
     @task
     def write_raw(csv_path: str) -> str:
