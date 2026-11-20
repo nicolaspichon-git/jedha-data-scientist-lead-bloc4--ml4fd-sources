@@ -4,9 +4,20 @@
     python tools/build_traceability.py            # writes TRACEABILITY.md
     python tools/build_traceability.py --check    # writes nothing, non-zero on a break
 
-Covers: EC07, EC28
+Covers: EC07, EC28, EC50
 Lot: L8 (repointe et reduit en L4, 20/11/2026)
-Competency: C1
+Competency: C1, C6
+
+EC50 IS THIS FILE'S OWN REQUIREMENT -- "tenir une matrice de tracabilite
+competence -> exigence -> element de la solution -> emplacement" -- and it went
+unmarked while the generator read a document that did not exist. Marked here
+rather than anywhere else: the requirement asks for the matrix to be KEPT, and
+what keeps it is the generator, not the file it writes.
+
+NOTE FOR THE READER OF THAT REQUIREMENT. It names four things and the table
+carries three columns for them: Comp., Exigence, and Code -- which merges the
+element of the solution with its location, as "file:line function()". Splitting
+them is a change to the table, not to this mark, and it is listed as such.
 
 WHY A SCRIPT RATHER THAN A HAND-KEPT TABLE: a hand-written matrix drifts. The
 BC03 one did -- eleven citations had slipped by one rank after a renumbering,
@@ -78,10 +89,23 @@ KINDS = (("livrable", "L"), ("documentaire", "D"), ("demonstration", "DM"),
 LETTERS = {"L": "L", "D": "D", "DM": "DM", "A": "A", "F": "F"}
 LEGEND = ("L = livrable, D = documentaire, DM = demonstration, "
           "A = architectural, F = fonctionnel")
-# The two kinds that must end up in code. A documentary, architectural or
+# THE ONE KIND THAT MUST END UP IN CODE. A documentary, architectural or
 # demonstration requirement legitimately carries none: its absence is counted,
 # not penalised.
-NEEDS_CODE = ("F", "L")
+#
+# L LEFT THIS TUPLE ON 2026-11-20, and that is a correction rather than a
+# loosening. A deliverable is a thing that must EXIST -- a presentation, a
+# repository, a report -- and three of this dossier's four carry no line of
+# code by their nature: EC46 is a slide deck, EC48 is five minutes of speech,
+# EC47 is "heberger le code sur GitHub", which was already true when it was
+# first reported as missing code. Counting them as debt put three items on a
+# to-do list that no amount of code could ever clear, which is the fastest way
+# to teach a reader to skip a section.
+#
+# So L is listed apart, as what this tool cannot check: whether the thing
+# exists. Saying "I do not verify this" is worth more than a false red.
+NEEDS_CODE = ("F",)
+IS_DELIVERABLE = "L"
 
 
 def abbreviated(kind: str) -> str:
@@ -305,9 +329,13 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
            suspect: list[tuple], declared: dict) -> str:
     carried, no_code = coverage(req, code)
     flagged = {(name, where) for name, _filed, _claimed, where in suspect}
+    def kinds_of(name: str) -> list[str]:
+        return req[name]["kind"].split(", ")
+
     needs = [name for name in no_code
-             if any(letter in req[name]["kind"].split(", ")
-                    for letter in NEEDS_CODE)]
+             if any(letter in kinds_of(name) for letter in NEEDS_CODE)]
+    deliverables = [name for name in sorted(req)
+                    if IS_DELIVERABLE in kinds_of(name)]
 
     out = ["# Matrice de tracabilite", "",
            "> Fichier **genere** par `tools/build_traceability.py`. "
@@ -341,17 +369,26 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
     out += ["", "## Decompte", "",
             "- exigences definies : **%d**" % len(req),
             "- portees par du code : **%d**" % len(carried),
-            "- sans code : **%d**, dont de nature fonctionnelle ou livrable : "
-            "**%d**" % (len(no_code), len(needs)),
+            "- sans code : **%d**, dont de nature fonctionnelle : **%d**"
+            % (len(no_code), len(needs)),
+            "- livrables, dont l'existence n'est pas verifiee ici : **%d**"
+            % len(deliverables),
             "- marques a verifier (desaccord de competence) : **%d**"
             % len(suspect),
             "- ruptures de tracabilite : **%d**" % len(broken)]
     if needs:
-        out += ["", "### Fonctionnelles ou livrables, sans code", "",
-                "Une exigence de nature F ou L sans emplacement est soit non "
+        out += ["", "### Fonctionnelles, sans code", "",
+                "Une exigence de nature F sans emplacement est soit non "
                 "realisee, soit realisee sans marque `Covers:`. Les deux se "
                 "corrigent, et pas au meme endroit.", "",
                 ", ".join("**%s**" % name for name in needs)]
+    if deliverables:
+        out += ["", "### Livrables, hors code", "",
+                "Une exigence de nature L designe une chose qui doit EXISTER "
+                "-- une presentation, un depot, un rapport -- et non une ligne "
+                "de code. Cet outil ne peut pas verifier son existence : il la "
+                "nomme, et le dire vaut mieux qu'un faux rouge.", "",
+                ", ".join("**%s**" % name for name in deliverables)]
     out += ["", "## Par competence", ""]
     out += ["- " + line for line in by_competency(req, code, no_code)]
     if suspect:
@@ -359,11 +396,13 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
                 "Une marque `Covers:` dont la ligne `Competency:` contredit la "
                 "section sous laquelle le document classe l'exigence. Les deux "
                 "sont des declarations du meme fait, donc l'une des deux est "
-                "fausse -- sauf aux frontieres reelles, EC33 par exemple, que "
-                "le monitoring (C6) declenche et que le reentrainement (C5) "
-                "execute. Ces emplacements portent **(!)** dans la colonne "
-                "Code. Ils ne changent aucun compte : ce tableau trie, il ne "
-                "juge pas.", "",
+                "fausse. Une frontiere reelle en est un cas particulier et se "
+                "corrige du cote de la marque : EC33 est declenchee par le "
+                "monitoring (C6) et executee par le reentrainement (C5), et "
+                "`tests/test_monitor.py` a cesse d'y figurer le jour ou sa "
+                "ligne `Competency:` a dit les deux. Ces emplacements portent "
+                "**(!)** dans la colonne Code. Ils ne changent aucun compte : "
+                "ce tableau trie, il ne juge pas.", "",
                 "| Exigence | Document | Marque | Emplacement |",
                 "| --- | --- | --- | --- |"]
         out += ["| **%s** | %s | %s | `%s` |" % row for row in suspect]

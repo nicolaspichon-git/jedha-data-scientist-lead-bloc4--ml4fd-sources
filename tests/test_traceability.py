@@ -232,3 +232,64 @@ def test_the_matrix_says_the_old_marks_cannot_be_trusted_yet():
     text = MATRIX.read_text(encoding="utf-8")
     assert "renumerote" in text
     assert "EC01" in text and "stream.py" in text
+
+
+# --- L4: a deliverable is not functional debt --------------------------------
+
+def test_only_a_functional_requirement_must_carry_code():
+    """L LEFT NEEDS_CODE on 2026-11-20. A deliverable is a thing that must
+    EXIST -- a slide deck, a repository, five minutes of speech -- and three of
+    this dossier's four carry no line of code by their nature. EC47 is
+    "heberger le code sur GitHub", which was already true when it was first
+    reported as missing code. Three items on a to-do list that no amount of
+    code could clear is the fastest way to teach a reader to skip a section."""
+    assert bt.NEEDS_CODE == ("F",)
+    assert bt.IS_DELIVERABLE == "L"
+
+
+@needs_matrix
+def test_the_deliverables_are_named_apart_from_the_functional_gaps():
+    """Named rather than hidden: "this tool does not verify whether the thing
+    exists" is worth more than a false red, and worth more than silence."""
+    text = MATRIX.read_text(encoding="utf-8")
+    functional = text.index("### Fonctionnelles, sans code")
+    deliverables = text.index("### Livrables, hors code")
+    assert functional < deliverables
+    gaps = text[functional:deliverables]
+    for name in ("EC46", "EC47", "EC48"):
+        assert name not in gaps, "%s counted as functional debt" % name
+
+
+# --- L4: the three marks of this lot ----------------------------------------
+
+def test_the_unattended_retraining_is_marked():
+    """EC31 asks for a retraining that runs without a hand on it. dag_train is
+    that -- guard, dataset, fit, registration, gate, alias -- and the mark was
+    missing rather than the implementation."""
+    req = bt.defined()
+    code, _outside, _declared = bt.tagged()
+    assert req["EC31"]["competency"] == "C5"
+    assert any("dag_train.py" in place for place in code.get("EC31", []))
+
+
+def test_the_matrix_is_marked_by_its_own_generator():
+    """EC50 asks for the matrix to be KEPT, and what keeps it is the generator,
+    not the file it writes."""
+    code, _outside, _declared = bt.tagged()
+    assert any("build_traceability.py" in place
+               for place in code.get("EC50", []))
+
+
+def test_competence_five_is_complete_and_undoubted():
+    """The result of this lot, pinned: every EC of C5 carries a mark, and none
+    of those marks disagrees with the document. If this breaks, either a
+    requirement lost its code or a Competency line drifted."""
+    req = bt.defined()
+    code, _outside, declared = bt.tagged()
+    suspect = bt.disagreements(req, declared)
+    five = [name for name in req if req[name]["competency"] == "C5"]
+    assert five
+    for name in five:
+        assert code.get(name), "%s carries no code" % name
+    assert not [row for row in suspect
+                if req[row[0]]["competency"] == "C5"], suspect
