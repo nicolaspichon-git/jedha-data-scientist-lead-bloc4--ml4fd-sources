@@ -1,6 +1,14 @@
 """L4: the monitoring of the model in service, and the retraining it asks for.
 
-Covers: EC33, EC38, EC39, EC40, EC42, EC44, EC45   Lot: L4   Competency: C6
+Covers: EC33, EC38, EC39, EC40, EC42, EC44, EC45   Lot: L4
+Competency: C5, C6
+
+C5 AND NOT ONLY C6, corrected 2026-11-20. The requirements document
+files EC33 -- the trigger policy -- under C5, and this file exercises
+retraining_due, which IS that policy: the alert that must not trigger, the
+cooldown, the unanswered alert. Declaring C6 alone made the matrix flag the
+mark, and the matrix was right. Monitoring raises the alert, retraining
+answers it; the file sits on both sides of that line and now says so.
 
 WHAT THESE TESTS ARE FOR. The whole policy of C6 is a set of comparisons, and
 a live run almost never produces the interesting ones: a stream that has not

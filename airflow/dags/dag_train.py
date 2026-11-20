@@ -1,8 +1,19 @@
 """S2 -- training the fraud scoring model. Weekly.
 
-Covers: EI06, EC08, EC09
-Lot: M7
-Competency: C3
+Covers: EI06, EC08, EC09, EC31
+Lot: M7 (EC31 ajoute en L4, 20/11/2026)
+Competency: C3, C5
+
+EC31 ASKS FOR A RETRAINING THAT RUNS WITHOUT A HAND ON IT, and since
+2026-11-20 this DAG is that: guard, dataset, fit, registration, and -- as of
+challenge_and_promote -- the gate and the alias. Nothing in the chain waits for
+a command to be typed. The mark was missing rather than the implementation.
+
+C5 JOINS THE LINE FOR THE SAME REASON. The C3 beside it belongs to EC08 and
+EC09, which are marks of the referential this project grew out of and which the
+requirements document has since renumbered -- see TRACEABILITY.md, section
+"Marques en desaccord". They are left as they are rather than guessed at: the
+re-pointing is one pass over 303 marks and does not belong in a lot about EC31.
 
 M1 to M8: the guard, the cut-off and recipe, the dataset with its temporal
 split, the fit with its honest report, the threshold chosen off the test set,

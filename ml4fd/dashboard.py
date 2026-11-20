@@ -844,3 +844,206 @@ def rejects_view(conn, settings, first: dt.date | None = None,
                      "ici." % health.WATCHED_DAG),
             "title": "Rejets %s" % period}
 
+
+
+# --- the monitoring of the model in service, as a page shows it (R11) --------
+#
+# WHY THIS PAGE EXISTS. fd_monitoring was written by dag_monitor and read by
+# nothing: on 2026-11-20 a search for the table's name returned the DDL, the
+# insert, the task that calls it, and no reader at all. EC45 asks to keep the
+# history "afin de pouvoir constater une evolution dans le temps long" and EC49
+# asks for a monitoring report "consultable et presentable devant un jury" --
+# the keeping was done, the constater and the consultable were not.
+#
+# NO VERDICT IS COMPUTED HERE, and that is the one decision worth naming. Each
+# row of fd_monitoring already carries the state monitor.py decided and the
+# limit it compared against, so the page shows measurement and limit side by
+# side and lets the stored state speak. Recomputing would need the DIRECTION of
+# each comparison -- a share alerts above its limit, a recall below it -- which
+# is a second declaration of the policy, in a display module, free to disagree
+# with the first.
+
+MONITORING_LATEST_SQL = "dashboard/monitoring_latest.sql"
+MONITORING_SERIES_SQL = "dashboard/monitoring_series.sql"
+MONITORING_COLUMNS_SQL = "dashboard/monitoring_columns.sql"
+RETRAIN_REQUESTS_SQL = "dashboard/retrain_requests.sql"
+
+# A week by default. The nominal cadence measures hourly, so a week is about
+# 170 points per control -- enough to see a trend, few enough to read.
+MONITORING_DEFAULT_DAYS = 7
+
+MONITORING_LABELS = {"input_drift": "Dérive des entrées",
+                     "prediction_drift": "Dérive des prédictions",
+                     "performance": "Performance du modèle",
+                     "data_quality": "Qualité des données reçues"}
+
+# EVERY METRIC monitor.py CAN WRITE, named once. A metric this map does not
+# know would reach the page as its raw identifier -- readable, but English and
+# underscored on a French page -- so a test ties the two declarations together
+# rather than leaving the gap to be noticed by a reader.
+METRIC_LABELS = {"drifted_columns_share": "Part des colonnes en dérive",
+                 "alerts_per_day": "Alertes par jour",
+                 "recall_flagged": "Rappel observé",
+                 "recall_alerted": "Rappel sur les seules alertées",
+                 "rejection_share": "Part des lignes rejetées",
+                 "seconds_since_success": "Secondes depuis la dernière réussite"}
+
+MONITORING_STATE_LABELS = {"ok": "ok", "alert": "alerte",
+                           "unmeasurable": "non mesurable"}
+
+
+def _metric_label(metric: str) -> str:
+    """A metric's name in French, or the identifier itself.
+
+    The identifier rather than a raise: a page that stops because a new metric
+    was added is worse than a page showing one underscored name.
+    """
+    return METRIC_LABELS.get(metric, metric)
+
+
+def _measure(value, metric: str) -> str:
+    """A measurement as the page prints it, by what the metric counts."""
+    if value is None:
+        return "—"
+    number = float(value)
+    if metric in ("drifted_columns_share", "rejection_share") \
+            or metric.startswith("recall"):
+        return report._share(number)
+    if metric.startswith("column_drift:"):
+        return "%.4f" % number
+    if number >= 100:
+        return report._count(round(number))
+    return "%.3f" % number
+
+
+def monitoring_view(conn, settings, first: dt.date | None = None,
+                    last: dt.date | None = None,
+                    now: dt.datetime | None = None) -> dict:
+    """Everything the monitoring page shows, for days first..last.
+
+    Covers: EC45, EC49
+    Lot: L4
+    Competency: C6
+    """
+    last = last or today(settings, now)
+    first = first or last - dt.timedelta(days=MONITORING_DEFAULT_DAYS - 1)
+    first, last, clipped = bounded(first, last)
+    period = period_label(first, last)
+    window = report.span_for(settings, first, last)
+
+    latest = report._rows(conn, MONITORING_LATEST_SQL, {})
+    measured = report._rows(conn, MONITORING_SERIES_SQL, window.params())
+    columns = report._rows(conn, MONITORING_COLUMNS_SQL, {})
+    requests = report._rows(conn, RETRAIN_REQUESTS_SQL, window.params())
+
+    notices: list[Notice] = []
+    if clipped:
+        notices.append(Notice(INFO,
+            "Période ramenée à %d jours, du %s au %s."
+            % (MAX_PERIOD_DAYS, report._day(first), report._day(last))))
+    if not latest:
+        notices.append(Notice(INFO,
+            "Aucune mesure enregistrée : dag_monitor n'a pas encore tourné. "
+            ".\\fd-manager.ps1 monitor -Apply l'active, puis la cadence "
+            "déclarée en gouvernance s'applique."))
+    for row in latest:
+        if row["state"] == "alert":
+            notices.append(Notice(ERROR, "%s : %s (%s contre une limite de %s)."
+                % (MONITORING_LABELS.get(row["control"], row["control"]),
+                   row["detail"] or _metric_label(row["metric"]),
+                   _measure(row["value"], row["metric"]),
+                   _measure(row["threshold"], row["metric"]))))
+    if latest and not any(row["state"] == "alert" for row in latest):
+        notices.append(Notice(SUCCESS,
+            "Tous les contrôles de surveillance sont au vert à leur dernière "
+            "mesure."))
+
+    state = [{"Contrôle": MONITORING_LABELS.get(row["control"], row["control"]),
+              "Mesure": _metric_label(row["metric"]),
+              "Valeur": _measure(row["value"], row["metric"]),
+              "Limite": _measure(row["threshold"], row["metric"]),
+              "État": MONITORING_STATE_LABELS.get(row["state"], row["state"]),
+              # THE STATE TABLE'S since AND NOT THE MEASUREMENT'S instant: one
+              # says when this window was judged, the other since when the
+              # control has been saying the same thing. A control in alert for
+              # six hours and one that turned red a minute ago read identically
+              # without it.
+              "Depuis": _local(settings, row["recorded_since"]),
+              "Mesuré à": _local(settings, row["measured_at"]),
+              "Modèle": row["model_version"],
+              "Lignes": report._count(row["n_rows"]),
+              "Outil": row["tool"]}
+             for row in latest]
+
+    # ONE SERIES PER CONTROL **AND PER METRIC**, each carrying its measurement
+    # and the limit that was in force AT THE TIME.
+    #
+    # PER METRIC AND NOT PER CONTROL, corrected before this page was ever
+    # opened twice: performance writes recall_flagged AND recall_alerted, and
+    # data_quality writes rejection_share AND seconds_since_success. Grouped by
+    # control alone, two metrics landed in one frame and were drawn as one
+    # line -- a share between 0 and 1 plotted through a count of seconds.
+    #
+    # AND THE LIMIT IS DROPPED WHEN THERE IS NONE TO DRAW. recall_alerted
+    # carries no threshold at all, and recall_flagged carries none while the
+    # window holds too few labelled frauds to judge: the column is then null
+    # from end to end, which is not a line but a chart asked to plot nothing.
+    # Streamlit is handed the columns it can draw, named here rather than
+    # guessed there.
+    series = []
+    pairs = sorted({(row["control"], row["metric"]) for row in measured})
+    for control, metric in pairs:
+        points = [row for row in measured
+                  if row["control"] == control and row["metric"] == metric]
+        drawn = [{"Instant": row["measured_at"],
+                  "Mesure": None if row["value"] is None
+                            else float(row["value"]),
+                  "Limite": None if row["threshold"] is None
+                            else float(row["threshold"])}
+                 for row in points]
+        # NOT NAMED `columns`, and the name is the whole comment. It was, for
+        # one run of the suite, and it shadowed the per-column rows read from
+        # the database above -- so the table below iterated over ["Mesure"] and
+        # indexed a string with "column_name". The same shadowing that cost an
+        # hour in tools/build_traceability.py this morning.
+        drawn_columns = ["Mesure"]
+        if any(point["Limite"] is not None for point in drawn):
+            drawn_columns.append("Limite")
+        else:
+            for point in drawn:
+                point.pop("Limite")
+        series.append({
+            "control": control,
+            "label": MONITORING_LABELS.get(control, control),
+            "metric": _metric_label(metric),
+            "columns": drawn_columns,
+            "points": drawn})
+
+    drifted = [{"Colonne": row["column_name"],
+                "Statistique": _measure(row["value"], "column_drift:x"),
+                "Limite de l'outil": _measure(row["threshold"],
+                                              "column_drift:x"),
+                "Méthode": row["detail"],
+                "Lignes": report._count(row["n_rows"])}
+               for row in columns]
+
+    asked = [{"Demandé à": _local(settings, row["requested_at"]),
+              "Contrôles": row["controls"],
+              "Motif": row["reason"],
+              "Exécution": row["run_id"] or "—"}
+             for row in requests]
+
+    return {"first": first, "last": last, "notices": notices,
+            "state": state, "series": series, "columns": drifted,
+            "requests": asked,
+            "title": "Surveillance du modèle %s" % period,
+            "note": ("Chaque ligne porte la limite qui était en vigueur au "
+                     "moment de la mesure, et non celle d'aujourd'hui : un "
+                     "seuil qui bouge ne redessine pas le passé. Les figures "
+                     "par colonne sont celles du dernier passage et portent la "
+                     "limite choisie par l'outil, pas la nôtre — leur état "
+                     "n'est donc pas un verdict sur la colonne. Une demande de "
+                     "réentraînement dit qu'il a été demandé, et non qu'un "
+                     "modèle en est sorti : l'enregistrement suit le "
+                     "déclenchement, donc une exécution qui a échoué ensuite "
+                     "laisse une demande sans modèle derrière elle.")}
