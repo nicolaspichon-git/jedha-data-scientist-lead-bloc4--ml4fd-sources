@@ -262,6 +262,22 @@ services:
       # was refused on its FIRST call at 0.0 s. Ten under thirteen restores
       # the margin dag_ingest's docstring claims. Empty disables the limiter,
       # at the cost of EC25's 429 path becoming unreachable.
+      #
+      # VERIFIED, 2026-11-20 00:26 UTC
+      # (runtime/observations/n0-api-measure--20261120-0026.md): twenty
+      # calls back to back, in 0.365 s, so one window -- eight answered
+      # 200 and the twelve others 429. Eight and not thirteen, because
+      # dag_ingest was running and held five: under the LocalExecutor it
+      # runs in the same container as every measuring tool, and the
+      # producer keys its limiter on the client address, so they share one
+      # bucket. 8 + 5 = 13 closes the arithmetic and confirms this value
+      # is the one in force.
+      #
+      # AND IT CUTS BOTH WAYS. The ingestion asks for up to ten of the
+      # thirteen (five calls, each retried once on a 429), so a
+      # measurement campaign run beside it can starve the chain it is
+      # measuring. `fd-manager observe` now says so when dag_ingest is
+      # active, rather than leaving the figure to be misread.
       PRODUCER_RATE_LIMIT: "${PRODUCER_RATE_LIMIT-13/minute}"
       # The corpus's bucket and the credentials boto3 reads by itself. Needed
       # for the FIRST start only: fetch_csv caches the file with its sha256 and
