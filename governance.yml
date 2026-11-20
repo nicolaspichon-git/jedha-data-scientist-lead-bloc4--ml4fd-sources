@@ -11,12 +11,25 @@ verdicts:
   # scoring and the measured recall means nothing.
   #   nominal -- delay_days, the real-world figure
   #   demo    -- demo_delay_seconds, so a verdict falls due during a recording
-  mode: nominal
+  mode: demo
 
   # Delay between a transaction and the moment its verdict becomes known.
   # Sets the width of the blind band before the cut-off.
   delay_days: 30
   demo_delay_seconds: 300        # demonstration value (F13.1, EI12)
+
+  # HOW OFTEN THE DUE VERDICTS ARE WRITTEN, and it has to follow the switch
+  # above or the demonstration stalls on arithmetic nobody notices: in demo a
+  # verdict falls due 300 s after its transaction, while a DAG running once at
+  # 02:00 would write it the next morning. The delay would be short and the
+  # labels would still never arrive.
+  #
+  # 1-59/2 and not */2: dag_monitor runs on the even minutes, so the verdicts
+  # are written on the odd ones. Neither waits for the other -- they share no
+  # lock -- but a demonstration is read on one screen, and two tasks starting
+  # in the same second are harder to follow than two that alternate.
+  schedule: "0 2 * * *"
+  demo_schedule: "1-59/2 * * * *"
 
 retention:
   # EVERY STORE OF THE PROJECT IS DECLARED HERE, purged or not (S5/Q0). A store
@@ -110,6 +123,13 @@ retention:
       The Markdown morning reports. They name transactions by identifier and
       amount, never the cardholder. Kept: each is the document its digest in
       fd_reports vouches for.
+    fd_retrain_requests: >-
+      The retraining requests the monitoring made. Kept, and for the same
+      reason as fd_promotions: a request is a decision the system took on its
+      own, and "why was this model refitted on the 12th" has to be answerable
+      months later. It is also what makes the decision idempotent -- purging it
+      would re-arm every standing alert at once. No personal data: a timestamp,
+      a run identifier, control names and a sentence.
     fd_monitoring: >-
       The monitoring measurements. Kept, and not given a duration: EC45 exists
       to show an evolution over the long run, so a window that purges the
@@ -279,8 +299,8 @@ promotion:
   # places on the system. A candidate that exceeds it is refused however good
   # its recall: alerts nobody reads are not detections.
   #
-  # OFF FOR THE BOOTSTRAP, 2026-11-20, and here is the reason rather than an
-  # apology. The figure the gate compares is train.py's alerts_per_day,
+  # OFF FOR THE BOOTSTRAP, 2026-11-20. 
+  # The figure the gate compares is train.py's alerts_per_day, 
   # 7200 * flagged / n_test: the THROUGHPUT is the stream's (realtime.schedule
   # x calls_per_run = 7,200 calls a day) and the ALERT RATE is the test
   # split's. Only one of the two halves comes from where the model will serve.
@@ -296,7 +316,7 @@ promotion:
   # Then this goes back to true. fd_promotions writes alert_capacity into
   # every row, so a promotion decided with the check off stays visible for
   # good -- which is what makes this defensible instead of merely convenient.
-  respect_alert_capacity: false
+  respect_alert_capacity: true
 
   # WITH NO CHAMPION YET there is nothing to compare against, and refusing
   # would leave the scoring path with no model to load at all. The first
@@ -323,7 +343,20 @@ monitoring:
   # cycle -- drift, alert, retraining, gate, promotion -- fits in a recording.
   #   nominal -- the windows a production stream would use
   #   demo    -- the windows of the demonstration
-  mode: nominal
+  mode: demo
+
+  # HOW OFTEN THE MODEL IS WATCHED. Hourly at 17 past in nominal: the drift
+  # window is 24 hours, so measuring more often would re-read the same window
+  # and fill fd_monitoring with rows that say the same thing. 17 rather than 0
+  # because a scheduler with every cadence on the hour starts everything at
+  # once; the offset costs nothing and spreads the load.
+  #
+  # EVERY TWO MINUTES IN DEMO, and that is what makes the five-minute criterion
+  # reachable at all: a drift injected at T is measured by T+2, the retraining
+  # is asked for in the same run, and the gate decides when the candidate is
+  # fitted. An hourly monitor would make the loop correct and unshowable.
+  schedule: "17 * * * *"
+  demo_schedule: "*/2 * * * *"
 
   # THE TOOL, named because EC38 requires a named one. The figure it computes
   # and the version that computed it are written into every row of
@@ -347,13 +380,68 @@ monitoring:
     window_minutes: 1440
     demo_window_minutes: 15
 
-    # THE SHARE OF COLUMNS THAT MUST DRIFT BEFORE THIS IS AN ALERT. Five
-    # features are in service, so 0.40 is two of them. One column drifting is
-    # ordinary -- a seasonal amount, a category gaining share -- and alerting
-    # on it would train the operator to ignore this channel. Two columns is a
-    # change of shape. Per-column scores are recorded whatever the verdict, so
-    # the one that moved first stays readable afterwards.
-    max_drifted_share: 0.40
+    # AND A FLOOR ON THE SAMPLE, symmetric with performance.min_labelled_frauds
+    # below. Added 2026-11-20, because the measurement ran on ANY non-empty
+    # window: three rows produced a verdict carrying the same authority as
+    # seven thousand. performance refuses to conclude under 30 labelled frauds;
+    # drift concluded on anything at all. One of the two was wrong, and it was
+    # not performance.
+    #
+    # 500 nominal, against the 7,200 the window should hold: a floor that only
+    # bites when under 7 % of the expected volume arrived -- which is itself
+    # worth knowing, and is now reported as unmeasurable rather than as drift.
+    #
+    # 50 in demo, against the ~75 the fifteen-minute window holds, and the
+    # lower floor is justified by the SIZE of the injected effect rather than
+    # by convenience: the drift switch multiplies the amount up to the
+    # validation bound, which shows on tens of rows where a seasonal shift of a
+    # few percent would not. A thin window still carries its n_rows into
+    # fd_monitoring, so a reader always sees what a verdict rests on.
+    min_rows: 500
+    demo_min_rows: 50
+
+    # THE SHARE OF COLUMNS THAT MUST DRIFT BEFORE THIS IS AN ALERT.
+    #
+    # 0.40 UNTIL 2026-11-20: five features were measured, so 0.40 was two of
+    # them, on the argument that one column drifting is ordinary -- a seasonal
+    # amount, a category gaining share -- while two is a change of shape.
+    #
+    # WHY IT MOVED. not_comparable below removes the two history features, so
+    # three columns are now measured and the same intent -- two columns -- is
+    # 0.667, not 0.40. But the real reason is the one the per-column figures
+    # exposed: of those three, TWO drift permanently and for a reason that has
+    # nothing to do with the model ageing. The producer replays a 100,000-row
+    # slice of fraudTest spanning 2020-06-21 to 2020-07-26; the corpus is
+    # fraudTrain over about eighteen months. A one-month slice of another file
+    # has its own merchant mix and its own geography, so category (PSI 0.230)
+    # and f_home_distance_km (0.557) sit outside their limits at rest, with no
+    # injection and no drift of the stream itself.
+    #
+    # That offset is REAL and the control is right to see it -- the model is
+    # serving a population it was not trained on, and the retraining the loop
+    # asked for at 10:52 on 2026-11-20 was the correct answer to it. What the
+    # offset cannot be is a THRESHOLD: 2 of 3 is the permanent state, so a
+    # limit of 0.40 reports alert for ever, can never fall back to ok, and
+    # therefore can never re-arm. An alert that cannot re-arm is not a trigger;
+    # it is a lamp that was left on, and the loop fires exactly once.
+    #
+    # 0.70 IS ABOVE THE MEASURED OFFSET AND BELOW EVERYTHING ELSE. At rest
+    # 2/3 = 0.667 reads ok; one more comparable column moving gives 3/3 = 1.0
+    # and reads alert. The control now answers the question worth asking --
+    # has the stream moved beyond the offset we have measured and written down
+    # -- instead of restating the offset at every run.
+    #
+    # WHAT PUTS IT BACK TO 0.40. A producer that replays the corpus's own
+    # distribution, or a champion trained on a corpus that includes enough of
+    # the stream to cover it (datasets.include_stream delivers 7,200 rows a day
+    # against 1,164,585, so 0.6 % a day -- not enough yet). When the offset is
+    # gone, this line is the first that should go back.
+    #
+    # Per-column scores are recorded whatever the verdict, so the column that
+    # moved first stays readable afterwards, and the detail of
+    # drifted_columns_share carries "n of m columns drifted" -- which is how a
+    # reader of EC45's series knows that m changed the day this list did.
+    max_drifted_share: 0.70
 
     # THE STATISTIC IS PINNED, and this is the one setting here that exists for
     # EC45 rather than for EC39. Left to itself Evidently picks the per-column
@@ -369,6 +457,52 @@ monitoring:
     # tool reports, so the limit in each row is Evidently's and not a number
     # invented here.
     method: psi
+
+    # WHICH COLUMNS THE DRIFT IS MEASURED ON, by naming the ones it is NOT.
+    # Added 2026-11-20 after reading the per-column figures of a monitor that
+    # had been in alert since 09:34:34 without a single injection behind it:
+    #   f_tx_count          6.857   f_home_distance_km 0.557   category 0.230
+    #   amt                 0.073   f_avg_amount       0.027   (limit 0.100)
+    # The two columns the amount injection moves were UNDER the limit and the
+    # alert rested entirely on columns nothing had touched.
+    #
+    # THE CRITERION IS THE DEFINITION OF THE FEATURE, NOT ITS FIGURE, and the
+    # list below is the proof of it: f_avg_amount sits at 0.027, well inside
+    # its limit, and is excluded all the same. A list chosen by the figures
+    # would be a list that silences whatever is currently inconvenient.
+    #
+    # WHAT THE DEFINITION SAYS. sql/functions/fd_client_features.sql, ruling 3:
+    # "population: the whole fd_transactions table, all batches together",
+    # with a strict bound txn_ts < p_ts. A streamed transaction carries a 2026
+    # timestamp, so EVERY historical row of its cardholder precedes it and
+    # counts: the feature arrives at roughly the client's full history, about
+    # 1,400 transactions for 1,296,675 rows over 924 cardholders. A row of the
+    # training corpus carries the count that had accumulated by ITS OWN date --
+    # near zero at the start of the corpus, near the full count at the end.
+    # The two distributions describe the loading order of the table, not the
+    # behaviour of the cardholder, and no retraining can make them agree.
+    #
+    # f_avg_amount comes from the same function and the same population, so it
+    # carries the same defect; a mean over 1,400 values merely hides it where a
+    # count cannot. Excluding one and keeping the other would mean the rule is
+    # the PSI and not the population.
+    #
+    # WHAT IS NOT EXCLUDED, and deliberately. amt, category and
+    # f_home_distance_km are computed per row -- transform.home_distance_km
+    # reads only that row's own coordinates -- so a corpus row and a stream row
+    # are computed identically and their distributions are comparable. category
+    # and f_home_distance_km do drift, and that drift is real: the producer
+    # replays a 100,000-row slice of fraudTest spanning 2020-06-21 to
+    # 2020-07-26 against a corpus spanning a year and a half. A narrow slice of
+    # another file IS a different population, and a monitor that says so is
+    # right. Silencing them would turn this control into a drift detector that
+    # can only ever see what we inject ourselves.
+    #
+    # EC45 READS A SERIES, so the count is published with every verdict:
+    # drifted_columns_share carries "n of m columns drifted" in its detail, and
+    # m changes the day this list changes. A share of 0.60 over five columns
+    # and one over three do not mean the same thing, and the row says which.
+    not_comparable: [f_tx_count, f_avg_amount]
 
   # ---- the predictions moving (EC39)
   prediction_drift:
@@ -666,6 +800,44 @@ datasets:
   # difference of two recalls falls from +/-0.048 to about +/-0.030.
   split_rule: "temporal:train<=2020-04-30,test<=2020-05-31"
 
+  # WHETHER THE STREAM IS A TRAINING SOURCE, decided 2026-11-20 and the answer
+  # to a question a jury will ask: on what does the retraining retrain?
+  #
+  # Until today, on nothing new. The query bounds the rows by
+  # t.txn_ts < test_end, which is 2020-05-31, while a streamed transaction
+  # carries current_time -- so not one of them had ever entered a training set.
+  # The cut-off was clamped to labels.horizon as well, so the recipe digest
+  # never changed and build_or_reuse handed back the same Parquet files: the
+  # loop refitted on identical data and produced a model identical to the one
+  # it replaced.
+  #
+  # TWO SOURCES, TWO LABELLING REGIMES, which is the whole reason this is a
+  # flag and not a line deleted from the query. The historical corpus is
+  # trustworthy only up to labels.horizon -- past it its rows carry
+  # is_fraud = 0 because nobody labelled them, not because they are not fraud.
+  # The stream is labelled as it goes, by dag_ingest_verdicts, so its verdicts
+  # are real up to the cut-off. The query now bounds each source by its own
+  # regime, telling them apart by fd_raw_events.source and never by a date.
+  #
+  # AND THE STREAM ROWS GO TO train, NEVER TO test. The gate of L3 compares a
+  # candidate to the champion on one test set; a test set that moved with every
+  # retraining would make the published figures incomparable from one version
+  # to the next, which is what the whole promotion journal exists to prevent.
+  #
+  # false RESTORES TODAY'S BEHAVIOUR AT THE BIT. Recipe.canonical() omits this
+  # key when it is false, so the digest of a stream-free recipe is byte for
+  # byte the one it was before this lot -- the champion's dataset stays
+  # findable and no file is rewritten. That is the escape hatch, and it is
+  # tested.
+  #
+  # WHAT IT DOES NOT FIX, said here rather than discovered at the oral: the
+  # stream delivers 7,200 rows a day against 1,164,585 training rows, so 0.6 %
+  # a day. Admitting it makes the retraining mechanically fresh; it does not
+  # make the model move. Moving it needs a windowing or weighting policy, and
+  # the share is recorded in each dataset's manifest so the claim always comes
+  # with its denominator.
+  include_stream: true
+
 realtime:
   # Measured in N0 (ws/fraud-project--n0-mesure-api--20261116-0826.md), on a
   # campaign of 60 calls run ALONE -- three overlapping campaigns had reported
@@ -849,7 +1021,20 @@ sources:
   # validation.max_amount: above it the transactions would be quarantined, and
   # the demonstration would show a data_quality alert where it meant to show an
   # input_drift one.
-  drift_switch: runtime/drift.json
+  #
+  # UNDER runtime/producer/ AND NOT AT THE ROOT OF runtime/. runtime/ holds one
+  # directory per producer of artefacts -- datasets/, observations/, channels/,
+  # reports/ -- and the switch is the stand-in's own state, so it belongs in a
+  # directory of its own rather than loose beside them.
+  #
+  # IT MUST STAY UNDER runtime/, AND THAT IS NOT TIDINESS. The writer runs in
+  # the scheduler container and the reader in the producer container; runtime/
+  # is the only path the first mounts read-write and the second mounts
+  # read-only. A switch declared anywhere else would be written where nobody
+  # reads it, and drift_factor() answers 1.0 to a file it cannot find -- so the
+  # demonstration would inject nothing and say nothing. tests/test_drift.py
+  # holds that invariant.
+  drift_switch: runtime/producer/drift.json
 
 personal_data:
   # Fields that identify a person. None of them reaches the exploited layer.

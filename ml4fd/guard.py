@@ -17,6 +17,21 @@ labelled them. A window holding no positive must stop the DAG exactly as a
 window holding no run does -- that is EC14, "detect the absence", applied to
 labels rather than to runs.
 
+AND THE HORIZON IS JUDGED AGAINST THE WINDOW, NOT THE CUT-OFF, since
+2026-11-20. It used to be judged against the cut-off, which was the same
+question datasets.assert_cut_off_usable asks -- called from build.py, three
+tasks later in the same DAG. Two checks, one question, and only one of them was
+taught that datasets.include_stream makes a 2026 cut-off legitimate: the stream
+carries real verdicts from dag_ingest_verdicts, while the historical rows are
+bounded per row by labels.horizon inside sql/datasets/training_set.sql. So this
+guard refused a retraining its own system had correctly asked for, at 14:42 UTC
+on 2026-11-20, with a window report saying the window was healthy.
+
+The duplicate is gone rather than patched. What this guard knows and the other
+cannot is the SPLIT RULE's test period, read from the same settings: a test
+period reaching past the horizon is measured on rows holding nothing to find,
+and no training metric would show it. That question is this function's own.
+
 The decision is a pure function of a report, so it can be exercised without a
 database. inspect_window() gathers the facts; verdict() judges them.
 """
@@ -46,6 +61,7 @@ class WindowReport:
     labelled_positives: int
     cut_off: dt.datetime
     label_horizon: dt.datetime
+    window_end: dt.datetime
     verdict_delay: dt.timedelta = dt.timedelta(0)
 
     @property
@@ -68,6 +84,8 @@ class WindowReport:
             "base_rate": "%.4f %%" % (100 * self.labelled_positives / self.labelled_rows)
                          if self.labelled_rows else "n/a",
             "cut_off": self.cut_off.isoformat(),
+            "window_end": self.window_end.isoformat(),
+            "label_horizon": self.label_horizon.isoformat(),
         }
 
 
@@ -83,11 +101,16 @@ def verdict(report: WindowReport, min_positives: int) -> list[str]:
     """
     reasons: list[str] = []
 
-    if report.cut_off > report.label_horizon:
+    # THE WINDOW AND NOT THE CUT-OFF, since 2026-11-20, and the change is a
+    # DUPLICATE REMOVED rather than a rule relaxed. See this module's header.
+    if report.window_end > report.label_horizon:
         reasons.append(
-            "the cut-off %s is beyond the labelling horizon %s: the rows in "
-            "between are false negatives, not negatives"
-            % (report.cut_off.isoformat(), report.label_horizon.isoformat()))
+            "the test period ends at %s, beyond the labelling horizon %s: the "
+            "rows in between carry is_fraud = 0 because nobody labelled them, "
+            "so the published metrics would be measured partly on rows holding "
+            "nothing to find. Move test<= in the split rule back, or extend "
+            "labels.horizon once the labels actually exist."
+            % (report.window_end.isoformat(), report.label_horizon.isoformat()))
 
     if report.runs_total == 0:
         reasons.append("no ingestion run covers this window: the dataset would "
@@ -162,7 +185,8 @@ def inspect_window(conn: "psycopg.Connection", window_start: dt.datetime,
         last_success=last_ok, last_failure=last_ko,
         rows_in_window=rows_in_window, labelled_rows=labelled,
         labelled_positives=positives, cut_off=cut_off,
-        label_horizon=label_horizon, verdict_delay=verdict_delay)
+        label_horizon=label_horizon, window_end=window_end,
+        verdict_delay=verdict_delay)
 
 
 def assert_window_healthy(conn: "psycopg.Connection", window_start: dt.datetime,

@@ -386,6 +386,44 @@ def log_run(model, payload: dict, report: str, lock: str,
 CHAMPION_ALIAS = "champion"
 
 
+def version_of_run(client, run_id: str, name: str = REGISTERED_NAME):
+    """The registered version produced by one MLflow run.
+
+    NOT score.latest_version, AND THE DIFFERENCE MATTERS TO THE LOOP. "The
+    newest version" is the right question for an operator at a terminal, who
+    knows which training just finished. dag_train's gate asks a different one:
+    judge THE MODEL THIS RUN PRODUCED. The two answers diverge the moment two
+    trainings overlap -- a drift-triggered run and the Monday schedule, say --
+    and then the gate would compare a model to a champion while a third version
+    sat between them, promoting something no run of this DAG had evaluated.
+
+    The run_id is the only thing that ties a registered version to the task
+    that registered it, so it is what the loop carries.
+
+    Covers: EC34
+    Lot: L4
+    Competency: C5
+    """
+    found = [version for version in
+             client.search_model_versions("name='%s'" % name)
+             if str(version.run_id) == str(run_id)]
+    if not found:
+        raise LookupError(
+            "no version of model %r comes from run %s. The run registered "
+            "nothing, or it registered under another model name."
+            % (name, run_id))
+    if len(found) > 1:
+        # Two versions from one run means the same model was registered twice.
+        # Guessing which one to judge would make the gate's subject depend on
+        # an ordering nobody declared.
+        raise LookupError(
+            "run %s produced %d versions of model %r (%s): the gate cannot "
+            "know which one to judge."
+            % (run_id, len(found), name,
+               ", ".join(str(version.version) for version in found)))
+    return found[0]
+
+
 def champion(client, name: str = REGISTERED_NAME,
              alias: str = CHAMPION_ALIAS):
     """The version carrying the alias, or None when nothing carries it.

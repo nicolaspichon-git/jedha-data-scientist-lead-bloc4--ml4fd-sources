@@ -246,11 +246,18 @@ def test_the_declared_cadence_is_weekly_and_on_a_sunday():
 def test_the_purge_does_not_meet_the_verdict_writer():
     """THE COLLISION THIS CADENCE AVOIDS. The purge deletes batches of the raw
     zone; dag_ingest_verdicts READS the raw zone to write the verdicts that
-    fell. At the same hour the purge would take batches out from under it."""
-    verdicts = (ROOT / "airflow" / "dags" / "dag_ingest_verdicts.py").read_text(
-        encoding="utf-8")
-    other = re.search(r'schedule="([^"]+)"', verdicts).group(1)
+    fell. At the same hour the purge would take batches out from under it.
+
+    THE CLAIM IS ABOUT THE NOMINAL CONFIGURATION, and it is read from
+    governance rather than from the DAG source since 2026-11-20: the cadence
+    of dag_ingest_verdicts now follows verdicts.mode, so the source carries no
+    literal and the demo value carries no hour at all. In demo the cadences are
+    deliberately collapsed so the loop fits in minutes -- nobody claims this
+    guarantee of a recording.
+    """
     from ml4fd import config
+
+    other = config.load().verdict_schedule_nominal
     mine = config.load().purge_schedule
     assert mine.split()[:2] != other.split()[:2], (
         "the purge and the verdict writer share an hour: %r" % mine)

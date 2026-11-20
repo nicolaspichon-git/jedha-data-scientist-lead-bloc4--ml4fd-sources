@@ -59,7 +59,8 @@ Settings, all from the environment so the service needs no file of its own:
     PRODUCER_SKIP_ROWS   first row of the served window (default 0)
     PRODUCER_MAX_ROWS    rows held (default 100000, ~14 days of stream)
     PRODUCER_RATE_LIMIT  slowapi rule, "13/minute" as MEASURED; "" disables
-    PRODUCER_DRIFT_FILE  the drift switch (default /opt/project/runtime/drift.json)
+    PRODUCER_DRIFT_FILE  the drift switch, overriding governance's
+                         sources.drift_switch
     PRODUCER_GOVERNANCE  governance.yml, read once for validation.max_amount
 """
 import json
@@ -99,8 +100,7 @@ MAX_ROWS = int(os.environ.get("PRODUCER_MAX_ROWS") or 100_000)
 # call at 0.0 s. Empty disables the limiter, but then nothing in the project
 # can reach EC25's 429 path again.
 RATE_LIMIT = os.environ.get("PRODUCER_RATE_LIMIT", "13/minute").strip()
-DRIFT_FILE = Path(os.environ.get("PRODUCER_DRIFT_FILE",
-                                 "/opt/project/runtime/drift.json"))
+# DRIFT_FILE is resolved further down, from governance.yml: see drift_switch().
 GOVERNANCE = Path(os.environ.get("PRODUCER_GOVERNANCE",
                                  "/opt/project/governance.yml"))
 
@@ -137,6 +137,32 @@ def amount_cap(declared: dict) -> float:
     except (KeyError, TypeError, ValueError):
         log.warning("validation.max_amount not declared: cap at 50000")
         return 50000.0
+
+
+def drift_switch(declared: dict) -> Path:
+    """sources.drift_switch, resolved against the project root.
+
+    READ FROM THE DECLARATION AND NOT FROM AN ENVIRONMENT DEFAULT OF OUR OWN.
+    Until 2026-11-20 this file carried "/opt/project/runtime/drift.json" as a
+    literal while governance.yml declared sources.drift_switch, and nothing
+    compared the two: the line in governance could have moved and this service
+    would have gone on reading the old path, reporting no drift for ever. The
+    writer, tools/drift.py, reads the same field through ml4fd.config.
+
+    PRODUCER_DRIFT_FILE still overrides, for a second producer run side by side
+    with its own switch.
+    """
+    override = os.environ.get("PRODUCER_DRIFT_FILE", "").strip()
+    if override:
+        return Path(override)
+    try:
+        declared_path = Path(str(declared["sources"]["drift_switch"]))
+    except (KeyError, TypeError):
+        log.warning("sources.drift_switch not declared: no drift can be "
+                    "injected, and the demonstration of C6 needs it")
+        return GOVERNANCE.parent / "runtime" / "producer" / "drift.json"
+    return (declared_path if declared_path.is_absolute()
+            else GOVERNANCE.parent / declared_path)
 
 
 def corpus(declared: dict) -> Path:
@@ -216,7 +242,7 @@ program's own API and cached. One endpoint matters:
   `.to_json(orient="split")` form.
 
 Rate limited, as the original was. The served window and the amount drift are
-declared in the environment and in runtime/drift.json.
+declared in the environment and in runtime/producer/drift.json.
 """
 
 app = FastAPI(title="ML4FD - Real-time payments producer",
@@ -232,6 +258,7 @@ templates = Jinja2Templates(directory="templates")
 DECLARED = governance(GOVERNANCE)
 FRAME = load_window(corpus(DECLARED), SKIP_ROWS, MAX_ROWS)
 CAP = amount_cap(DECLARED)
+DRIFT_FILE = drift_switch(DECLARED)
 SERVED = {"calls": 0}
 log.info("cap %.2f, rate limit %r, drift switch %s",
          CAP, RATE_LIMIT or "none", DRIFT_FILE)

@@ -8,6 +8,9 @@ from ml4fd.guard import WindowReport, verdict
 UTC = dt.timezone.utc
 HORIZON = dt.datetime(2020, 12, 22, 23, 13, 39, tzinfo=UTC)
 CUT_OFF = dt.datetime(2020, 11, 30, tzinfo=UTC)
+# The end of the split rule's test period, which is what the horizon is judged
+# against. Inside the horizon, as the shipped split rule is.
+WINDOW_END = dt.datetime(2020, 6, 1, tzinfo=UTC)
 
 
 def report(**changes):
@@ -15,7 +18,7 @@ def report(**changes):
         runs_total=1, runs_success=1, runs_failed=0,
         last_success=dt.datetime(2026, 11, 15, tzinfo=UTC), last_failure=None,
         rows_in_window=100_000, labelled_rows=100_000, labelled_positives=400,
-        cut_off=CUT_OFF, label_horizon=HORIZON,
+        cut_off=CUT_OFF, label_horizon=HORIZON, window_end=WINDOW_END,
         verdict_delay=dt.timedelta(days=30))
     base.update(changes)
     return WindowReport(**base)
@@ -63,11 +66,50 @@ def test_a_failure_before_the_last_success_is_tolerated():
 
 # --- labelling health -----------------------------------------------------
 
-def test_a_cut_off_past_the_horizon_is_refused():
-    reasons = verdict(report(cut_off=dt.datetime(2020, 12, 31, tzinfo=UTC)),
+def test_a_test_period_past_the_horizon_is_refused():
+    """The metrics would be measured partly on rows nobody labelled, and no
+    training metric would show it."""
+    reasons = verdict(report(window_end=dt.datetime(2020, 12, 31, tzinfo=UTC)),
                       min_positives=1)
     assert any("beyond the labelling horizon" in r for r in reasons)
-    assert any("false negatives" in r for r in reasons)
+    assert any("nothing to find" in r for r in reasons)
+
+
+def test_the_refusal_names_the_split_rule_key_to_change():
+    """A reader who meets this has to edit a setting, so the message says
+    which one rather than leaving them to find it."""
+    reasons = verdict(report(window_end=dt.datetime(2020, 12, 31, tzinfo=UTC)),
+                      min_positives=1)
+    assert any("test<=" in r for r in reasons)
+
+
+def test_a_cut_off_past_the_horizon_is_NOT_this_guard_s_business():
+    """THE REGRESSION THIS PINS, paid for at 14:42 UTC on 2026-11-20: a
+    retraining the monitor had correctly asked for was refused here, over a
+    window this same report described as healthy.
+
+    datasets.include_stream makes a 2026 cut-off legitimate -- the stream
+    carries real verdicts, and the historical rows are bounded per row by
+    labels.horizon inside training_set.sql. The cut-off's own rule lives in
+    datasets.assert_cut_off_usable, which knows about the stream; this one did
+    not. Asking the same question twice means maintaining the answer twice."""
+    reasons = verdict(report(cut_off=dt.datetime(2026, 11, 16, tzinfo=UTC)),
+                      min_positives=1)
+    assert reasons == []
+
+
+def test_the_cut_off_rule_still_exists_and_is_still_called():
+    """Removing a duplicate is only correct while the original is reached. The
+    guard task runs before build_dataset in dag_train, so the refusal moved
+    three tasks later -- it did not disappear."""
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    datasets_body = (root / "ml4fd" / "datasets.py").read_text(encoding="utf-8")
+    build_body = (root / "ml4fd" / "build.py").read_text(encoding="utf-8")
+    assert "def assert_cut_off_usable(" in datasets_body
+    assert "beyond the labelling horizon" in datasets_body
+    assert "assert_cut_off_usable(" in build_body
 
 
 def test_a_window_without_a_single_positive_is_refused():
@@ -119,7 +161,7 @@ def test_every_reason_is_reported_not_only_the_first():
     reasons = verdict(
         report(runs_total=0, runs_success=0, last_success=None,
                labelled_positives=0,
-               cut_off=dt.datetime(2020, 12, 31, tzinfo=UTC)),
+               window_end=dt.datetime(2020, 12, 31, tzinfo=UTC)),
         min_positives=1)
     assert len(reasons) == 3
 

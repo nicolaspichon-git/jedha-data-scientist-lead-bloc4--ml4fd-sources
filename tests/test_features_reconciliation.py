@@ -10,6 +10,7 @@ one the rulings prescribe, and the ROWS-style one they forbid. A test then shows
 the two differ ON TIES AND NOWHERE ELSE -- which is why the reconciliation has to
 be stratified, and why a random sample proves nothing.
 """
+import re
 from decimal import Decimal
 from pathlib import Path
 
@@ -229,11 +230,28 @@ def test_the_four_strata_are_all_in_the_sample():
 
 def test_the_strata_do_not_overlap():
     """rest must exclude all three named strata, or a row would be compared
-    twice and a divergence counted twice."""
+    twice and a divergence counted twice.
+
+    THE SPELLING CHANGED ON 2026-11-19 AND THE REASON IS THE POINT. This test
+    required `NOT IN (SELECT txn_id FROM <stratum>)`. On the 1.2 M-row corpus
+    that form stopped being an anti-join at all: the hash outgrew work_mem and
+    PostgreSQL fell back to rescanning the SubPlan once per row, for a plan
+    cost of 4.6e11. NOT EXISTS is a reliable anti-join, and it is safe here
+    because txn_id is the primary key and therefore never NULL -- which is the
+    single case where the two forms disagree.
+
+    So the test now requires the EXCLUSION, keyed on txn_id, and no longer a
+    spelling. A test that pins the shape of a query forbids its optimisation,
+    and this one did: it survived the rewrite by failing on it.
+    """
     body = _without_comments(_sql("checks/reconcile_features.sql"))
-    rest = body[body.index("rest AS ("):body.index("sample AS (")]
+    rest = body[body.index("rest AS ("):body.index("sample AS MATERIALIZED (")]
     for stratum in ("tied", "firsts", "stale"):
-        assert "NOT IN (SELECT txn_id FROM %s)" % stratum in rest, stratum
+        tied_on_txn_id = re.search(
+            r"NOT\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+" + stratum
+            + r"\s+(\w+)\s+WHERE\s+\1\.txn_id\s*=\s*t\.txn_id\s*\)",
+            rest)
+        assert tied_on_txn_id, stratum
 
 
 def test_a_first_transaction_is_not_a_stale_one():

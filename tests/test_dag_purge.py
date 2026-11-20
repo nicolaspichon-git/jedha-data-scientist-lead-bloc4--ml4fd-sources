@@ -142,11 +142,18 @@ def test_the_cadence_is_weekly_on_a_sunday():
 def test_it_does_not_meet_the_verdict_writer():
     """The purge deletes batches of the raw zone; dag_ingest_verdicts reads the
     raw zone to write the verdicts that have fallen. At the same hour the purge
-    would take batches out from under it."""
-    other = re.search(
-        r'schedule="([^"]+)"',
-        (ROOT / "airflow" / "dags" / "dag_ingest_verdicts.py").read_text(
-            encoding="utf-8")).group(1)
+    would take batches out from under it.
+
+    THE CLAIM IS ABOUT THE NOMINAL CONFIGURATION, and it is read from
+    governance rather than from the DAG source since 2026-11-20: the cadence
+    of dag_ingest_verdicts now follows verdicts.mode, so the source carries no
+    literal and the demo value carries no hour at all. In demo the cadences are
+    deliberately collapsed so the loop fits in minutes -- nobody claims this
+    guarantee of a recording.
+    """
+    from ml4fd import config
+
+    other = config.load().verdict_schedule_nominal
     mine = _dag_keywords()["schedule"]
     assert mine.split()[:2] != other.split()[:2]
 
