@@ -231,9 +231,9 @@ def test_each_flip_appends_one_line_and_rewrites_none(tmp_path, monkeypatch):
     assert tool.main(["--off"]) == 0
     assert tool.main(["--factor", "2.5"]) == 0
 
-    lines = [json.loads(l) for l
+    lines = [json.loads(log_entry) for log_entry
              in tool.journal_path(path).read_text(encoding="utf-8").splitlines()
-             if l.strip()]
+             if log_entry.strip()]
     assert [entry["factor"] for entry in lines] == [3.0, 1.0, 2.5]
     assert all(entry["at"] for entry in lines)
     assert all(entry["note"] for entry in lines)
@@ -262,9 +262,9 @@ def test_an_injection_already_in_force_is_recovered_from_the_switch(tmp_path,
     monkeypatch.setattr(tool, "switch_path", lambda settings, root: path)
 
     assert tool.main(["--off"]) == 0
-    lines = [json.loads(l) for l
+    lines = [json.loads(log_entry) for log_entry
              in tool.journal_path(path).read_text(encoding="utf-8").splitlines()
-             if l.strip()]
+             if log_entry.strip()]
     assert len(lines) == 2, lines
     assert lines[0]["at"] == "2026-11-20T11:49:52+00:00"
     assert lines[0]["reconstructed"] is True
@@ -283,9 +283,9 @@ def test_nothing_is_recovered_when_no_drift_was_in_force(tmp_path, monkeypatch):
     monkeypatch.setattr(tool, "switch_path", lambda settings, root: path)
 
     assert tool.main(["--factor", "3"]) == 0
-    lines = [json.loads(l) for l
+    lines = [json.loads(log_entry) for log_entry
              in tool.journal_path(path).read_text(encoding="utf-8").splitlines()
-             if l.strip()]
+             if log_entry.strip()]
     assert len(lines) == 1 and lines[0]["factor"] == 3.0
 
 

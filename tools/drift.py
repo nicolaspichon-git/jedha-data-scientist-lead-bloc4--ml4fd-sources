@@ -177,7 +177,7 @@ def report(path: Path, factor: float, cap: float) -> None:
             print("sur la derive.")
     journal = journal_path(path)
     if journal.exists():
-        lines = [l for l in journal.read_text(encoding="utf-8").splitlines() if l.strip()]
+        lines = [log_entry for log_entry in journal.read_text(encoding="utf-8").splitlines() if log_entry.strip()]
         last = json.loads(lines[-1]) if lines else {}
         print("Journal      : %s" % journal.name)
         print("               %d bascule(s), la derniere le %s"
