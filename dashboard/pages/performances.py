@@ -16,7 +16,7 @@ import streamlit as st
 import common
 from ml4fd import dashboard
 
-st.title("Performances du modèle de scoring")
+st.title("Performances du modèle")
 
 KEY = "performances_period"
 settings = common.settings()
