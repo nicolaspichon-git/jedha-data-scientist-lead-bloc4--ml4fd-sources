@@ -44,12 +44,40 @@ DAG_ID = "dag_train"
 )
 def train_model():
 
+    # THE TWO KINDS OF RUN, and they do not read the same instant. A SCHEDULED
+    # run replays the interval it was scheduled for, so its cut-off is
+    # data_interval_end and a re-run rebuilds the identical dataset -- that is
+    # EI02. A TRIGGERED run exists because something happened just now, so its
+    # cut-off is the instant the trigger fired.
+    #
+    # MEASURED 2026-11-20. This DAG is scheduled weekly, Monday 03:00 Paris.
+    # Airflow infers a manual run's data interval from the timetable, so EVERY
+    # run triggered between two Mondays received data_interval_end =
+    # 2026-11-16T02:00:00+00:00 -- up to seven days in the past, and always
+    # BEFORE the data that caused the trigger. The recipe digest is computed
+    # from the cut-off, so three retrainings in one afternoon produced the same
+    # digest, build_or_reuse handed back the same Parquet, and the models were
+    # byte-identical: v4 published exactly v2's metrics and the gate correctly
+    # refused to promote a model that was not different.
+    #
+    # So a drift-triggered retraining could never see the drift that triggered
+    # it. The streamed rows carry a 2026-11-20 label_ts and
+    # sql/datasets/training_set.sql keeps only label_ts <= cut_off: at a cut-off
+    # of 2026-11-16 the stream contributed zero rows, however much of it had
+    # arrived. The loop measured, alerted, triggered, trained and compared --
+    # correctly at every link -- on last Monday's data.
+    #
+    # STILL NEVER THE CLOCK. logical_date is fixed when the run is created and
+    # stored on the dag_run, so clearing a task and re-running it reads the
+    # same instant; utcnow() inside the task would not. EI02 holds.
+    INTERVAL_RUN_TYPES = ("scheduled", "backfill")
+
     @task
     def resolve_cut_off() -> str:
-        """The cut-off of this run, from the interval and never from the clock.
+        """The cut-off of this run, from the run and never from the clock.
 
         Covers: EI02, EC23
-        Lot: M2
+        Lot: M2 (revu en L4, 20/11/2026)
         Competency: C5
         """
         from airflow.operators.python import get_current_context
@@ -59,16 +87,39 @@ def train_model():
         context = get_current_context()
         settings = config.load()
 
-        override = (context["dag_run"].conf or {}).get("cut_off")
+        run = context["dag_run"]
+        override = (run.conf or {}).get("cut_off")
         if override:
             cut_off = pendulum.parse(override)
             log.info("cut-off given in --conf: %s", cut_off)
-        else:
+        elif run.run_type in INTERVAL_RUN_TYPES:
             cut_off = context["data_interval_end"]
-            log.info("cut-off from data_interval_end: %s", cut_off)
+            log.info("cut-off from data_interval_end: %s (run %s, replaying "
+                     "the interval it was scheduled for)",
+                     cut_off, run.run_type)
+        else:
+            cut_off = context["logical_date"]
+            log.info("cut-off from logical_date: %s (run %s, triggered by %s). "
+                     "data_interval_end would have been %s -- the end of the "
+                     "last WEEKLY interval, before the data that caused this "
+                     "run",
+                     cut_off, run.run_type,
+                     (run.conf or {}).get("requested_by", "hand"),
+                     context["data_interval_end"])
 
         horizon = settings.label_horizon
-        if cut_off > horizon:
+        if settings.include_stream:
+            # NOT CLAMPED WHEN THE STREAM IS A SOURCE. The clamp froze the
+            # cut-off on 2020-06-21, so the recipe digest never changed and
+            # build_or_reuse handed back the same Parquet files every time: the
+            # retraining refitted on identical data. The horizon still bounds
+            # the HISTORICAL rows, inside sql/datasets/training_set.sql, where
+            # it can apply to one source and not to the other.
+            log.info("cut-off %s kept: the stream is a training source and its "
+                     "verdicts are written as they fall due (horizon %s bounds "
+                     "the historical rows only)",
+                     cut_off.isoformat(), horizon.isoformat())
+        elif cut_off > horizon:
             log.warning(
                 "cut-off %s is past the labelling horizon %s: clamped to the "
                 "horizon. Past it the rows carry is_fraud = 0 because nobody "
@@ -192,7 +243,12 @@ def train_model():
             # build the SAME recipe or fit_model would look for a dataset under
             # a digest build_dataset never wrote.
             features=tuple(features),
-            split_rule=settings.split_rule)
+            split_rule=settings.split_rule,
+            # THE TWO TASKS MUST AGREE ON THE WHOLE RECIPE, this field
+            # included: it enters the digest, so one of them omitting it
+            # would make fit_model look for a dataset build_dataset
+            # never wrote.
+            include_stream=settings.include_stream)
 
         log.info("recipe %s -> version %s", recipe.digest()[:16], recipe.version())
         log.info("features: %s", ", ".join(recipe.features))
@@ -205,6 +261,21 @@ def train_model():
                  result["version"], result.get("n_train"),
                  result.get("n_train_pos"), result.get("n_test"),
                  result.get("n_test_pos"), result["reused"])
+        # THE FRESH SHARE, IN THE LOG AND IN THE XCOM. "retrained on fresh
+        # data" is a claim that needs a denominator: the stream delivers 7,200
+        # rows a day against more than a million, so a share of 0.006 means the
+        # retraining is mechanically fresh and materially the same model. The
+        # figure belongs where someone reading the run will see it, not only in
+        # a commit message.
+        fresh = result.get("n_train_stream")
+        if fresh is None:
+            log.info("stream share: not counted on this run -- the dataset was "
+                     "reused, and the share was counted when it was built")
+        else:
+            total = result.get("n_train") or 0
+            log.info("stream share: %d of %d training rows (%.3f %%) came from "
+                     "the stream", fresh, total,
+                     100.0 * fresh / total if total else 0.0)
         log.info("base rates: train=%.4f %% test=%.4f %% -- a precision figure "
                  "cannot be read without them",
                  100 * float(result["base_rate_train"]),
@@ -233,7 +304,12 @@ def train_model():
             # build the SAME recipe or fit_model would look for a dataset under
             # a digest build_dataset never wrote.
             features=tuple(features),
-            split_rule=settings.split_rule)
+            split_rule=settings.split_rule,
+            # THE TWO TASKS MUST AGREE ON THE WHOLE RECIPE, this field
+            # included: it enters the digest, so one of them omitting it
+            # would make fit_model look for a dataset build_dataset
+            # never wrote.
+            include_stream=settings.include_stream)
         train_path, test_path = recipe.paths(settings.datasets_root)
         if not (train_path.is_file() and test_path.is_file()):
             raise FileNotFoundError(
@@ -330,11 +406,77 @@ def train_model():
         return {"run_id": str(run_id),
                 "version": payload["dataset"]["version"]}
 
+    @task
+    def challenge_and_promote(registered: dict) -> dict:
+        """The last link of the loop: challenge the candidate, and serve it if
+        it passes.
+
+        WHY THIS TASK EXISTS. Until 2026-11-20 this DAG ended at
+        register_model, and the alias moved only when somebody ran
+        .\\fd-manager.ps1 promote by hand. The cycle the specification asks to
+        automate -- deployment, monitoring, retraining, challenging, deployment
+        -- was therefore automatic for three links out of five, and the two
+        that decide what the system SERVES were manual.
+
+        IT TAKES NO GUARD AWAY. The decision is the same pure function of
+        ml4fd/promote.py, through the same orchestration ml4fd/challenge.py
+        gives the command line: the capacity ceiling is still asked first, the
+        paired test still runs on rows neither model was fitted on, and the
+        refusals are still journalled in fd_promotions. Automating the CALL
+        does not automate the verdict.
+
+        THE CANDIDATE IS THIS RUN'S, by run_id and not by "the newest
+        registered" -- see registry.version_of_run for what the difference
+        costs when two trainings overlap.
+
+        A NON-DECISION IS A SKIP AND NOT A SUCCESS. The candidate already
+        carrying the alias, or a shared window too thin to ask, are both
+        different from a refusal: nothing is recorded and the champion stays.
+        Marking them success would make a loop that decided nothing look in the
+        interface exactly like one that promoted.
+
+        Covers: EC33, EC34, EC36, EC37
+        Lot: L4
+        Competency: C5, C6
+        """
+        import os
+
+        import mlflow
+        from airflow.exceptions import AirflowSkipException
+
+        from ml4fd import challenge, config, registry
+
+        settings = config.load()
+        uri = os.environ.get("MLFLOW_TRACKING_URI")
+        if uri:
+            mlflow.set_tracking_uri(uri)
+        client = mlflow.MlflowClient()
+
+        candidate_mv = registry.version_of_run(client, registered["run_id"])
+        try:
+            outcome = challenge.judge(client, settings, candidate_mv,
+                                      apply=True, say=log.info)
+        except challenge.AlreadyChampion as nothing_to_do:
+            raise AirflowSkipException(str(nothing_to_do)) from nothing_to_do
+        except challenge.Undecidable as unmeasurable:
+            raise AirflowSkipException(str(unmeasurable)) from unmeasurable
+
+        if outcome["promoted"]:
+            log.warning("champion deplace sur la version %s : c'est ce que le "
+                        "service lira au prochain scoring", outcome["candidate"])
+        else:
+            log.warning("candidat %s refuse, le champion %s reste en service : "
+                        "%s", outcome["candidate"], outcome["champion"],
+                        outcome["reason"])
+        return outcome
+
     moment = resolve_cut_off()
     kept = resolve_features()
-    register_model(
-        moment,
-        fit_model(moment, kept, build_dataset(moment, kept, guard(moment))))
+    challenge_and_promote(
+        register_model(
+            moment,
+            fit_model(moment, kept,
+                      build_dataset(moment, kept, guard(moment)))))
 
 
 train_model()

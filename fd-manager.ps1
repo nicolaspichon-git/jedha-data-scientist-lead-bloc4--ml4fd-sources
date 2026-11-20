@@ -40,6 +40,7 @@ param(
                  'purge',
                  'promote',
                  'monitor',
+                 'drift',
                  'replay', 'forget', 'dashboard',
                  'tasklog', 'dag-test', 'accept', 'test', 'lint', 'traceability',
                  'typology',
@@ -49,7 +50,7 @@ param(
     [string]$Batch,
 
     [ValidateSet('postgres', 'airflow-init', 'airflow-scheduler',
-                 'airflow-webserver', 'mlflow', 'dashboard')]
+                 'airflow-webserver', 'mlflow', 'dashboard', 'producer')]
     [string]$Service,
 
     [string]$TaskId = 'preflight',
@@ -88,6 +89,17 @@ param(
     [switch]$Start,
 
     [switch]$Stop,
+
+    # Only used by 'drift'. -Factor is a double rather than a switch because
+    # the amount multiplier is the measurement: 3 and 30 inject very different
+    # drifts, and 30 clips most frauds against validation.max_amount.
+    #
+    # NOT TESTED WITH -eq 0, because 0 is exactly the value tools/drift.py
+    # refuses -- treating it as "not supplied" would swallow the refusal and
+    # report the switch instead. PSBoundParameters says what was typed.
+    [double]$Factor,
+
+    [switch]$Off,
 
     # Only used by 'health': the controls are PRINTED by default and sent only
     # when asked. Looking at a transition must not consume the message that
@@ -315,7 +327,7 @@ switch ($Task) {
             @{ n = 'airflow-user'; d = 'list the Airflow accounts and reset admin / admin' }
             @{ n = 'init';         d = 'apply the DDL and the function (replayable)' }
             @{ n = 'load';         d = 'trigger the loading of the labelled history' }
-            @{ n = 'train';        d = 'trigger a training: .\fd-manager.ps1 train [-CutOff 2020-11-30] [-Drop none]' }
+            @{ n = 'train';        d = 'trigger a training, challenging and promotion: .\fd-manager.ps1 train [-CutOff 2020-11-30] [-Drop none]' }
             @{ n = 'cleanup';      d = 'drop the roles and tables of the old naming (no prefix)' }
             @{ n = 'progress';     d = 'where the runs stand, task by task' }
             @{ n = 'observe';      d = 'observe and measure the payment API, reporting under runtime/observations/' }
@@ -337,8 +349,9 @@ switch ($Task) {
             @{ n = 'batches';      d = 'list the raw-zone batches and their run' }
             @{ n = 'digests';      d = 'batches with no digest (-Apply to record it)' }
             @{ n = 'purge';        d = 'dry-run purge (-Before; -Apply to delete)' }
-            @{ n = 'promote';      d = 'judge the newest model against the champion (-Candidate <v>; -Apply to move the alias)' }
+            @{ n = 'promote';      d = 'judge a model by hand; dag_train now does it on its own (-Candidate <v>; -Apply to move the alias)' }
             @{ n = 'monitor';      d = 'drift, performance and the retraining they ask for; -Apply triggers the run' }
+            @{ n = 'drift';        d = 'the injected amount drift: show it, set it (-Factor N), lift it (-Off)' }
             @{ n = 'replay';       d = 'replay a batch: .\fd-manager.ps1 replay -Batch <uuid>' }
             @{ n = 'forget';       d = 'forget a failed batch: forget -Batch <uuid> [-Apply]' }
             @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8501) [-Stop]' }
@@ -576,8 +589,8 @@ switch ($Task) {
             @{ id = 'dag_load_history';    note = 'on trigger only, no cadence' }
             @{ id = 'dag_train';           note = 'Monday 03:00' }
             @{ id = 'dag_ingest';          note = 'every minute' }
-            @{ id = 'dag_ingest_verdicts'; note = 'daily 02:00' }
-            @{ id = 'dag_monitor';         note = 'hourly, at 17 past' }
+            @{ id = 'dag_ingest_verdicts'; note = 'governance verdicts.schedule' }
+            @{ id = 'dag_monitor';         note = 'governance monitoring.schedule' }
             @{ id = 'dag_daily';           note = 'daily 06:00, catches up missed days' }
             @{ id = 'dag_purge';           note = 'Sunday 04:00, the only one that deletes' }
         )
@@ -742,6 +755,20 @@ switch ($Task) {
             $values += $dropped
             $label = "$label, sans $dropped"
         }
+
+        # THE RUN CAN CHANGE WHAT IS SERVED, since 2026-11-20. dag_train ends
+        # on challenge_and_promote, so a training is no longer a read-only act:
+        # a candidate that passes the gate takes the champion alias and the
+        # scoring path reads it at the next call. An operator typing this
+        # command used to get a registered version and nothing more, so the
+        # change is announced rather than discovered.
+        Write-Host ""
+        Write-Host "Ce passage peut deplacer le champion." -ForegroundColor Yellow
+        Write-Host "dag_train finit sur challenge_and_promote : un candidat qui" -ForegroundColor DarkGray
+        Write-Host "passe le gate prend l'alias, et le service le lit au scoring" -ForegroundColor DarkGray
+        Write-Host "suivant. Refus comme promotion sont journalises dans" -ForegroundColor DarkGray
+        Write-Host "fd_promotions. Pour juger sans rien deplacer : promote." -ForegroundColor DarkGray
+        Write-Host ""
 
         # Unlike dag_load_history, this one carries a cadence: making it
         # active also lets it run on its own every Monday. Said rather than
@@ -1338,6 +1365,46 @@ LIMIT  10;
         }
     }
 
+    'drift' {
+        Assert-Env
+        Assert-Docker
+        Write-Host ""
+        Write-Host "The injected amount drift." -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "A drift has to enter the pipeline as data or it is not a" -ForegroundColor DarkGray
+        Write-Host "drift. This writes the switch governance declares; the" -ForegroundColor DarkGray
+        Write-Host "producer multiplies the amount of every transaction it" -ForegroundColor DarkGray
+        Write-Host "serves, before the raw zone, so the shift travels through" -ForegroundColor DarkGray
+        Write-Host "validation, the features, the scoring and the monitoring" -ForegroundColor DarkGray
+        Write-Host "exactly as a real change of the stream would." -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "  no argument    reports what is in force" -ForegroundColor DarkGray
+        Write-Host "  -Factor 3      multiplies every served amount by three" -ForegroundColor DarkGray
+        Write-Host "  -Off           lifts the drift" -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "Read on every request: the producer needs no restart." -ForegroundColor DarkGray
+        Write-Host ""
+
+        if ($Off -and $PSBoundParameters.ContainsKey('Factor')) {
+            Write-Host "-Factor et -Off ensemble : choisissez." -ForegroundColor Red
+            Write-Host ""
+            exit 1
+        }
+
+        # TRANSLATED HERE AND NOT PASSED THROUGH. The task is named in
+        # PowerShell, so its options are too; tools/drift.py keeps the POSIX
+        # flags it needs to stay runnable on its own inside the container.
+        # tests/test_drift.py ties the two spellings together.
+        $extra = @()
+        if ($Off) { $extra += '--off' }
+        if ($PSBoundParameters.ContainsKey('Factor')) {
+            $extra += @('--factor', $Factor)
+        }
+        & docker compose exec -T airflow-scheduler `
+            python3 /opt/project/tools/drift.py @extra @Rest
+        Write-Host ""
+    }
+
     'monitor' {
         Assert-Env
         Assert-Docker
@@ -1356,7 +1423,16 @@ LIMIT  10;
         Write-Host ""
 
         if ($Apply) {
-            Enable-Dag 'dag_monitor' 'hourly, at 17 past'
+            Enable-Dag 'dag_monitor' 'cadence from governance monitoring.schedule'
+            # AND WHAT IT TRIGGERS, which nothing activated until
+            # 2026-11-20. A TriggerDagRunOperator against a PAUSED dag
+            # creates the run and returns success; the scheduler then
+            # ignores it, so the request is recorded in
+            # fd_retrain_requests, the alert counts as answered, and
+            # nothing ever trains. Activating a trigger without
+            # activating its target is the defect of 19 November again,
+            # one link further down the chain.
+            Enable-Dag 'dag_train' 'cadence from governance, and on request'
             Invoke-Step 'declenchement de dag_monitor' {
                 & docker compose exec -T airflow-scheduler `
                     airflow dags trigger dag_monitor

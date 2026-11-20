@@ -15,3 +15,5 @@ runtime/reports/202*.*
 ws/
 _to_delete/
 /runtime/observations/
+/runtime/channels/monitoring/
+/runtime/producer/

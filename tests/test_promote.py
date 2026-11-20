@@ -218,7 +218,9 @@ def test_the_alias_name_is_declared_and_not_hard_coded():
 
 # --- the gate stays installable ------------------------------------------------
 
-@pytest.mark.parametrize("module", ["ml4fd/promote.py", "ml4fd/registry.py"])
+@pytest.mark.parametrize("module", ["ml4fd/promote.py",
+                                    "ml4fd/registry.py",
+                                    "ml4fd/challenge.py"])
 def test_the_gate_imports_no_mlflow_at_load_time(module):
     """mlflow is not a declared dependency. A module-level import here would
     make the suite -- and the integration chain -- unable to even collect."""
@@ -238,7 +240,7 @@ def test_the_entry_point_only_reads_columns_the_splits_carry():
     """THE TEST THAT WOULD HAVE CAUGHT is_fraud.
 
     Every other test here hands decide() a table that is already built, so not
-    one of them touches a column name. tools/promote.py is where the names are
+    one of them touches a column name. challenge.py is where the names are
     read, and it read frame["is_fraud"] -- which is what the payment API and
     fd_transactions call the label, while the Parquet splits call it label
     (datasets.LABEL). A KeyError, on the first real run, after a retraining.
@@ -247,8 +249,13 @@ def test_the_entry_point_only_reads_columns_the_splits_carry():
     holds. build.py writes exactly STORED_COLUMNS, deliberately including the
     features a recipe dropped, which is why scoring the champion on the
     candidate's split works at all.
+
+    FOLLOWED THE CODE TO ml4fd/challenge.py on 2026-11-20, when the
+    orchestration moved there so dag_train could reach it. The assertion below
+    that `read` is non-empty is what made the move safe: pointed at the old
+    file, this test would have passed while checking nothing.
     """
-    source = (ROOT / "tools" / "promote.py").read_text(encoding="utf-8")
+    source = (ROOT / "ml4fd" / "challenge.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     read = set()
     for node in ast.walk(tree):
@@ -261,7 +268,7 @@ def test_the_entry_point_only_reads_columns_the_splits_carry():
     assert read, "no column read found: the check has stopped checking"
     unknown = sorted(read - set(datasets.STORED_COLUMNS))
     assert not unknown, (
-        "tools/promote.py reads %s, which no split carries. The columns are %s"
+        "ml4fd/challenge.py reads %s, which no split carries. The columns are %s"
         % (unknown, list(datasets.STORED_COLUMNS)))
 
 
@@ -320,3 +327,95 @@ def test_scoring_resolves_the_promoted_version():
     client = _Client(aliases={"champion": "7"}, versions={"7": "la version 7"})
     assert score.champion_version(
         client, "fraud_scoring", "champion") == "la version 7"
+
+
+# --- L4: the candidate the loop judges is the one the loop produced -----------
+
+class _Version:
+    def __init__(self, version, run_id):
+        self.version, self.run_id = str(version), str(run_id)
+
+
+class _SearchingClient(_Client):
+    """_Client plus search_model_versions, which version_of_run needs."""
+
+    def __init__(self, registered=(), **kw):
+        super().__init__(**kw)
+        self._registered = list(registered)
+
+    def search_model_versions(self, _filter):
+        return list(self._registered)
+
+
+def test_the_version_of_a_run_is_found_by_its_run_id():
+    client = _SearchingClient(registered=[_Version(3, "aaa"),
+                                          _Version(4, "bbb")])
+    assert registry.version_of_run(client, "bbb").version == "4"
+
+
+def test_a_run_that_registered_nothing_is_a_refusal_and_not_the_newest():
+    """THE SILENT FAILURE THIS FORBIDS. Falling back to the newest version
+    would make the gate judge whatever happened to be registered last --
+    possibly a model from another run -- and promote something no run of this
+    DAG had evaluated."""
+    client = _SearchingClient(registered=[_Version(3, "aaa")])
+    with pytest.raises(LookupError, match="comes from run"):
+        registry.version_of_run(client, "zzz")
+
+
+def test_two_versions_from_one_run_cannot_be_judged():
+    """Guessing which to judge would make the gate's subject depend on an
+    ordering nobody declared."""
+    client = _SearchingClient(registered=[_Version(3, "aaa"),
+                                          _Version(4, "aaa")])
+    with pytest.raises(LookupError, match="which one to judge"):
+        registry.version_of_run(client, "aaa")
+
+
+def test_the_run_id_is_compared_as_text():
+    """MLflow run ids are hexadecimal strings; a caller holding one as
+    something else must still match, the same trap set_champion carries."""
+    client = _SearchingClient(registered=[_Version(5, "1234")])
+    assert registry.version_of_run(client, 1234).version == "5"
+
+
+# --- L4: the loop closes, and closes on the same orchestration ----------------
+
+def test_the_candidate_already_in_service_is_not_a_refusal():
+    """A NON-DECISION IS NOT False. Nothing is recorded and the champion stays,
+    which is a different statement from "the gate refused this model" -- and
+    returning False for both would let a caller journal a refusal that never
+    happened."""
+    from ml4fd import challenge
+
+    client = _SearchingClient(aliases={"champion": "9"},
+                              versions={"9": _Version(9, "ccc")})
+    with pytest.raises(challenge.AlreadyChampion, match="rien a decider"):
+        challenge.judge(client, config.load(), _Version(9, "ccc"),
+                        apply=False, say=lambda _message: None)
+
+
+def test_the_two_non_decisions_are_distinct_exceptions():
+    """AlreadyChampion and Undecidable say different things: one means there
+    was nothing to compare, the other that the comparison could not be asked.
+    A single exception would collapse them in the logs and in the DAG."""
+    from ml4fd import challenge
+
+    assert challenge.AlreadyChampion is not challenge.Undecidable
+    assert not issubclass(challenge.AlreadyChampion, challenge.Undecidable)
+    assert not issubclass(challenge.Undecidable, challenge.AlreadyChampion)
+
+
+def test_the_command_and_the_dag_share_one_orchestration():
+    """THE DUPLICATION THIS FORBIDS. The gate must not refuse in one path and
+    promote in the other, so neither caller may hold its own copy of the
+    sequence: both go through challenge.judge, and only challenge.py calls
+    promote.decide."""
+    cli = (ROOT / "tools" / "promote.py").read_text(encoding="utf-8")
+    dag = (ROOT / "airflow" / "dags" / "dag_train.py").read_text(encoding="utf-8")
+    for caller, body in (("tools/promote.py", cli), ("dag_train.py", dag)):
+        assert "challenge.judge(" in body, "%s does not call judge" % caller
+        assert "promote.decide(" not in body, (
+            "%s holds its own copy of the decision" % caller)
+    assert "promote.decide(" in (
+        ROOT / "ml4fd" / "challenge.py").read_text(encoding="utf-8")

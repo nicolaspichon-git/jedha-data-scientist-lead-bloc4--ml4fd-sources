@@ -113,7 +113,16 @@ def criteria(root: Path):
         found = ""
         for line in body.splitlines():
             if line.strip().startswith("schedule="):
-                found = line.split('"')[1] if '"' in line else ""
+                # A LITERAL OR WHAT IT DEFERS TO, and never an empty string.
+                # Since 2026-11-20 dag_ingest_verdicts resolves its cadence
+                # from governance, so there is no cron in its source: the old
+                # `"" if no quote` made this criterion read blank and pass
+                # VACUOUSLY -- blank is not the minute, so "distincte de la
+                # minute" answered yes about nothing. Reporting the expression
+                # does not restore the comparison, but it stops the report
+                # from claiming a check it no longer makes.
+                found = (line.split('"')[1] if '"' in line
+                         else line.split("=", 1)[1].strip().rstrip(","))
                 break
         if expected_schedule is None:
             yield item("N6 cadence de %s distincte de la minute" % name,

@@ -31,6 +31,8 @@ import logging
 import pendulum
 from airflow.decorators import dag, task
 
+from ml4fd import config
+
 log = logging.getLogger(__name__)
 
 DAG_ID = "dag_ingest_verdicts"
@@ -39,7 +41,13 @@ DAG_ID = "dag_ingest_verdicts"
 @dag(
     dag_id=DAG_ID,
     description="S3/N6: write the withheld verdicts of the stream",
-    schedule="0 2 * * *",               # daily, 02:00 -- a cadence of its own
+    # A CADENCE OF ITS OWN, and it has to follow verdicts.mode. Daily at 02:00
+    # in nominal, where a verdict falls due 30 days after its transaction.
+    # Every two minutes in demo, where it falls due after 300 s -- written once
+    # a day it would arrive the next morning, the delay short and the labels
+    # never there. Read from governance for the same reason dag_monitor does:
+    # see config.verdict_schedule().
+    schedule=config.load().verdict_schedule(),
     start_date=pendulum.datetime(2026, 1, 5, tz="Europe/Paris"),
     catchup=False,
     max_active_runs=1,

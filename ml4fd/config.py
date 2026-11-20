@@ -48,6 +48,8 @@ class Settings:
     verdict_mode: str
     verdict_delay_days: int
     demo_delay_seconds: int
+    verdict_schedule_nominal: str
+    verdict_schedule_demo: str
     raw_retention_days: int
     quarantine_retention_days: int
     airflow_logs_retention_days: int
@@ -69,14 +71,19 @@ class Settings:
     ops_max_empty_share: float
     ops_max_rejection_share: float
     monitoring_mode: str
+    monitoring_schedule_nominal: str
+    monitoring_schedule_demo: str
     monitoring_tool: str
     monitoring_channel: str
     monitoring_file: str
     monitoring_recipient: str
     monitoring_drift_window_minutes: int
     monitoring_demo_drift_window_minutes: int
+    monitoring_drift_min_rows: int
+    monitoring_demo_drift_min_rows: int
     monitoring_max_drifted_share: float
     monitoring_drift_method: str
+    monitoring_drift_not_comparable: tuple[str, ...]
     monitoring_max_alert_rate_ratio: float
     monitoring_min_recall: float
     monitoring_performance_window_days: int
@@ -113,6 +120,13 @@ class Settings:
     # holding "kaggle-datasets/fraudTrain.csv" would be a name that lies, and
     # the next reader would spend a minute finding out.
     csv_source: str
+    # THE SWITCH THE DEMONSTRATION TURNS. Declared here and read on both
+    # sides of it since 2026-11-20: tools/drift.py writes it and
+    # producer/app.py reads it, through this one field. Before that the
+    # declaration was decorative -- the producer used an environment
+    # default of its own, so the line in governance.yml and the path in
+    # service could have disagreed without anyone finding out.
+    drift_switch: str
     api_url: str
     label_horizon: dt.datetime
     min_positives: int
@@ -120,6 +134,7 @@ class Settings:
     dataset_family: str
     dataset_schema_version: str
     split_rule: str
+    include_stream: bool
     identifying_fields: tuple[str, ...]
     pepper: str                 # never logged, never in governance.yml
     pg_host: str
@@ -181,22 +196,85 @@ class Settings:
             dt.timedelta(
                 minutes=self.monitoring_demo_performance_window_minutes))
 
+    def monitoring_schedule(self) -> str:
+        """How often the model is watched, by the switch.
+
+        READ AT DAG PARSE TIME, which departs from the five other DAGs: each of
+        those repeats its cron as a literal and a test ties it to governance.
+        That convention keeps a DAG parseable without governance, and it is
+        right for a cadence nobody changes. It is wrong for a DEMONSTRATION
+        knob: flipping monitoring.mode would then need a second edit inside the
+        DAG, and between the two edits the suite would be red. One switch has
+        to move one thing.
+
+        Covers: EC32, EC33
+        Lot: L4
+        Competency: C5, C6
+        """
+        return self._by_mode(self.monitoring_schedule_nominal,
+                             self.monitoring_schedule_demo)
+
+    def verdict_schedule(self) -> str:
+        """How often the due verdicts are written, by the VERDICT switch.
+
+        BY verdicts.mode AND NOT BY monitoring.mode, because the two are
+        independent and must stay so: shortening the windows a recording is
+        read over is not the same decision as shortening the delay before a
+        verdict is known. A cadence resolved by the wrong switch would write
+        verdicts once at 02:00 while they fall due every 300 s -- the delay
+        short, the labels never arriving, and nothing saying why.
+
+        Covers: EC41
+        Lot: L4
+        Competency: C4, C6
+        """
+        return self._by_mode(self.verdict_schedule_nominal,
+                             self.verdict_schedule_demo,
+                             mode=self.verdict_mode, name="verdicts.mode")
+
+    def drift_min_rows(self) -> int:
+        """The smallest window the drift measurement will speak about.
+
+        THE SYMMETRY WITH performance, which refuses to read a recall under
+        min_labelled_frauds. Until 2026-11-20 the drift measurement had no such
+        floor -- `if len(current):` was the whole guard -- so a window of three
+        rows produced a verdict with the authority of one of seven thousand.
+        The floor counts ROWS and not frauds, because a distribution test
+        counts observations and not positives.
+
+        Covers: EC39, EC45
+        Lot: L4
+        Competency: C6
+        """
+        return self._by_mode(self.monitoring_drift_min_rows,
+                             self.monitoring_demo_drift_min_rows)
+
     def retrain_cooldown(self) -> dt.timedelta:
         """How long a retraining suppresses the next one (EC33)."""
         return self._by_mode(
             dt.timedelta(minutes=self.monitoring_cooldown_minutes),
             dt.timedelta(minutes=self.monitoring_demo_cooldown_minutes))
 
-    def _by_mode(self, nominal: dt.timedelta,
-                 demo: dt.timedelta) -> dt.timedelta:
-        """One place where monitoring.mode is read, so three windows cannot
-        end up on two different modes."""
-        if self.monitoring_mode == "nominal":
+    def _by_mode(self, nominal, demo, mode=None, name="monitoring.mode"):
+        """One place where a demonstration switch is read.
+
+        Untyped on purpose: it resolves durations, a row count and two cron
+        expressions, and a second copy of the rule per type would be the same
+        rule written four times.
+
+        TWO SWITCHES, ONE VALIDATOR. monitoring.mode governs the windows, the
+        cooldown, the drift floor and the monitoring cadence; verdicts.mode
+        governs the verdict delay and the cadence that writes them. They are
+        independent by design, so the mode is a parameter here and the key is
+        named in the refusal -- otherwise a bad value in verdicts.mode would
+        send a reader to the wrong line of governance.yml."""
+        chosen = self.monitoring_mode if mode is None else mode
+        if chosen == "nominal":
             return nominal
-        if self.monitoring_mode == "demo":
+        if chosen == "demo":
             return demo
-        raise ValueError("monitoring.mode is %r; expected 'nominal' or 'demo'"
-                         % self.monitoring_mode)
+        raise ValueError("%s is %r; expected 'nominal' or 'demo'"
+                         % (name, chosen))
 
     def observed_per_day(self) -> int:
         """Transactions N7 will actually see in a day, from its own settings.
@@ -322,13 +400,19 @@ def _hours(value) -> tuple[int, ...]:
 POLICIES = ("cost", "capacity")
 
 
-def _columns(value) -> tuple[str, ...]:
+def _columns(value, where: str) -> tuple[str, ...]:
     """A list of column names, checked for SHAPE and not for membership.
 
     Whether a name is a feature of the recipe is ml4fd/datasets.without()'s
     business, and it refuses an unknown one there -- one place deciding, called
     by the DAG. This module stays free of any fraud import, so a governance file
     cannot be read differently depending on what else is loaded.
+
+    where IS PASSED AND NOT DEFAULTED. It used to name scoring.drop_features in
+    the message because that was the only caller; the second caller arrived
+    2026-11-20 and would have been told to look at the wrong line of
+    governance.yml. A default that names one caller is a default that lies as
+    soon as there are two.
     """
     if value is None:
         return ()
@@ -338,8 +422,8 @@ def _columns(value) -> tuple[str, ...]:
     bad = [name for name in names if not name.replace("_", "").isalnum()]
     if bad:
         raise ValueError(
-            "scoring.drop_features holds %s, which is not a column name"
-            % ", ".join(repr(name) for name in bad))
+            "%s holds %s, which is not a column name"
+            % (where, ", ".join(repr(name) for name in bad)))
     return names
 
 
@@ -538,6 +622,20 @@ def _datasets_root(value) -> str:
     return _under_project(value)
 
 
+def _cron(value, where: str) -> str:
+    """A five-field cron expression, or a refusal that names the line.
+
+    Airflow refuses a malformed one too, but at DAG parse time and with a
+    message about croniter. Named here, the reader is sent to the line of
+    governance.yml that is wrong rather than to a stack trace.
+    """
+    text = str(value).strip()
+    if len(text.split()) != 5:
+        raise ValueError("%s is %r; a cron expression has five fields"
+                         % (where, text))
+    return text
+
+
 def governance_path() -> Path:
     for p in CANDIDATES:
         if p and p.is_file():
@@ -586,6 +684,10 @@ def load(path: Path | None = None) -> Settings:
         verdict_mode=str(g["verdicts"]["mode"]),
         verdict_delay_days=int(g["verdicts"]["delay_days"]),
         demo_delay_seconds=int(g["verdicts"]["demo_delay_seconds"]),
+        verdict_schedule_nominal=_cron(
+            g["verdicts"]["schedule"], "verdicts.schedule"),
+        verdict_schedule_demo=_cron(
+            g["verdicts"]["demo_schedule"], "verdicts.demo_schedule"),
         raw_retention_days=retention["raw_events_days"],
         quarantine_retention_days=retention["quarantine_days"],
         airflow_logs_retention_days=retention["airflow_logs_days"],
@@ -596,7 +698,8 @@ def load(path: Path | None = None) -> Settings:
         decision_threshold=float(g["scoring"]["decision_threshold"]),
         rule_min_amount=float(g["scoring"]["rule_baseline"]["min_amount"]),
         rule_night_hours=_hours(g["scoring"]["rule_baseline"]["night_hours"]),
-        drop_features=_columns(g["scoring"].get("drop_features")),
+        drop_features=_columns(g["scoring"].get("drop_features"),
+                               "scoring.drop_features"),
         alert_channel=str(g["notifications"]["channel"]),
         alert_file=_under_project(g["notifications"]["file"]),
         alert_delivery=_delivery(g["notifications"]["delivery"]),
@@ -621,14 +724,25 @@ def load(path: Path | None = None) -> Settings:
         # EC44 asks the alert to designate its recipient. A role and never
         # a person: the holder changes, the responsibility does not.
         monitoring_recipient=str(g["monitoring"]["recipient"]),
+        monitoring_schedule_nominal=_cron(
+            g["monitoring"]["schedule"], "monitoring.schedule"),
+        monitoring_schedule_demo=_cron(
+            g["monitoring"]["demo_schedule"], "monitoring.demo_schedule"),
         monitoring_drift_window_minutes=int(
             g["monitoring"]["input_drift"]["window_minutes"]),
         monitoring_demo_drift_window_minutes=int(
             g["monitoring"]["input_drift"]["demo_window_minutes"]),
+        monitoring_drift_min_rows=int(
+            g["monitoring"]["input_drift"]["min_rows"]),
+        monitoring_demo_drift_min_rows=int(
+            g["monitoring"]["input_drift"]["demo_min_rows"]),
         monitoring_max_drifted_share=_share_under_one(
             g["monitoring"]["input_drift"]["max_drifted_share"],
             "monitoring.input_drift.max_drifted_share"),
         monitoring_drift_method=str(g["monitoring"]["input_drift"]["method"]),
+        monitoring_drift_not_comparable=_columns(
+            g["monitoring"]["input_drift"].get("not_comparable"),
+            "monitoring.input_drift.not_comparable"),
         monitoring_max_alert_rate_ratio=float(
             g["monitoring"]["prediction_drift"]["max_alert_rate_ratio"]),
         monitoring_min_recall=_share_under_one(
@@ -669,12 +783,14 @@ def load(path: Path | None = None) -> Settings:
         max_amount=float(g["validation"]["max_amount"]),
         systematic_share=float(g["validation"]["systematic_share"]),
         csv_source=g["sources"]["historical_csv"],
+        drift_switch=str(g["sources"]["drift_switch"]),
         label_horizon=_as_utc(g["labels"]["horizon"]),
         min_positives=int(g["labels"]["min_positives"]),
         datasets_root=_datasets_root(g["datasets"]["root"]),
         dataset_family=str(g["datasets"]["family"]),
         dataset_schema_version=str(g["datasets"]["schema_version"]),
         split_rule=str(g["datasets"]["split_rule"]),
+        include_stream=bool(g["datasets"]["include_stream"]),
         api_url=g["sources"]["realtime_api"],
         identifying_fields=tuple(g["personal_data"]["identifying_fields"]),
         pepper=os.environ.get("ML4FD_PEPPER", ""),

@@ -38,6 +38,8 @@ FEATURES_SQL = "monitoring/features_window.sql"
 FLAGS_SQL = "monitoring/flag_rate_window.sql"
 PERFORMANCE_SQL = "monitoring/performance_window.sql"
 RECORD_SQL = "monitoring/record_measurement.sql"
+LAST_REQUEST_SQL = "monitoring/last_retrain_request.sql"
+RECORD_REQUEST_SQL = "monitoring/record_retrain_request.sql"
 
 # The two metric types of a DataDriftPreset snapshot, as 0.7 names them in
 # each entry's config.type. Matched on the type and never on metric_name:
@@ -123,6 +125,50 @@ def tool_version() -> str:
     return "evidently %s" % getattr(evidently, "__version__", "unknown")
 
 
+def drift_columns(features, not_comparable) -> list[str]:
+    """The served features minus the ones governance declares incomparable.
+
+    WHY A SUBTRACTION AND NOT A LIST OF COLUMNS TO WATCH. A list of columns to
+    watch stops watching a feature the day the recipe gains one, and says
+    nothing when it does: the drift of the new feature is simply never
+    measured. Subtracting makes the default "watched", which is the direction a
+    silence should fall in, and leaves the exclusion the thing that has to be
+    argued for in governance.yml.
+
+    AN EXCLUSION THAT NAMES NOTHING IS AN ERROR, not an exclusion of nothing.
+    The names are checked against the features of the model ACTUALLY IN
+    SERVICE, read from its manifest, so a rename in the recipe makes this
+    refuse at the next run instead of quietly reverting to measuring all five
+    columns -- the failure a reader would never think to look for.
+
+    AN EMPTY RESULT IS AN ERROR TOO. Evidently would report a share over zero
+    columns, drift_measurements would read 0.0, and the control would publish a
+    serene ok forever.
+
+    Covers: EC39, EC45
+    Lot: L4
+    Competency: C6
+    """
+    names = list(features)
+    excluded = list(not_comparable)
+    unknown = [name for name in excluded if name not in names]
+    if unknown:
+        raise LookupError(
+            "monitoring.input_drift.not_comparable names %s, which the model "
+            "in service does not use. Its features are %s. A stale exclusion "
+            "would put the column back under measurement without saying so."
+            % (", ".join(repr(name) for name in unknown),
+               ", ".join(repr(name) for name in names)))
+    kept = [name for name in names if name not in excluded]
+    if not kept:
+        raise ValueError(
+            "monitoring.input_drift.not_comparable excludes every feature of "
+            "the model in service (%s), so there would be no column left to "
+            "measure and the drift share would read 0.0 forever."
+            % ", ".join(repr(name) for name in names))
+    return kept
+
+
 def definition(features):
     """Which columns hold numbers and which hold categories.
 
@@ -143,6 +189,57 @@ def definition(features):
                           categorical_columns=categorical)
 
 
+def comparable(frame, features):
+    """The frame Evidently can read: PostgreSQL numerics turned into floats.
+
+    MEASURED ON THE FIRST REAL RUN of dag_monitor, 2026-11-20 08:48 UTC, which
+    failed with "ufunc 'isinf' not supported for the input types". amt,
+    f_avg_amount and f_home_distance_km are numeric(12,2) in the DDL, so
+    psycopg returns decimal.Decimal and the column's dtype is object. Our
+    DataDefinition then declares that column numerical, and Evidently collects
+    numerical stats by calling np.isinf on it, which cannot work on Decimals.
+
+    BOTH SIDES, AND THAT IS WHY THIS LIVES HERE. The window comes from psycopg;
+    the reference is a Parquet that ml4fd/build.py wrote from a frame built by
+    psycopg too, so pyarrow stored decimal128 and hands Decimals back. The two
+    sides were equally affected and only the first one evaluated raised. Fixing
+    one of them would have turned a crash into a comparison between two types,
+    which is worse: it would have produced a number.
+
+    FLOAT AND NOT DECIMAL, because float is what the model was fitted on --
+    train.py casts with .astype(float) before it fits -- so the drift is then
+    measured on the values the model actually saw.
+
+    NOT IN THE SQL. scoring/rows_to_score.sql selects the same columns for the
+    scoring path, a cross-declaration test ties the two select lists together,
+    and the scoring path needs no cast. One boundary, one cast, and no second
+    declaration of what the columns are.
+
+    WHY NO UNIT TEST CAUGHT IT. Every drift test in this suite replays the
+    snapshot Evidently returned, as a dict -- which is the right design for
+    judging a verdict without the tool, and is also blind to everything that
+    happens before the tool is called. The test added beside this function is
+    the one that closes that gap.
+
+    Covers: EC39
+    Lot: L4
+    Competency: C6
+    """
+    import decimal
+
+    casts = {}
+    for name in features:
+        if name not in frame.columns:
+            continue
+        column = frame[name]
+        if column.dtype != object:
+            continue
+        known = column.dropna()
+        if len(known) and isinstance(known.iloc[0], decimal.Decimal):
+            casts[name] = column.astype(float)
+    return frame.assign(**casts) if casts else frame
+
+
 def drift_snapshot(current, reference, features, max_share: float,
                    method: str) -> dict:
     """Run the drift report and return its dictionary.
@@ -157,6 +254,9 @@ def drift_snapshot(current, reference, features, max_share: float,
     from evidently.presets import DataDriftPreset
 
     shape = definition(features)
+    # BOTH SIDES, BEFORE THE TOOL SEES EITHER. See comparable().
+    current = comparable(current, features)
+    reference = comparable(reference, features)
     report = Report([DataDriftPreset(columns=list(features),
                                      drift_share=max_share,
                                      method=method)])
@@ -170,6 +270,40 @@ def drift_snapshot(current, reference, features, max_share: float,
 
 
 # ------------------------------------------------- the verdicts, without the tool
+
+def thin_window(n_rows: int, min_rows: int) -> list[Measurement]:
+    """One unmeasurable measurement when the window is too small to speak
+    about the stream, and nothing at all when it is big enough. Pure.
+
+    ASKED BEFORE THE SNAPSHOT, AND NOT INSIDE drift_measurements. That function
+    reads a snapshot, so a floor applied there would have let the tool run on a
+    sample it cannot speak about: the figure would be computed, recorded, and
+    only then thrown away. Here the thin window costs nothing and still leaves
+    a row saying why there is no verdict.
+
+    AN EMPTY WINDOW IS A THIN WINDOW, which is a repair of its own. The DAG
+    used to log "aucune transaction dans la fenetre de derive" and record
+    NOTHING, so the series EC45 asks for carried a hole exactly where it should
+    have carried a reason. A hole cannot be told apart from a measurement
+    nobody took.
+
+    THE METRIC NAME IS THE SAME ONE the verdict uses, drifted_columns_share, so
+    one query over fd_monitoring returns the series with its gaps in place
+    rather than two series to be joined by a reader.
+
+    Covers: EC39, EC45
+    Lot: L4
+    Competency: C6
+    """
+    if n_rows >= min_rows:
+        return []
+    return [Measurement(
+        control=INPUT_DRIFT, metric="drifted_columns_share", value=0.0,
+        state=UNMEASURABLE, n_rows=n_rows,
+        detail="%d row(s) in the window, under the floor of %d: a distribution "
+               "test over so few says more about the sample than about the "
+               "stream" % (n_rows, min_rows))]
+
 
 def drift_measurements(payload: dict, max_share: float,
                        n_rows: int) -> list[Measurement]:
@@ -560,53 +694,117 @@ def notify(conn, settings, report: dict) -> dict:
             "in_alert": report.get("in_alert", 0)}
 
 
-def retraining_due(report: dict, stored, allowed, cooldown: dt.timedelta,
+def last_request(conn):
+    """When the monitoring last asked for a retraining, or None if never.
+
+    None AND NOT A NULL FROM max(). An aggregate over an empty table returns
+    NULL, and the caller would then have to tell "never asked" from "asked at
+    an unknown time" -- which are the same thing here, but would not read as
+    such at the call site.
+    """
+    from ml4fd import db
+
+    rows = db.query_file(conn, LAST_REQUEST_SQL)
+    return rows[0][0] if rows else None
+
+
+def record_request(conn, controls, reason: str, run_id=None) -> None:
+    """Record a retraining request, AFTER the trigger fired.
+
+    TRIGGER, THEN RECORD -- the same order and the same reason as fd_frauds and
+    fd_ops_state, which sql/ddl/100_ops_state.sql states for the channel: the
+    record is written only after the thing it records has happened, so a crash
+    between the two repeats one request on the next run rather than losing it.
+    At-least-once, as governance.yml declares for the alerts.
+    """
+    from ml4fd import db
+
+    db.execute_file(conn, RECORD_REQUEST_SQL, run_id=run_id,
+                    controls=",".join(sorted(controls)), reason=reason)
+
+
+def stored_from(report: dict) -> list[dict]:
+    """The recorded control states, read back out of a report. Pure.
+
+    ONE PARSER AND NOT TWO. decide() and the task that records the request both
+    need these rows, and a report carries `since` as an ISO string because it
+    travels through XCom as JSON. Two parsers of one shape is how one of them
+    comes to forget a field -- `detail`, here, which is what puts the drifted
+    column count into the reason an operator reads.
+    """
+    return [{"control": row["control"], "state": row["state"],
+             "since": (dt.datetime.fromisoformat(row["since"])
+                       if row.get("since") else None),
+             "detail": row.get("detail")}
+            for row in report.get("stored", [])]
+
+
+def alerting_controls(stored, allowed) -> list[str]:
+    """The triggering controls currently in alert, by name."""
+    return sorted(row["control"] for row in stored
+                  if row["control"] in allowed and row["state"] == ALERT)
+
+
+def retraining_due(stored, answered, allowed, cooldown: dt.timedelta,
                    now: dt.datetime) -> str | None:
     """Why a retraining is due, or None. Pure.
 
-    ON A TRANSITION INTO ALERT, and never on the alert itself. A drift that
-    lasts three days raises the same alert every window; firing on the state
-    would queue a training per window, and the cooldown would be carrying a
-    load the transition machinery already carries. Firing on the change gives
-    one training per incident, which is the right number.
+    ON AN ALERT NOT YET ANSWERED, and no longer on a transition. The old rule
+    read report["transitions"], and it was right about one thing -- a drift
+    that lasts three days must ask once and not once per window -- and wrong
+    about where the evidence lived. The transition was computed by one task and
+    COMMITTED BY THE NEXT, so a failure in this one consumed it: on 2026-11-20
+    at 09:34 UTC the drift was seen, input_drift went into alert, tell() wrote
+    the state, decide() crashed, and every later run found a standing alert
+    with nothing left to report. One crash, and the request was lost for good.
 
-    THE COOLDOWN GUARDS THE OTHER CASE: a control that flaps, alert to ok to
-    alert, transitions every time. So a transition is suppressed when another
-    control that can trigger has been in alert for less than the cooldown --
-    the training it asked for is still recent, and a second one would learn
-    from the same data.
+    SO THE QUESTION MOVED, from "did a transition happen in the run I am part
+    of" to "has this alert been answered". The second is a question about the
+    database, so it survives a crash, a retry and a scheduler restart --
+    nothing about it is held in a task's memory.
+
+    ANSWERED MEANS a request recorded at or after the alert began. An alert
+    that starts AFTER the last request therefore re-arms the trigger, which is
+    what lets a control that recovers and fails again ask a second time.
+
+    THE COOLDOWN NOW KEYS ON THE REQUEST, which is what it was always about.
+    The old rule suppressed when ANOTHER triggering control had been in alert
+    for less than the cooldown -- a proxy for "a training was asked for
+    recently" that held only while a request followed every transition.
 
     WHY IT IS ALLOWED TO BE WRONG. It may fire on a drift that turns out
     harmless; the cost is a training nobody needed. It cannot put a bad model
-    in service, because registering is not promoting: the gate of L3 judges
-    the candidate against the champion and refuses it. So this is tuned to
-    miss little rather than to be right -- the expensive mistake is
-    downstream, and it is already guarded.
+    in service, because registering is not promoting: the gate of L3 judges the
+    candidate against the champion and refuses it. So this is tuned to miss
+    little rather than to be right -- the expensive mistake is downstream, and
+    it is already guarded.
 
     Covers: EC33
     Lot: L4
     Competency: C5, C6
     """
-    into_alert = [change for change in report.get("transitions", [])
-                  if change["state"] == ALERT and change["control"] in allowed]
-    if not into_alert:
+    alerting = [row for row in stored
+                if row["control"] in allowed
+                and row["state"] == ALERT
+                and row["since"] is not None]
+    if not alerting:
         return None
 
-    changing = {change["control"] for change in into_alert}
-    recent = [row for row in stored
-              if row["control"] in allowed
-              and row["control"] not in changing
-              and row["state"] == ALERT
-              and row["since"] is not None
-              and now - row["since"] < cooldown]
-    if recent:
-        log.info("reentrainement supprime : %s en alerte depuis moins de %s",
-                 ", ".join(row["control"] for row in recent), cooldown)
+    began = max(row["since"] for row in alerting)
+    if answered is not None and answered >= began:
+        log.info("reentrainement deja demande : alerte ouverte le %s, "
+                 "demande enregistree le %s", began, answered)
+        return None
+    if answered is not None and now - answered < cooldown:
+        log.info("reentrainement supprime : demande il y a moins de %s",
+                 cooldown)
         return None
 
-    return "; ".join("%s became alert (%s)"
-                     % (change["control"], change["detail"])
-                     for change in into_alert)
+    return "; ".join(
+        "%s in alert since %s%s"
+        % (row["control"], row["since"],
+           " (%s)" % row["detail"] if row.get("detail") else "")
+        for row in sorted(alerting, key=lambda row: row["control"]))
 
 
 def _columns(metrics) -> list[str]:

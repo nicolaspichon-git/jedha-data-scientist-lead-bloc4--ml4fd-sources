@@ -36,21 +36,48 @@ import pendulum
 from airflow.decorators import dag, task
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 
+from ml4fd import config
+
 log = logging.getLogger(__name__)
 
 DAG_ID = "dag_monitor"
 TRAIN_DAG_ID = "dag_train"
 
+# THE TWO BRANCH TARGETS, NAMED ONCE. @task.branch chooses by returning a
+# task_id AS A STRING, so the branch and the tasks it picks between are two
+# declarations of one name -- and on 2026-11-20 they disagreed. The branch
+# returned "monitor_model.ask_for_retraining", prefixed with the name of the
+# @dag function, while the task was plainly "ask_for_retraining": Airflow
+# refused the run with "branch_task_ids must contain only valid task_ids".
+# A @dag function is not a TaskGroup and adds no prefix; only a TaskGroup does.
+#
+# The refusal came at the worst moment -- after the drift had been injected,
+# measured, and the alert raised -- because nothing before execution compares
+# a returned string to a declared task_id. tests/test_dag_monitor.py now does.
+ASK_FOR_RETRAINING = "ask_for_retraining"
+NO_RETRAINING = "no_retraining"
+RECORD_REQUEST = "record_request"
+
 
 @dag(
     dag_id=DAG_ID,
     description="L4: drift, performance, and the retraining they ask for",
-    # HOURLY, which is neither the drift window nor the performance window.
-    # The windows say what is measured; the cadence says how often it is
-    # looked at. An hour is short enough that a drift is seen the same
-    # morning and long enough that the series does not fill with 1,440
-    # near-identical rows a day -- fd_monitoring is kept for the long run.
-    schedule="17 * * * *",
+    # THE CADENCE IS NEITHER WINDOW. The windows say what is measured; this
+    # says how often it is looked at. Hourly in nominal -- short enough that a
+    # drift is seen the same morning, long enough that the series does not fill
+    # with near-identical rows, since fd_monitoring is kept for the long run.
+    # Every two minutes in demo, which is what makes the five-minute criterion
+    # reachable.
+    #
+    # READ FROM GOVERNANCE AT PARSE TIME, which departs from the five other
+    # DAGs: each of those repeats its cron as a literal and a test ties it to
+    # governance.yml. That convention keeps a DAG parseable without governance
+    # and is right for a cadence nobody changes; it is wrong for a
+    # demonstration knob, because flipping monitoring.mode would then need a
+    # second edit in this file. config.monitoring_schedule() carries the full
+    # argument. Every airflow service of the compose holds POSTGRES_*, so this
+    # call cannot make the file parse in one container and fail in another.
+    schedule=config.load().monitoring_schedule(),
     start_date=pendulum.datetime(2026, 11, 16, tz="Europe/Paris"),
     catchup=False,                      # a past window cannot be re-measured
     max_active_runs=1,
@@ -128,16 +155,33 @@ def monitor_model():
             current = monitor.features_window(conn, drift_window)
             reference = train.load_split(
                 monitor.reference_split(settings, served["dataset_version"]))
-            if len(current):
+            # WHICH COLUMNS, BEFORE THE FLOOR AND NOT INSIDE THE else. The
+            # declaration is valid or stale whatever the window holds, so a
+            # thin window must not be what hides a name that no longer matches
+            # the model in service.
+            columns = monitor.drift_columns(
+                served["features"], settings.monitoring_drift_not_comparable)
+            if settings.monitoring_drift_not_comparable:
+                log.info("derive mesuree sur %d colonne(s) : %s ; exclues par "
+                         "governance : %s", len(columns), ", ".join(columns),
+                         ", ".join(settings.monitoring_drift_not_comparable))
+            # THE FLOOR IS ASKED FIRST, so Evidently is never run on a sample
+            # it cannot speak about. An empty window takes this branch too, and
+            # records its reason instead of only logging it.
+            thin = monitor.thin_window(len(current), settings.drift_min_rows())
+            if thin:
+                measurements += thin
+                log.info("fenetre de derive trop mince : %d ligne(s) pour un "
+                         "plancher de %d", len(current),
+                         settings.drift_min_rows())
+            else:
                 snapshot = monitor.drift_snapshot(
-                    current, reference, served["features"],
+                    current, reference, columns,
                     settings.monitoring_max_drifted_share,
                     settings.monitoring_drift_method)
                 measurements += monitor.drift_measurements(
                     snapshot, settings.monitoring_max_drifted_share,
                     len(current))
-            else:
-                log.info("aucune transaction dans la fenetre de derive")
 
             measurements += monitor.prediction_drift_measurements(
                 monitor.flag_rate(conn, drift_window, served["model_version"],
@@ -172,7 +216,8 @@ def monitor_model():
             "in_alert": sum(1 for control in controls if control.alert),
             "stored": [{"control": row["control"], "state": row["state"],
                         "since": row["since"].isoformat()
-                                 if row["since"] else None}
+                                 if row["since"] else None,
+                        "detail": row.get("detail")}
                        for row in stored],
             "tool": tool,
         }
@@ -201,24 +246,27 @@ def monitor_model():
         is then answerable from the Airflow graph as well as from the channel,
         which matters for a jury reading one screen.
         """
-        from ml4fd import config, monitor
+        from ml4fd import config, db, monitor
 
         settings = config.load()
-        stored = [{"control": row["control"], "state": row["state"],
-                   "since": dt.datetime.fromisoformat(row["since"])
-                            if row["since"] else None}
-                  for row in report.get("stored", [])]
+        stored = monitor.stored_from(report)
+        # READ FROM THE DATABASE AND NOT FROM THIS RUN. The decision is "has
+        # this alert been answered", which survives a crash of this very task;
+        # the old rule asked "did a transition happen in the run I am part of",
+        # and lost the request when the task after the transition failed.
+        with db.connect("fd_ingest", settings) as conn:
+            answered = monitor.last_request(conn)
         reason = monitor.retraining_due(
-            report, stored, settings.monitoring_retrain_on,
+            stored, answered, settings.monitoring_retrain_on,
             settings.retrain_cooldown(),
             dt.datetime.now(dt.timezone.utc))
         if reason is None:
             log.info("aucun reentrainement demande")
-            return "monitor_model.no_retraining"
+            return NO_RETRAINING
         log.warning("reentrainement demande : %s", reason)
-        return "monitor_model.ask_for_retraining"
+        return ASK_FOR_RETRAINING
 
-    @task
+    @task(task_id=NO_RETRAINING)
     def no_retraining() -> None:
         """The branch that does nothing, named so that it shows."""
         log.info("rien a demander : les controles qui declenchent sont au vert")
@@ -231,7 +279,7 @@ def monitor_model():
     # a worker for the length of a training, and what happens to the candidate
     # is the gate's business, not this DAG's.
     ask_for_retraining = TriggerDagRunOperator(
-        task_id="ask_for_retraining",
+        task_id=ASK_FOR_RETRAINING,
         trigger_dag_id=TRAIN_DAG_ID,
         conf={"requested_by": DAG_ID,
               "reason": "{{ ti.xcom_pull(task_ids='measure')['transitions'] }}"},
@@ -239,11 +287,45 @@ def monitor_model():
         reset_dag_run=False,
     )
 
+    @task(task_id=RECORD_REQUEST)
+    def record_request(report: dict) -> None:
+        """Record the request, AFTER the trigger fired.
+
+        DOWNSTREAM OF THE TRIGGER, which is the whole repair. The default
+        trigger rule is all_success, so nothing is recorded unless the
+        TriggerDagRunOperator actually ran: a failure there leaves the alert
+        unanswered and the next monitoring run asks again. The reverse order --
+        record, then trigger -- is what lost the request of 2026-11-20.
+
+        answered=None ON PURPOSE. The decision was taken by decide(); what is
+        computed here is its justification, through the same sentence, so the
+        reason in fd_retrain_requests is the one the operator read in the log.
+        """
+        from airflow.operators.python import get_current_context
+
+        from ml4fd import config, db, monitor
+
+        settings = config.load()
+        stored = monitor.stored_from(report)
+        controls = monitor.alerting_controls(stored,
+                                             settings.monitoring_retrain_on)
+        reason = monitor.retraining_due(
+            stored, None, settings.monitoring_retrain_on,
+            settings.retrain_cooldown(), dt.datetime.now(dt.timezone.utc))
+        run_id = str(get_current_context()["run_id"])
+        with db.connect("fd_ingest", settings) as conn:
+            monitor.record_request(conn, controls or ["input_drift"],
+                                   reason or "declenche par dag_monitor",
+                                   run_id)
+            conn.commit()
+        log.info("demande de reentrainement enregistree : %s", reason)
+
     served = champion()
     report = measure(served)
     tell(report)
     branch = decide(report)
     branch >> [ask_for_retraining, no_retraining()]
+    ask_for_retraining >> record_request(report)
 
 
 monitor_model()

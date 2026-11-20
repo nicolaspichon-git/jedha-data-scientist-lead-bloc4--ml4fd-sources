@@ -219,15 +219,26 @@ def test_the_declared_removal_leaves_a_trainable_recipe():
 def test_a_name_that_is_not_a_column_is_refused():
     for bad in (["txn hour"], "txn-hour", ["amt;"]):
         with pytest.raises(ValueError, match="not a column name"):
-            config._columns(bad)
+            config._columns(bad, "scoring.drop_features")
+
+
+def test_the_refusal_names_the_setting_it_read_and_not_one_caller():
+    """The message used to say scoring.drop_features whatever had been read,
+    because that was the only caller. The second one arrived 2026-11-20 and
+    would have sent the reader to the wrong line of governance.yml."""
+    with pytest.raises(ValueError,
+                       match="monitoring.input_drift.not_comparable"):
+        config._columns(["f tx count"],
+                        "monitoring.input_drift.not_comparable")
 
 
 def test_an_absent_or_empty_declaration_removes_nothing():
     """Governance may legitimately declare no removal; it must not then be read
     as a missing key and crash the whole load."""
-    assert config._columns(None) == ()
-    assert config._columns([]) == ()
-    assert config._columns("") == ()
+    where = "scoring.drop_features"
+    assert config._columns(None, where) == ()
+    assert config._columns([], where) == ()
+    assert config._columns("", where) == ()
 
 
 def test_the_shape_is_checked_here_and_membership_elsewhere():
@@ -235,7 +246,8 @@ def test_the_shape_is_checked_here_and_membership_elsewhere():
     business -- one place deciding. This module stays free of any fraud import,
     so a governance file cannot be read differently depending on what else
     happens to be loaded."""
-    assert config._columns(["not_a_feature"]) == ("not_a_feature",)
+    assert config._columns(["not_a_feature"],
+                           "scoring.drop_features") == ("not_a_feature",)
     from pathlib import Path
 
     body = Path(config.__file__).read_text(encoding="utf-8")
@@ -288,3 +300,110 @@ def test_the_declared_rejection_share_clears_the_measured_floor():
     threshold below the measured floor would hold the control in permanent
     alert. Measured, then declared above it."""
     assert config.load().ops_max_rejection_share > 1 / 57
+
+def test_the_four_mode_dependent_settings_follow_the_mode():
+    """ONE PLACE READS monitoring.mode, so they cannot disagree. Three windows
+    and, since 2026-11-20, one row count: _by_mode is untyped for that reason
+    and this test is what keeps the fourth from drifting out of the family."""
+    import dataclasses
+
+    # AND THE TEST MUST NOT CARE WHICH MODE IS DECLARED. The first version of
+    # this test asserted the repository ships in nominal, and failed within the
+    # hour -- when the demonstration was switched to demo, which is the whole
+    # point of the setting. A test that forbids the operation it documents is
+    # worse than no test. Both branches are built here, from whichever mode
+    # happens to be in force.
+    declared = config.load()
+    assert declared.monitoring_mode in ("nominal", "demo")
+
+    nominal = dataclasses.replace(declared, monitoring_mode="nominal")
+    assert nominal.drift_window() == dt.timedelta(
+        minutes=nominal.monitoring_drift_window_minutes)
+    assert nominal.performance_window() == dt.timedelta(
+        days=nominal.monitoring_performance_window_days)
+    assert nominal.retrain_cooldown() == dt.timedelta(
+        minutes=nominal.monitoring_cooldown_minutes)
+    assert nominal.drift_min_rows() == nominal.monitoring_drift_min_rows
+
+    demo = dataclasses.replace(declared, monitoring_mode="demo")
+    assert demo.drift_window() == dt.timedelta(
+        minutes=demo.monitoring_demo_drift_window_minutes)
+    assert demo.performance_window() == dt.timedelta(
+        minutes=demo.monitoring_demo_performance_window_minutes)
+    assert demo.retrain_cooldown() == dt.timedelta(
+        minutes=demo.monitoring_demo_cooldown_minutes)
+    assert demo.drift_min_rows() == demo.monitoring_demo_drift_min_rows
+
+
+def test_an_unknown_monitoring_mode_is_refused_and_not_guessed():
+    import dataclasses
+
+    broken = dataclasses.replace(config.load(), monitoring_mode="demonstration")
+    for ask in ("drift_window", "performance_window", "retrain_cooldown",
+                "drift_min_rows"):
+        with pytest.raises(ValueError, match="monitoring.mode"):
+            getattr(broken, ask)()
+
+
+def test_the_demo_floor_fits_inside_the_demo_window():
+    """A floor above what the window can hold would make the demonstration
+    permanently unmeasurable. 15 minutes at 5 calls a minute is about 75 rows,
+    and the floor is 50."""
+    s = config.load()
+    available = s.monitoring_demo_drift_window_minutes * s.calls_per_run
+    assert s.monitoring_demo_drift_min_rows < available, (
+        "plancher %d pour %d lignes disponibles"
+        % (s.monitoring_demo_drift_min_rows, available))
+
+def test_the_demonstration_cadences_are_not_the_nominal_ones():
+    """A demonstration mode that left the cadences alone would keep the loop
+    correct and unshowable: an hourly monitor cannot close a five-minute
+    criterion, and verdicts written once at 02:00 never arrive during a
+    recording."""
+    import dataclasses
+
+    s = config.load()
+    nominal = dataclasses.replace(s, monitoring_mode="nominal",
+                                  verdict_mode="nominal")
+    demo = dataclasses.replace(s, monitoring_mode="demo", verdict_mode="demo")
+    assert demo.monitoring_schedule() != nominal.monitoring_schedule()
+    assert demo.verdict_schedule() != nominal.verdict_schedule()
+
+
+def test_the_monitor_looks_at_least_as_often_as_its_window_is_wide():
+    """THE CROSS-DECLARATION THAT MATTERS. A cadence slower than the window it
+    reads lets a drift appear and vanish between two looks -- measured by
+    nobody, and absent from the series EC45 asks for. In demo the window is
+    fifteen minutes, so the monitor must run at least that often."""
+    import dataclasses
+
+    demo = dataclasses.replace(config.load(), monitoring_mode="demo")
+    minute = demo.monitoring_schedule().split()[0]
+    assert minute.startswith("*/"), demo.monitoring_schedule()
+    every = int(minute[2:])
+    assert every <= demo.monitoring_demo_drift_window_minutes, (
+        "regarde toutes les %d min une fenetre de %d min"
+        % (every, demo.monitoring_demo_drift_window_minutes))
+
+
+def test_the_verdicts_are_written_sooner_than_they_fall_due():
+    """Same shape, other switch: a verdict that falls due after 300 s and is
+    written every ten minutes is a label that arrives late for no reason the
+    product has. The cadence must be the shorter of the two."""
+    import dataclasses
+
+    demo = dataclasses.replace(config.load(), verdict_mode="demo")
+    minute = demo.verdict_schedule().split()[0]
+    assert "/" in minute, demo.verdict_schedule()
+    every_minutes = int(minute.split("/")[1])
+    assert every_minutes * 60 <= demo.demo_delay_seconds, (
+        "ecrit toutes les %d s pour un delai de %d s"
+        % (every_minutes * 60, demo.demo_delay_seconds))
+
+
+def test_a_cron_that_is_not_five_fields_is_refused_with_its_line_named():
+    """Airflow refuses it too, at DAG parse time and with a message about
+    croniter. Named here, the reader is sent to the line of governance.yml."""
+    for bad in ("17 * * *", "", "every two minutes", "*/2 * * * * *"):
+        with pytest.raises(ValueError, match="monitoring.schedule"):
+            config._cron(bad, "monitoring.schedule")

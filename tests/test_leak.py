@@ -249,10 +249,18 @@ def test_the_verdict_dag_shares_no_task_with_any_other():
 
 def test_the_verdict_dag_has_a_cadence_of_its_own():
     """EI06: the ingestion runs every minute, this once a day. Nothing is lost
-    by waiting -- the verdict is not due for the declared delay anyway."""
-    body = (ROOT / "airflow/dags/dag_ingest_verdicts.py").read_text(
-        encoding="utf-8")
-    schedule = re.search(r'schedule="([^"]+)"', body).group(1)
+    by waiting -- the verdict is not due for the declared delay anyway.
+
+    THE CLAIM IS ABOUT THE NOMINAL CONFIGURATION, and it is read from
+    governance rather than from the DAG source since 2026-11-20: the cadence
+    of dag_ingest_verdicts now follows verdicts.mode, so the source carries no
+    literal and the demo value carries no hour at all. In demo the cadences are
+    deliberately collapsed so the loop fits in minutes -- nobody claims this
+    guarantee of a recording.
+    """
+    from ml4fd import config
+
+    schedule = config.load().verdict_schedule_nominal
     assert schedule != "* * * * *"
     assert re.match(r"^\d+ \d+ \* \* \*$", schedule), schedule
 

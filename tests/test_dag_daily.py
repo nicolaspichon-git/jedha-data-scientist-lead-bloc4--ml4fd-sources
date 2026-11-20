@@ -116,11 +116,17 @@ def test_the_cadence_is_the_declared_one():
 def test_the_report_passes_after_the_verdicts_are_written():
     """A DEPENDENCY AND NOT A PREFERENCE: section 3 reads the verdicts that
     fell, and dag_ingest_verdicts writes them at 02:00. Produced before, the
-    section would be empty every morning and nothing would say why."""
+    section would be empty every morning and nothing would say why.
+
+    THE CLAIM IS ABOUT THE NOMINAL CONFIGURATION, and it is read from
+    governance rather than from the DAG source since 2026-11-20: the cadence
+    of dag_ingest_verdicts now follows verdicts.mode, so the source carries no
+    literal and the demo value carries no hour at all. In demo the cadences are
+    deliberately collapsed so the loop fits in minutes -- nobody claims this
+    guarantee of a recording.
+    """
     report_hour = int(_dag_keywords()["schedule"].split()[1])
-    verdicts = (ROOT / "airflow" / "dags" / "dag_ingest_verdicts.py").read_text(
-        encoding="utf-8")
-    verdict_hour = int(re.search(r'schedule="\d+ (\d+)', verdicts).group(1))
+    verdict_hour = int(config.load().verdict_schedule_nominal.split()[1])
     assert report_hour > verdict_hour, (report_hour, verdict_hour)
 
 

@@ -128,6 +128,10 @@ class Recipe:
     cut_off: dt.datetime
     features: tuple[str, ...]
     split_rule: str
+    # WHETHER THE STREAM IS A TRAINING SOURCE (governance datasets).
+    # Defaulted, so every construction site that does not mention it keeps the
+    # behaviour it had before 2026-11-20 -- and keeps its digest, see below.
+    include_stream: bool = False
 
     def canonical(self) -> str:
         """The form that gets hashed.
@@ -146,6 +150,16 @@ class Recipe:
             "features": list(self.features),
             "split_rule": self.split_rule,
         }
+        # OMITTED WHEN FALSE, AND THAT IS THE POINT. Adding the key
+        # unconditionally would change every digest, so the champion's dataset
+        # would stop being findable and the first retraining after this lot
+        # would rebuild a file it already had -- under a new version, with a
+        # new lineage, for no change in content. Omitted, a stream-free recipe
+        # hashes byte for byte as it did before the stream existed as an
+        # option. tests/test_datasets.py pins that equality against a literal
+        # digest, so it cannot drift back.
+        if self.include_stream:
+            payload["include_stream"] = True
         return json.dumps(payload, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=True)
 
@@ -201,20 +215,36 @@ def parse_split_rule(rule: str) -> tuple[dt.datetime, dt.datetime]:
     return train_end, test_end
 
 
-def assert_cut_off_usable(cut_off: dt.datetime, horizon: dt.datetime) -> None:
-    """Refuse a cut-off beyond the labelling horizon.
+def assert_cut_off_usable(cut_off: dt.datetime, horizon: dt.datetime,
+                          include_stream: bool = False) -> None:
+    """Refuse a cut-off beyond the labelling horizon, unless the stream is a
+    training source.
 
-    Past it, the rows carry is_fraud = 0 because nobody labelled them, not
-    because they are not fraud. Training on them teaches the model that an
-    unlabelled period is never fraudulent, and evaluating on them reports a
-    flattering recall over a window holding nothing to find.
+    Past the horizon the HISTORICAL rows carry is_fraud = 0 because nobody
+    labelled them, not because they are not fraud. Training on them teaches
+    the model that an unlabelled period is never fraudulent, and evaluating on
+    them reports a flattering recall over a window holding nothing to find.
+
+    THE HORIZON IS THE CORPUS'S AND NOT THE SYSTEM'S, which this refusal did
+    not distinguish until 2026-11-20 -- and its own message already pointed
+    the way out: "extend labels.horizon once the labels actually exist". For
+    the stream they do exist: dag_ingest_verdicts writes a verdict as it falls
+    due, so a streamed transaction is labelled for real up to the cut-off.
+    Refusing the cut-off wholesale would forbid exactly what
+    datasets.include_stream asks for.
+
+    So with the stream admitted, the historical rows are bounded by the horizon
+    INSIDE sql/datasets/training_set.sql rather than by the cut-off here -- the
+    guard moves, it does not disappear. Without it, nothing changes.
 
     Covers: EC14
-    Lot: M1
+    Lot: M1 (revu en L4, 20/11/2026)
     Competency: C5
     """
     if cut_off.tzinfo is None:
         raise ValueError("cut_off must be timezone-aware")
+    if include_stream:
+        return
     if cut_off > horizon:
         raise ValueError(
             "cut-off %s is beyond the labelling horizon %s: the rows in between "
