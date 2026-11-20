@@ -68,6 +68,23 @@ class Settings:
     ops_freshness_minutes: int
     ops_max_empty_share: float
     ops_max_rejection_share: float
+    monitoring_mode: str
+    monitoring_tool: str
+    monitoring_channel: str
+    monitoring_file: str
+    monitoring_recipient: str
+    monitoring_drift_window_minutes: int
+    monitoring_demo_drift_window_minutes: int
+    monitoring_max_drifted_share: float
+    monitoring_drift_method: str
+    monitoring_max_alert_rate_ratio: float
+    monitoring_min_recall: float
+    monitoring_performance_window_days: int
+    monitoring_demo_performance_window_minutes: int
+    monitoring_min_labelled_frauds: int
+    monitoring_retrain_on: tuple[str, ...]
+    monitoring_cooldown_minutes: int
+    monitoring_demo_cooldown_minutes: int
     report_timezone: str
     report_root: str
     report_schedule: str
@@ -89,7 +106,13 @@ class Settings:
     promote_first_unopposed: bool
     max_amount: float
     systematic_share: float
-    csv_url: str
+    # NOT A URL ANY MORE, which is why it is not called one. Since the
+    # corpora moved to a private bucket this carries whatever governance.yml
+    # declares -- an http(s) URL, an S3 object key, or a bare file name -- and
+    # ml4fd/fetch.py decides which of the three it is. A field named csv_url
+    # holding "kaggle-datasets/fraudTrain.csv" would be a name that lies, and
+    # the next reader would spend a minute finding out.
+    csv_source: str
     api_url: str
     label_horizon: dt.datetime
     min_positives: int
@@ -121,6 +144,59 @@ class Settings:
             return dt.timedelta(seconds=self.demo_delay_seconds)
         raise ValueError(
             "verdicts.mode is %r; expected 'nominal' or 'demo'" % self.verdict_mode)
+
+    def drift_window(self) -> dt.timedelta:
+        """The window the input distribution is compared over.
+
+        RESOLVED BY THE SWITCH, exactly as verdict_delay() is, and for the
+        same reason: a loop whose windows are measured in days is a loop
+        nobody can show. The two modes are declared side by side in
+        governance.yml so the demonstration value is never a figure somebody
+        edited over the real one and forgot to put back.
+
+        Covers: EC39, EC45
+        Lot: L4
+        Competency: C6
+        """
+        return self._by_mode(
+            dt.timedelta(minutes=self.monitoring_drift_window_minutes),
+            dt.timedelta(minutes=self.monitoring_demo_drift_window_minutes))
+
+    def performance_window(self) -> dt.timedelta:
+        """The window the real performance is measured over.
+
+        LONGER THAN THE DRIFT WINDOW, and that is a measurement and not a
+        preference. At a base rate of 0.414 % the stream yields about 30
+        frauds a day, and a recall over 30 frauds carries a standard error of
+        0.079 -- so one day swings +/-0.16 at two sigma, wider than the gap
+        between the published 0.751 and the floor of 0.60. Seven days is about
+        210 frauds and a standard error of 0.030.
+
+        Covers: EC40
+        Lot: L4
+        Competency: C6
+        """
+        return self._by_mode(
+            dt.timedelta(days=self.monitoring_performance_window_days),
+            dt.timedelta(
+                minutes=self.monitoring_demo_performance_window_minutes))
+
+    def retrain_cooldown(self) -> dt.timedelta:
+        """How long a retraining suppresses the next one (EC33)."""
+        return self._by_mode(
+            dt.timedelta(minutes=self.monitoring_cooldown_minutes),
+            dt.timedelta(minutes=self.monitoring_demo_cooldown_minutes))
+
+    def _by_mode(self, nominal: dt.timedelta,
+                 demo: dt.timedelta) -> dt.timedelta:
+        """One place where monitoring.mode is read, so three windows cannot
+        end up on two different modes."""
+        if self.monitoring_mode == "nominal":
+            return nominal
+        if self.monitoring_mode == "demo":
+            return demo
+        raise ValueError("monitoring.mode is %r; expected 'nominal' or 'demo'"
+                         % self.monitoring_mode)
 
     def observed_per_day(self) -> int:
         """Transactions N7 will actually see in a day, from its own settings.
@@ -347,6 +423,52 @@ def _retention(section: dict) -> dict:
     return out
 
 
+CONTROLS = ("input_drift", "prediction_drift", "performance",
+            "data_quality")
+
+
+def _retrain_on(value) -> tuple[str, ...]:
+    """The controls allowed to trigger a retraining, checked against the four.
+
+    AN UNKNOWN NAME IS REFUSED AND NOT IGNORED. A typo in this list would
+    silently disarm the trigger: the loop would run, measure, alert, and never
+    retrain, and nothing would say why. This is the same refusal as
+    datasets.without() applies to a feature name.
+
+    The names must also match the CHECK on fd_monitoring.control, or a
+    measurement the policy acts on could not be recorded.
+    """
+    names = tuple(str(name) for name in (value or ()))
+    unknown = [name for name in names if name not in CONTROLS]
+    if unknown:
+        raise ValueError(
+            "monitoring.trigger.retrain_on names %s, which is not a control. "
+            "The controls are %s. (In YAML 1.1 the bare word on is a boolean, "
+            "which is why this key is retrain_on.)"
+            % (", ".join(unknown), ", ".join(CONTROLS)))
+    return names
+
+
+def _third_destination(alert_file: str, ops_file: str,
+                       monitoring_file: str) -> str:
+    """The monitoring channel must not write where the other two write.
+
+    THREE AUDIENCES, THREE DESTINATIONS. The analyst is told about a
+    transaction, the pipeline owner about the chain, the model owner that what
+    is in service no longer matches the world. _distinct_destinations below
+    refuses the first two being equal; this refuses the third colliding with
+    either, which is the same separation extended rather than a new rule.
+    """
+    for other, name in ((alert_file, "notifications.file"),
+                        (ops_file, "ops.file")):
+        if Path(monitoring_file) == Path(other):
+            raise ValueError(
+                "monitoring.file and %s are the same path (%s). The model "
+                "owner's channel and that one have different readers; one "
+                "would bury the other." % (name, monitoring_file))
+    return monitoring_file
+
+
 def _distinct_destinations(alert_file: str, ops_file: str) -> str:
     """The two channels must not write to the same place.
 
@@ -489,6 +611,41 @@ def load(path: Path | None = None) -> Settings:
             g["ops"]["max_empty_run_share"], "ops.max_empty_run_share"),
         ops_max_rejection_share=_share_under_one(
             g["ops"]["max_rejection_rate"], "ops.max_rejection_rate"),
+        monitoring_mode=str(g["monitoring"]["mode"]),
+        monitoring_tool=str(g["monitoring"]["tool"]),
+        monitoring_channel=str(g["monitoring"]["channel"]),
+        monitoring_file=_third_destination(
+            _under_project(g["notifications"]["file"]),
+            _under_project(g["ops"]["file"]),
+            _under_project(g["monitoring"]["file"])),
+        # EC44 asks the alert to designate its recipient. A role and never
+        # a person: the holder changes, the responsibility does not.
+        monitoring_recipient=str(g["monitoring"]["recipient"]),
+        monitoring_drift_window_minutes=int(
+            g["monitoring"]["input_drift"]["window_minutes"]),
+        monitoring_demo_drift_window_minutes=int(
+            g["monitoring"]["input_drift"]["demo_window_minutes"]),
+        monitoring_max_drifted_share=_share_under_one(
+            g["monitoring"]["input_drift"]["max_drifted_share"],
+            "monitoring.input_drift.max_drifted_share"),
+        monitoring_drift_method=str(g["monitoring"]["input_drift"]["method"]),
+        monitoring_max_alert_rate_ratio=float(
+            g["monitoring"]["prediction_drift"]["max_alert_rate_ratio"]),
+        monitoring_min_recall=_share_under_one(
+            g["monitoring"]["performance"]["min_recall"],
+            "monitoring.performance.min_recall"),
+        monitoring_performance_window_days=int(
+            g["monitoring"]["performance"]["window_days"]),
+        monitoring_demo_performance_window_minutes=int(
+            g["monitoring"]["performance"]["demo_window_minutes"]),
+        monitoring_min_labelled_frauds=int(
+            g["monitoring"]["performance"]["min_labelled_frauds"]),
+        monitoring_retrain_on=_retrain_on(
+            g["monitoring"]["trigger"]["retrain_on"]),
+        monitoring_cooldown_minutes=int(
+            g["monitoring"]["trigger"]["cooldown_minutes"]),
+        monitoring_demo_cooldown_minutes=int(
+            g["monitoring"]["trigger"]["demo_cooldown_minutes"]),
         report_timezone=str(g["report"]["timezone"]),
         report_root=_under_project(g["report"]["root"]),
         report_schedule=str(g["report"]["schedule"]),
@@ -511,7 +668,7 @@ def load(path: Path | None = None) -> Settings:
         validation_share=_share(g["scoring"]["validation_share"]),
         max_amount=float(g["validation"]["max_amount"]),
         systematic_share=float(g["validation"]["systematic_share"]),
-        csv_url=g["sources"]["historical_csv"],
+        csv_source=g["sources"]["historical_csv"],
         label_horizon=_as_utc(g["labels"]["horizon"]),
         min_positives=int(g["labels"]["min_positives"]),
         datasets_root=_datasets_root(g["datasets"]["root"]),

@@ -20,6 +20,10 @@
 -- Airflow, and the runs it executed really were runs of the old dag_id: the old
 -- DAG keeps its history, the new one starts its own. Rewriting another system's
 -- state to tidy up our own would be the kind of fix that breaks a scheduler.
+-- Since L1 it could not be done from here in any case: Airflow has a database
+-- of its own, and this file writes fd_pipeline_runs and nothing else -- which
+-- is why the L1 split left it working while it broke the two files that read
+-- dag_run (sql/checks/abandoned_runs.sql and its closer).
 --
 -- THE NEW DAG IS CREATED PAUSED by Airflow's default, so nothing runs until it
 -- is unpaused: .\fd-manager.ps1 realtime -Start

@@ -27,6 +27,8 @@ Usage, from the scheduler container which has the network and the dependencies:
 
     python3 /opt/project/tools/observe_api.py            # 20 calls, 13 s apart
     python3 /opt/project/tools/observe_api.py \
+        --endpoint http://producer:4000/current-transactions
+    python3 /opt/project/tools/observe_api.py \
         --calls 60 --spacing 0 --burst 0                 # the limiter, tested
     python3 /opt/project/tools/observe_api.py \
         --from-log runtime/observations/n0-observations--<stamp>.jsonl
@@ -36,6 +38,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import math
 import statistics
 import sys
 import types
@@ -45,8 +48,27 @@ from pathlib import Path
 
 import requests
 
-ENDPOINT = ("https://sdacelo-real-time-fraud-detection.hf.space"
-            "/current-transactions")
+# THE ADDRESS IS DECLARED, NOT CODED. This literal was the Hugging Face Space,
+# and on 2026-11-19 it stopped answering while governance.yml had already been
+# pointed at the local producer: the one script whose whole purpose is to
+# measure what the ingestion will read was measuring something else. So the
+# default now comes from the same line the ingestion reads,
+# realtime.endpoint, and --endpoint overrides it for a one-off probe. The
+# literal stays as the last resort, so a broken governance.yml cannot stop a
+# measurement.
+FALLBACK_ENDPOINT = ("https://sdacelo-real-time-fraud-detection.hf.space"
+                     "/current-transactions")
+
+
+def declared_endpoint() -> str:
+    """realtime.endpoint, or the literal above if governance cannot be read."""
+    try:
+        from ml4fd import config
+        return config.load().api_endpoint
+    except Exception as problem:                              # noqa: BLE001
+        print("governance.yml illisible (%s: %s) ; adresse de repli."
+              % (type(problem).__name__, problem))
+        return FALLBACK_ENDPOINT
 
 # The documented limiter is 5 per minute per IP, so one call every 13 seconds
 # stays under it with a margin that does not depend on clock synchronisation.
@@ -55,6 +77,23 @@ ENDPOINT = ("https://sdacelo-real-time-fraud-detection.hf.space"
 # 19-minute run that was announced as 6.
 DEFAULT_SPACING_SECONDS = 13
 TIMEOUT_SECONDS = 30
+
+# THE SERVED WINDOW, MEASURED, and not the corpus. The producer holds rows
+# PRODUCER_SKIP_ROWS .. + PRODUCER_MAX_ROWS of fraudTest.csv and samples that
+# window, so the base rate a campaign draws against is the window's. Measured
+# on 2026-11-20 over rows 0..99,999 (2020-06-21 to 2020-07-26): 402 frauds in
+# 100,000 rows. The file as a whole sits at 0.3860 % and June alone at
+# 0.4425 %, so quoting either here would be wrong by a tenth of a point, in
+# the direction that flatters the sample. Re-measure with
+# tools/profile_corpus.py if the window moves.
+WINDOW_BASE_RATE = 0.004020
+
+# The rate at which the INGESTION consumes the stream: realtime.schedule every
+# minute x realtime.calls_per_run = 7,200 a day. It turns a number of draws
+# into a duration. The spacing of this script is a property of the
+# measurement and not of the pipeline, so quoting it would answer a question
+# nobody asked.
+INGESTION_PER_DAY = 7200.0
 
 # Fields whose VALUES may be written to the measurement file. Everything else is
 # reported by shape alone. cc_num is absent on purpose: its length and whether
@@ -125,8 +164,12 @@ def writable_dir() -> Path:
                   % ", ".join(str(c) for c in OUT_CANDIDATES))
 
 
-def call() -> dict:
-    """One call. Returns what happened, never raising."""
+def call(endpoint: str) -> dict:
+    """One call. Returns what happened, never raising.
+
+    The address travels in the record, so the raw log says what it measured
+    and --from-log can name it instead of guessing.
+    """
     started = time.monotonic()
     # OUR clock, in the same unit as current_time, taken at the moment of the
     # call. Without it there is nothing to compare the server's clock against,
@@ -134,15 +177,15 @@ def call() -> dict:
     # comparing an elapsed span with a span that forgot the latency.
     our_clock_ms = int(time.time() * 1000)
     try:
-        response = requests.get(ENDPOINT, timeout=TIMEOUT_SECONDS)
+        response = requests.get(endpoint, timeout=TIMEOUT_SECONDS)
     except requests.RequestException as problem:
         return {"ok": False, "status": None, "latency": time.monotonic() - started,
-                "our_clock_ms": our_clock_ms,
+                "our_clock_ms": our_clock_ms, "endpoint": endpoint,
                 "error": "%s: %s" % (type(problem).__name__, problem)}
 
     latency = time.monotonic() - started
     record = {"ok": False, "status": response.status_code, "latency": latency,
-              "our_clock_ms": our_clock_ms,
+              "our_clock_ms": our_clock_ms, "endpoint": endpoint,
               "headers": {k.lower(): v for k, v in response.headers.items()
                           if k.lower().startswith(("x-rate", "retry", "ratelimit"))},
               "bytes": len(response.content)}
@@ -248,12 +291,18 @@ def main(argv=None) -> int:
                         help="seconds between spaced calls (default %d; 0 runs "
                              "back to back, which tests the limiter)"
                              % DEFAULT_SPACING_SECONDS)
+    parser.add_argument("--endpoint", metavar="URL",
+                        help="address to measure (default: realtime.endpoint "
+                             "from governance.yml)")
     parser.add_argument("--from-log", metavar="PATH",
                         help="rebuild the report from a log, no API call")
     args = parser.parse_args(argv)
 
     if args.from_log:
         return rebuild(Path(args.from_log))
+
+    args.endpoint = args.endpoint or declared_endpoint()
+    print("Point d'entree : %s" % args.endpoint)
 
     started_at = dt.datetime.now(dt.timezone.utc)
     out = writable_dir()
@@ -280,7 +329,7 @@ def main(argv=None) -> int:
     for i in range(args.calls):
         if i and args.spacing:
             time.sleep(args.spacing)
-        record = call()
+        record = call(args.endpoint)
         spaced.append(record)
         _append(journal, "spaced", record)
         mark = "ok " if record["ok"] else "KO "
@@ -293,7 +342,7 @@ def main(argv=None) -> int:
     if args.burst:
         print("\n  rafale pour declencher le limiteur :")
     for i in range(args.burst):
-        record = call()
+        record = call(args.endpoint)
         burst.append(record)
         _append(journal, "burst", record)
         print("    %d  HTTP %-4s %6.0f ms  %s"
@@ -308,7 +357,15 @@ def main(argv=None) -> int:
         while waited < 180:
             time.sleep(10)
             waited += 10
-            probe = call()
+            probe = call(args.endpoint)
+            # JOURNALLED LIKE THE REST, and it was not until 2026-11-20. The
+            # file promises that the log survives any failure of the report and
+            # that --from-log rebuilds it; these probes were the one measurement
+            # kept nowhere but a local variable, so a rebuilt report said "non
+            # observee" where the campaign had measured a delay. A promise that
+            # holds for all but one figure is worse than no promise, because
+            # nothing in the rebuilt report says which figure went missing.
+            _append(journal, "reopen", dict(probe, waited_s=waited))
             print("    apres %3d s : HTTP %s" % (waited, probe["status"]))
             if probe["ok"]:
                 reopened_after = waited
@@ -334,24 +391,35 @@ def main(argv=None) -> int:
 
 def rebuild(journal: Path) -> int:
     """Rebuild the report from a log. Costs nothing and calls nothing."""
-    spaced, burst = [], []
+    spaced, burst, reopen = [], [], []
     for line in journal.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         record = json.loads(line)
-        (burst if record.get("phase") == "burst" else spaced).append(record)
-    print("Journal relu : %d appels espaces, %d en rafale."
-          % (len(spaced), len(burst)))
+        # THREE PHASES AND NOT TWO. "anything that is not burst is spaced" put
+        # the reopening probes among the spaced calls, where they would have
+        # moved the median latency and the availability table -- a rebuilt
+        # report quietly describing a campaign that never ran.
+        {"burst": burst, "reopen": reopen}.get(
+            record.get("phase"), spaced).append(record)
+    print("Journal relu : %d appels espaces, %d en rafale, %d sonde(s) de "
+          "reouverture." % (len(spaced), len(burst), len(reopen)))
 
     # SimpleNamespace, not a class body: inside a class body the name being
     # assigned shadows the enclosing function's, so `calls, burst = len(spaced),
     # len(burst)` raises NameError on its own right-hand side.
-    args = types.SimpleNamespace(calls=len(spaced), burst=len(burst))
+    # The endpoint is read back from the first record rather than defaulted:
+    # a report that names the wrong address is worse than one that names none.
+    seen = [r.get("endpoint") for r in spaced + burst if r.get("endpoint")]
+    args = types.SimpleNamespace(calls=len(spaced), burst=len(burst),
+                                 endpoint=seen[0] if seen else "non releve")
 
     out = writable_dir()
     stamp = journal.stem.split("--")[-1]
+    reopened_after = next((r["waited_s"] for r in reopen
+                           if r.get("ok") and "waited_s" in r), None)
     path = write_report(dt.datetime.now(dt.timezone.utc), spaced, burst,
-                        None, args, out, stamp)
+                        reopened_after, args, out, stamp)
     print("Mesure ecrite : %s" % path)
     return 0
 
@@ -458,7 +526,8 @@ def write_report(started_at, spaced, burst, reopened_after, args,
         "",
         "> Produit par `tools/observe_api.py`, %s."
         % started_at.strftime("%d/%m/%Y a %H:%M:%S UTC"),
-        "> Point d'entree : `%s`" % ENDPOINT,
+        "> Point d'entree : `%s`"
+        % getattr(args, "endpoint", FALLBACK_ENDPOINT),
         "> %d appels espaces de %d s, rafale de %d."
         % (args.calls, getattr(args, "spacing", DEFAULT_SPACING_SECONDS),
            args.burst),
@@ -505,10 +574,18 @@ def write_report(started_at, spaced, burst, reopened_after, args,
         "",
         "## 3. Le limiteur et les echecs",
         "",
-        "La limite annoncee est de 5 par minute et par IP. **Ces chiffres",
-        "decident de la marge du lot N7** -- et ils ne valent QUE si une seule",
-        "campagne tournait : deux clients simultanes depuis la meme adresse",
-        "faussent le limiteur comme le taux d erreur.",
+        "Le plafond est celui de PRODUCER_RATE_LIMIT (docker-compose.yml), que",
+        "ce script ne lit pas : il l eprouve. **Ces chiffres decident de la",
+        "marge du lot N7** -- et ils ne valent QUE si une seule campagne",
+        "tournait : deux clients simultanes depuis la meme adresse faussent le",
+        "limiteur comme le taux d erreur.",
+        "",
+        "**UNE CAMPAGNE ESPACEE NE MESURE PAS LE PLAFOND.** La rafale part",
+        "juste apres la phase espacee, dont les derniers appels sont encore",
+        "dans la fenetre du limiteur : le rang du premier 429 melange alors les",
+        "deux phases et ne dit plus combien d appels passent par minute. Pour",
+        "le plafond seul, une campagne qui n est que rafale :",
+        "`--calls 20 --spacing 0 --burst 0`.",
         "",
         "| | |", "|---|---|",
         "| appels au total | %d |" % len(every),
@@ -574,12 +651,15 @@ def write_report(started_at, spaced, burst, reopened_after, args,
         lines += [
             "**Une seule valeur observee (%s), donc cet echantillon ne dit rien"
             % seen,
-            "sur la capacite du flux a livrer l'autre.** Le taux de fraude de la",
-            "source est de 0,386 %% : sur %d tirages, la probabilite d'en voir"
-            % len(shapes),
-            "au moins une est de %.0f %%. Il faudrait environ 780 tirages, soit"
-            % (100 * (1 - (1 - 0.00386) ** max(len(shapes), 1))),
-            "quatre heures de collecte, pour atteindre 95 %.",
+            "sur la capacite du flux a livrer l'autre.** Le taux de fraude de",
+            "la FENETRE SERVIE est de %.4f %% : sur %d tirages, la probabilite"
+            % (100 * WINDOW_BASE_RATE, max(len(shapes), 1)),
+            "d'en voir au moins une est de %.0f %%. Il en faudrait %d, soit"
+            % (100 * (1 - (1 - WINDOW_BASE_RATE) ** max(len(shapes), 1)),
+               math.ceil(math.log(0.05) / math.log(1 - WINDOW_BASE_RATE))),
+            "%.1f h d'ingestion a %d appels par jour, pour atteindre 95 %%."
+            % (24 * math.ceil(math.log(0.05) / math.log(1 - WINDOW_BASE_RATE))
+               / INGESTION_PER_DAY, int(INGESTION_PER_DAY)),
             "",
             "**N6 ne doit donc pas attendre d'observer un `is_fraud = 1` reel.**",
             "Son critere injecte les deux valeurs dans la meme charge utile et",
@@ -729,9 +809,14 @@ def write_report(started_at, spaced, burst, reopened_after, args,
         "| `trans_num` distincts | %d |" % len(set(trans_nums)),
         "| correspondance index <-> trans_num | %s |" % _mapping(pairs),
         "",
-        "Un doublon est **attendu** : chaque appel tire au hasard dans tout",
-        "l'historique. Deux tirages de la meme ligne sont deux evenements",
-        "distincts, separes par leur `current_time`.",
+        "Un doublon est **attendu A L ECHELLE**, et c est une propriete de la",
+        "fenetre et non du hasard : le producer tire avec remise dans les",
+        "lignes qu il tient (PRODUCER_MAX_ROWS, 100 000 par defaut) et non",
+        "dans tout le corpus, comme le faisait l original. Les collisions",
+        "attendues sur n tirages valent n^2 / 2N : negligeables sur une",
+        "campagne de dix, environ 260 sur une journee d ingestion de 7 200.",
+        "Deux tirages de la meme ligne sont deux evenements distincts, separes",
+        "par leur `current_time`.",
         "",
         "## 8. La precision du numero de carte --- LE controle decisif",
         "",

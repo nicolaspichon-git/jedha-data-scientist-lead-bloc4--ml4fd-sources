@@ -110,6 +110,12 @@ retention:
       The Markdown morning reports. They name transactions by identifier and
       amount, never the cardholder. Kept: each is the document its digest in
       fd_reports vouches for.
+    fd_monitoring: >-
+      The monitoring measurements. Kept, and not given a duration: EC45 exists
+      to show an evolution over the long run, so a window that purges the
+      measurements is a window that erases the thing being asked for. They
+      carry no personal data -- a drift score, a recall, a count -- which is
+      what makes keeping them cheap. Append-only, like fd_promotions.
     local_cache: >-
       The downloaded historical CSV. It carries personal data but it is the
       SOURCE and downloads again; its place is outside the repository, and it
@@ -272,7 +278,25 @@ promotion:
   # analyst can review in a morning, and it is the constraint G2 actually
   # places on the system. A candidate that exceeds it is refused however good
   # its recall: alerts nobody reads are not detections.
-  respect_alert_capacity: true
+  #
+  # OFF FOR THE BOOTSTRAP, 2026-11-20, and here is the reason rather than an
+  # apology. The figure the gate compares is train.py's alerts_per_day,
+  # 7200 * flagged / n_test: the THROUGHPUT is the stream's (realtime.schedule
+  # x calls_per_run = 7,200 calls a day) and the ALERT RATE is the test
+  # split's. Only one of the two halves comes from where the model will serve.
+  # The test split runs at a 0.7790 % base rate; the window the producer
+  # serves -- fraudTest rows 0 to 99,999, measured 402 frauds in 100,000 --
+  # runs at 0.4020 %. So the published 75.9 alerts a day describes May 2020
+  # and not the stream. Carrying the test split's false positive rate per
+  # legitimate row (185 / 47,253) onto a 0.4020 % window gives about 53 a
+  # day, under the ceiling. ABOUT is the whole problem: that is an
+  # extrapolation, and a ceiling deserves a measurement. So the first
+  # champion is promoted with the check off, the stream is left to run, and
+  # monitoring.prediction_drift measures the rate that actually arrives.
+  # Then this goes back to true. fd_promotions writes alert_capacity into
+  # every row, so a promotion decided with the check off stays visible for
+  # good -- which is what makes this defensible instead of merely convenient.
+  respect_alert_capacity: false
 
   # WITH NO CHAMPION YET there is nothing to compare against, and refusing
   # would leave the scoring path with no model to load at all. The first
@@ -284,6 +308,167 @@ promotion:
   # left in a log line. A promotion changes what the system serves; a refusal
   # explains why it did not. Both have to be answerable months later, to a
   # jury or to an auditor, and a log that rotates answers nothing.
+
+# ------------------------------------------------------------------- monitoring
+# WHAT C6 ADDS TO WHAT S3 ALREADY WATCHED. The ops section below watches the
+# CHAIN: is it running, is it rejecting, is it fresh. This section watches the
+# MODEL: are the transactions still shaped like the ones it was fitted on, is
+# it still flagging at the rate it was tuned for, and is it still catching what
+# the specification requires. A chain in perfect health can serve a model that
+# has quietly stopped working, and nothing in S3 would say so.
+monitoring:
+  # THE SWITCH, the same one as verdicts.mode and for the same reason: a loop
+  # whose windows are measured in days is a loop nobody can show. nominal is
+  # the real configuration; demo shortens every window below so the whole
+  # cycle -- drift, alert, retraining, gate, promotion -- fits in a recording.
+  #   nominal -- the windows a production stream would use
+  #   demo    -- the windows of the demonstration
+  mode: nominal
+
+  # THE TOOL, named because EC38 requires a named one. The figure it computes
+  # and the version that computed it are written into every row of
+  # fd_monitoring: a drift statistic is comparable only with another computed
+  # the same way, and the per-column test Evidently selects depends on the
+  # column type and on the sample size, by its own rules and not by ours.
+  tool: evidently
+
+  # WHAT THE CURRENT WINDOW IS COMPARED AGAINST. The training split of the
+  # model in service -- its own train.parquet, found through the manifest of
+  # the recipe its registered version came from. Not a fixed file: when the
+  # gate promotes a new model, the reference must move with it, or the drift
+  # measured is the drift away from a model nobody is running.
+  reference: training_split
+
+  # ---- the inputs moving away from the reference (EC39)
+  input_drift:
+    # 24 hours at the announced rate is 7,200 transactions: enough for a
+    # distribution test to mean something. An hour would be 300 rows, where
+    # the test's own sampling noise is larger than the drift worth acting on.
+    window_minutes: 1440
+    demo_window_minutes: 15
+
+    # THE SHARE OF COLUMNS THAT MUST DRIFT BEFORE THIS IS AN ALERT. Five
+    # features are in service, so 0.40 is two of them. One column drifting is
+    # ordinary -- a seasonal amount, a category gaining share -- and alerting
+    # on it would train the operator to ignore this channel. Two columns is a
+    # change of shape. Per-column scores are recorded whatever the verdict, so
+    # the one that moved first stays readable afterwards.
+    max_drifted_share: 0.40
+
+    # THE STATISTIC IS PINNED, and this is the one setting here that exists for
+    # EC45 rather than for EC39. Left to itself Evidently picks the per-column
+    # test from the column type AND the sample size -- K-S below about a
+    # thousand rows, a distance above it. The demonstration window holds ~75
+    # transactions and the nominal window 7,200, so the two modes would be
+    # measured by two different statistics, and the long series EC45 asks for
+    # would change units partway through without saying so.
+    #
+    # psi, because it reads the same way for a numeric and a categorical
+    # column, which keeps one number per column whatever the recipe holds.
+    # Its per-column threshold is left to the tool and recorded from what the
+    # tool reports, so the limit in each row is Evidently's and not a number
+    # invented here.
+    method: psi
+
+  # ---- the predictions moving (EC39)
+  prediction_drift:
+    # MEASURED ON THE FLAG RATE AND NOT ONLY ON THE SCORES, because the flag
+    # rate is the thing with an operational consequence: it is what fills the
+    # analyst's queue, under the capacity of 60 a day. The champion was
+    # measured at 41.6 alerts a day on its test window.
+    #
+    # A ratio and not an absolute: the reference moves with every promotion,
+    # and a number written here would go stale at the first retraining. Twice
+    # the rate the model was published at means the score distribution has
+    # moved under a threshold that was chosen for the old one.
+    max_alert_rate_ratio: 2.0
+
+  # ---- the performance against the specification (EC40)
+  performance:
+    # THE CRITERION OF THE SPECIFICATION, stated here so that it is measurable
+    # in production and not only at training time. The champion published
+    # 0.751 recall on its test split; 0.60 is the floor below which the service
+    # is not doing its job. The gap between the two is deliberate: it is the
+    # room a model has to age before anybody is woken up.
+    min_recall: 0.60
+
+    # AND THE DENOMINATOR THAT MAKES THAT FLOOR READABLE. At a base rate of
+    # 0.414 % the stream yields about 30 frauds a day, and a recall over 30
+    # frauds carries a standard error of 0.079 -- so a single day's figure
+    # swings +/-0.16 at two sigma, which is wider than the gap being watched.
+    # Seven days is about 210 frauds and a standard error of 0.030. Below this
+    # count the measurement is recorded as 'unmeasurable' rather than compared:
+    # a floor crossed by sampling noise is a false alarm that costs a
+    # retraining.
+    window_days: 7
+    demo_window_minutes: 15
+    min_labelled_frauds: 30
+
+  # ---- the quality of what the stream delivers (EC42)
+  data_quality:
+    # NOT MEASURED AGAIN HERE. Schema, missing values, out-of-range values and
+    # freshness are already decided and already measured: validation rejects to
+    # fd_quarantine with a reason, and ops below watches freshness and the
+    # rejection rate. Re-measuring them would create a second set of figures
+    # that could disagree with the first.
+    #
+    # What this lot adds is that those figures are COPIED into fd_monitoring,
+    # so they sit on the same timeline as the drift and the performance. EC45
+    # asks to see an evolution; three stores with three retentions cannot be
+    # read together.
+    from_existing_controls: true
+
+  # ---- the trigger (EC33)
+  trigger:
+    # WHICH ALERTS CAUSE A RETRAINING, and the list is deliberately short.
+    # Input drift and a performance floor crossed are the two conditions a
+    # retraining can actually answer. Prediction drift usually calls for a
+    # threshold to be rechosen rather than a model to be refitted, and a data
+    # quality alert calls for the stream to be fixed -- retraining on a broken
+    # stream would learn the breakage.
+    # retrain_on and not 'on': in YAML 1.1, which PyYAML implements, the bare
+    # word on is a BOOLEAN. 'on:' parsed as the key True, and the list was
+    # reachable only as settings[True] -- found by the check below two minutes
+    # after it was written, 2026-11-19. off, yes, no and y are the same trap.
+    retrain_on: [input_drift, performance]
+
+    # THE SCHEDULE IS NOT REPLACED BY THE TRIGGER. dag_train still runs every
+    # Monday: a periodic retraining is what keeps a model current when nothing
+    # has gone wrong enough to alert.
+    periodic: weekly
+
+    # AND NO MORE THAN ONE RETRAINING PER COOLDOWN. A drift that persists
+    # raises the same alert every window, and without this a single afternoon
+    # of drift would queue forty trainings on one worker.
+    cooldown_minutes: 360
+    demo_cooldown_minutes: 2
+
+    # WHY THE TRIGGER IS ALLOWED TO BE WRONG. It may fire on a drift that
+    # turns out harmless; the cost is a training nobody needed. It cannot put
+    # a bad model in service, because registering is not promoting: the gate
+    # of L3 judges the candidate against the champion and refuses it. The
+    # trigger is therefore tuned to miss little, not to be right -- the
+    # expensive mistake is downstream, and it is already guarded.
+
+  # ---- the channel (EC44)
+  # A THIRD AUDIENCE, and a third destination. The analyst is told about a
+  # transaction; the pipeline owner is told about the chain; the owner of the
+  # MODEL is told that what is in service no longer matches the world it was
+  # fitted to. Routing this into either of the other two would bury it: the
+  # analyst's queue is capped at 60 a day and a drift message would spend one
+  # of those, and the ops channel is read when the chain is down.
+  channel: file
+  file: runtime/channels/monitoring/monitoring.jsonl
+
+  # THE DESIGNATED RECIPIENT, which EC44 asks for by name. A role and never a
+  # person: the holder changes, the responsibility does not.
+  recipient: model owner (data scientist on duty)
+
+  # ONLY ON A CHANGE OF STATE, as ops does. A drift that lasts three days is
+  # one piece of news, not 4,320 messages. ml4fd/health.py already holds that
+  # logic and fd_ops_state already holds the state, so the controls of this
+  # section go through the same path.
+  notify_on_transition_only: true
 
 # HOW A FLAGGED TRANSACTION REACHES SOMEBODY. Lot N5, decided 2026-11-16.
 notifications:
@@ -433,16 +618,22 @@ report:
   schedule: "0 6 * * *"
 
 labels:
-  # The fraud generator stops injecting on this date: the 38,147 later
-  # transactions carry is_fraud = 0 because nobody labelled them, not because
-  # they are not fraud. They are false negatives, and a cut-off beyond this
-  # point would train a model on them.
+  # The last labelled fraud of the training corpus: a cut-off beyond this point
+  # would train a model on rows carrying is_fraud = 0 because nobody labelled
+  # them, which are false negatives and not legitimate transactions.
   #
-  # Measured: last labelled fraud 2020-12-22 23:13:39, last transaction
-  # 2020-12-31 23:59:34, nine days and 38,147 rows apart. Over the usable
-  # horizon the corpus holds 517,572 transactions and 2,145 frauds, a base rate
-  # of 0.414 % -- not the 0.386 % of the whole file.
-  horizon: 2020-12-22T23:13:39Z
+  # Measured on fraudTrain.csv by tools/profile_corpus.py, 2026-11-19:
+  #   1,296,675 transactions, 7,506 frauds, base rate 0.5789 %
+  #   first payment     2019-01-01 00:00:18
+  #   last payment      2020-06-21 12:13:37
+  #   last labelled     2020-06-21 03:59:46
+  #
+  # NO UNLABELLED TAIL HERE, unlike the corpus this project used until the
+  # swap. fraudTest.csv stopped being labelled on 2020-12-22 while running to
+  # 12-31 -- nine days and 38,147 rows of silent false negatives, which is why
+  # this setting exists at all. fraudTrain.csv is labelled to its last hours,
+  # so the horizon sits eight hours from the end rather than nine days.
+  horizon: 2020-06-21T03:59:46Z
 
   # A window holding no positive stops the training DAG, exactly as a window
   # holding no run does (EC14 applied to labels).
@@ -461,13 +652,60 @@ datasets:
   schema_version: v2
   # Deterministic and explicit, never random_state: a library version change
   # would otherwise make the split irreproducible and the audit worthless.
-  split_rule: "temporal:train<=2020-10-31,test<=2020-11-30"
+  #
+  # THE RULE BEHIND THESE TWO DATES, which is what survives a change of
+  # corpus: the test side is the last FULL calendar month before the month
+  # that holds the horizon, and the train side is everything before it. The
+  # horizon's own month is left out because it is partial, and a partial month
+  # carries the generator's own edge rather than the month's behaviour.
+  #
+  # Applied to fraudTrain.csv, whose horizon falls on 2020-06-21: the test side
+  # is May 2020 -- 74,343 transactions and 527 frauds -- and the train side is
+  # 2019-01-01 to 2020-04-30. The former corpus gave 205 test frauds; 527 is
+  # two and a half times the paired test's material, and the noise on a
+  # difference of two recalls falls from +/-0.048 to about +/-0.030.
+  split_rule: "temporal:train<=2020-04-30,test<=2020-05-31"
 
 realtime:
   # Measured in N0 (ws/fraud-project--n0-mesure-api--20261116-0826.md), on a
   # campaign of 60 calls run ALONE -- three overlapping campaigns had reported
   # 13 % failures that were our own load.
-  endpoint: https://sdacelo-real-time-fraud-detection.hf.space/current-transactions
+  # THE ADDRESS OF THE STREAM, and the one line that had to change when a third
+  # party went down. On 2026-11-19 the Hugging Face Space stopped answering: it
+  # reported itself running while its application returned an error. S3 reads
+  # an endpoint and not a code path, so standing up a local producer and
+  # pointing this line at it was the whole repair -- no module of the ingestion
+  # knows, or needs to know, which one is serving.
+  #
+  # ONE PRODUCER, AND IT IS OURS. producer/ is derived from the exercise's own
+  # application -- the FastAPI route, the slowapi limiter, the df.sample() and
+  # the df.to_json(orient="split") that produces the response -- with its three
+  # defects repaired: it re-read 150 MB from a public mirror on every call, it
+  # sampled the whole corpus so no drift could ever show, and its "/" route
+  # answered 500. vendor/realtime-transactions-producer holds the original,
+  # untouched, as the reference the derivation is read against.
+  #
+  # The alternative, for the record and for a line nobody has to guess at
+  # later:
+  #
+  #   https://sdacelo-real-time-fraud-detection.hf.space/current-transactions
+  #       The hosted Space. Stopped answering on 2026-11-19: it reported itself
+  #       running while its application returned an error. Still the same
+  #       contract, so this line is all it takes to go back to it.
+  #
+  # Changing this line needs the scheduler recreated, since config.load() runs
+  # per task but the compose environment does not.
+  # The CONTAINER port and not the published one: inside the compose network
+  # a service is reached on the port it listens on, and the 8801 in
+  # docker-compose.yml only publishes it to the host's loopback for a browser.
+  endpoint: http://producer:4000/current-transactions
+
+  # WHAT THE STAND-IN DOES NOT REPRODUCE, said rather than discovered later.
+  # N0 measured about 5 % of calls to the real API failing -- 2 of 60 with a
+  # 502, 1 with a 429 -- and ops.freshness_minutes and ops.max_empty_run_share
+  # were calibrated on that. The local server answers every call, so those two
+  # controls sit permanently green while it is in service. Faking failures
+  # would be inventing data; this comment is the honest alternative.
 
   # A 502 costs 25 s and is the expensive failure; a 429 costs 0.23 s. A timeout
   # under 26 s would cut off calls that were about to succeed.
@@ -501,6 +739,17 @@ realtime:
   # realistic run to roughly 47 s -- still inside the minute. TWO 502s would
   # overrun it, so N7 sets max_active_runs=1: a slow run must delay the next,
   # never run beside it, or two collectors would write the same batch.
+  #
+  # THAT BUDGET DESCRIBED A SERVICE THAT NO LONGER SERVES. Measured against the
+  # local producer, 18 calls on 2026-11-20
+  # (runtime/observations/n0-api-measure--20261120-0013.md): median latency
+  # 8 ms, minimum 6, maximum 17. Five sequential calls now take about 40 ms of
+  # the minute instead of 27 s, and the producer simulates no 502 at all, so
+  # the worst realistic run is no longer 47 s. The time budget is therefore no
+  # longer what justifies max_active_runs=1. The reason that remains is the one
+  # that never depended on latency: two collectors running side by side would
+  # write the same batch. Nothing to change here -- but a reader must not take
+  # the 5.4 s above for a figure of the system as it stands.
   spacing_seconds: 0
 
   # current_time IS the txn_ts of a real-time transaction. One call in 57 showed
@@ -510,17 +759,97 @@ realtime:
   clock_tolerance_seconds: 120
 
 validation:
-  # Measured on fraudTest.csv: max amount 22,768.11. The bound leaves room
-  # without becoming meaningless. Not a magic number in the code (EC20).
+  # THE BOUND MUST HOLD OVER BOTH CORPORA, because one is trained on and the
+  # other is served as the stream: a bound that rejected the stream's largest
+  # amounts would quarantine them, and the monitoring would read a data
+  # quality alert where the truth was a setting too tight.
+  #
+  # Measured 2026-11-19: fraudTrain.csv 28,948.90 (2019-12-01), fraudTest.csv
+  # 22,768.11 (2020-12-27). The bound leaves room above both without becoming
+  # meaningless. Not a magic number in the code (EC20).
   max_amount: 50000
   # A gap shared by more than this share of rows is a SOURCE defect, documented
   # and ruled on once -- not a per-record rejection. See checks.profile_gap.
   systematic_share: 0.99
 
 sources:
-  historical_csv: >-
-    https://lead-program-assets.s3.eu-west-3.amazonaws.com/M05-Projects/fraudTest.csv
+  # THE TWO HALVES OF ONE STREAM, AND THEY ARE CONTIGUOUS. Measured 2026-11-19:
+  # fraudTrain.csv ends at 2020-06-21 12:13:37 and fraudTest.csv begins at
+  # 2020-06-21 12:14:25 -- forty-eight seconds apart. The Kaggle dataset is a
+  # single generated stream cut in two, not two samples.
+  #
+  # So training on the first and serving the second is not a convenience: the
+  # stream is literally the FUTURE of the training data, continuous, same
+  # generator, no overlap and no gap. That is the most faithful production
+  # simulation this dataset can support, and it is the opposite of what the
+  # original exercise did -- the real API sampled fraudTest.csv, the file the
+  # project trained on, so most transactions it served were rows the model had
+  # already been fitted on.
+  #
+  # AND IT GIVES C6 SOMETHING REAL TO FIND. The base rate falls from 0.5789 %
+  # over the training corpus to 0.3860 % over the stream, and within the stream
+  # from 0.4425 % in June to 0.1849 % in December. The fraud rate more than
+  # halves across the served period. That drift is in the data rather than
+  # injected, which means the monitoring has a true positive to show before
+  # anything is forced.
+  #
+  # A PRIVATE BUCKET holds both files, so these two values are OBJECT KEYS and
+  # not URLs. The bucket is ML4FD_CORPUS_BUCKET in .env, with the credentials
+  # beside it: its name carries an AWS account number, and a versioned file is
+  # the wrong place for one. ml4fd/fetch.py resolves a key against that bucket
+  # with boto3, caches the file under .local_cache/ with its sha256, and takes
+  # the cache on every later run -- so the credentials are needed once.
+  #
+  # The last segment of a key names the cached file, which is why the keys end
+  # in the file names, and why a bare file name still works for a file placed
+  # by hand.
   realtime_api: https://huggingface.co/spaces/sdacelo/real-time-fraud-detection
+  historical_csv: kaggle-datasets/fraudTrain.csv
+  replay_csv:     kaggle-datasets/fraudTest.csv
+
+  # The producer in service, and the original it derives from -- both named,
+  # because which one served on a given day is a fact the dossier has to be
+  # able to state.
+  producer: producer/app.py
+  producer_origin: vendor/realtime-transactions-producer/app.py
+
+  # WHAT THE STAND-IN REPLAYS, and it is NOT historical_csv above. That file is
+  # what the model was fitted on -- train<=2020-10-31, tested on November -- so
+  # replaying it would serve the model transactions it has already seen: the
+  # measured performance would be optimistic by construction, and the drift
+  # against the training reference would be zero because the two samples would
+  # be one sample.
+  #
+  # fraudTrain.csv is the other half of the same Kaggle dataset: same
+  # generator, same schema, 2019-01-01 to 2020-06-20, disjoint rows. Every
+  # transaction served is one the model has never met, which is the whole
+  # premise of measuring anything in production.
+  #
+  # Its base rate differs -- about 0.58 % against the 0.414 % of the usable
+  # historical horizon -- and that difference is real rather than a defect:
+  # fd_monitoring records base_rate beside every performance figure precisely
+  # so a recall is never read against the wrong one.
+  #
+  # The stand-in serves the END of the file. June 2020 sits closest in time to
+  # the training period, so it should be the quietest baseline the file can
+  # offer; starting in January 2019 would risk the drift controls sitting in
+  # alert before anything was injected.
+  replay_csv: kaggle-datasets/fraudTest.csv
+
+  # WHERE THE DRIFT IS SWITCHED ON. A file, read by the stand-in on every
+  # request, because the switch has to outlast one run: a DAG conf lasts a
+  # single execution, and an environment variable needs the container
+  # recreated at each flip. Absent file means no drift.
+  #
+  # A drift has to enter the pipeline AS DATA or it is not a drift. The
+  # stand-in shifts the amount of each transaction it serves, before the raw
+  # zone, so the change travels through validation, the features, the scoring
+  # and the monitoring exactly as a real change of the stream would -- the same
+  # choice --corrupt makes for EC25. The shift is capped just under
+  # validation.max_amount: above it the transactions would be quarantined, and
+  # the demonstration would show a data_quality alert where it meant to show an
+  # input_drift one.
+  drift_switch: runtime/drift.json
 
 personal_data:
   # Fields that identify a person. None of them reaches the exploited layer.

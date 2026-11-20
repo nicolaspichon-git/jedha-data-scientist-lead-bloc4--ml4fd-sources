@@ -20,12 +20,37 @@
 -- sql/checks/reconcile_coverage.sql reports the size of each stratum: a sample
 -- whose tie stratum is empty is as blind as a random one.
 
+-- A SEMI-JOIN AND NOT A WINDOW FUNCTION, for one reason: the planner can
+-- estimate this and could not estimate that.
+--
+-- count(*) OVER (PARTITION BY ...) > 1 asks for a selectivity PostgreSQL has
+-- no statistic for, so it assumed the whole input: 1,027,440 rows where the
+-- truth is forty, an error of twenty-five thousandfold (2026-11-19). The
+-- estimate then propagated -- the UNION, the sample, and the LATERAL above it
+-- were all planned for a million rows, and the three IN (SELECT ...) of the
+-- CASE fell back to unhashed subplans.
+--
+-- EXISTS over (client_key, txn_ts) is a semi-join, which the index
+-- fd_transactions_client_ts_idx
+-- serves it and the column statistics estimate it. Strictly equivalent -- "at
+-- least two rows share this (client_key, txn_ts)" is the same predicate, and
+-- txn_id being the primary key makes o.txn_id <> t.txn_id exactly "another
+-- row". Verified against the window form on the loaded corpus before this was
+-- committed: same count, and EXCEPT empty in both directions.
+--
+-- IT WORKED EITHER WAY ON THIS CORPUS, which is the whole point of changing
+-- it. Forty tied rows make even a per-row rescan cheap, so the bad estimate
+-- cost nothing here. A corpus with coarser timestamps would collapse the plan
+-- again, and nobody would know why. A plan that holds by arithmetic is worth
+-- more than one that holds by luck.
 WITH tied AS (
-    SELECT txn_id
-    FROM  (SELECT txn_id,
-                  count(*) OVER (PARTITION BY client_key, txn_ts) AS peers
-           FROM   fd_transactions) p
-    WHERE peers > 1
+    SELECT t.txn_id
+    FROM   fd_transactions t
+    WHERE  EXISTS (SELECT 1
+                   FROM   fd_transactions o
+                   WHERE  o.client_key = t.client_key
+                     AND  o.txn_ts     = t.txn_ts
+                     AND  o.txn_id    <> t.txn_id)
 ),
 -- FOURTH STRATUM: the rows that carry NO features at all.
 --
@@ -46,16 +71,50 @@ firsts AS (
     FROM     fd_transactions
     ORDER BY client_key, txn_ts
 ),
+-- NOT EXISTS AND NOT NOT IN, and the difference is a thousandfold.
+--
+-- NOT IN must answer "is this value absent" in a way that copes with a NULL
+-- inside the subquery, and that obligation stops the planner using a hash
+-- anti-join whenever the hash would not fit in work_mem. On 1,296,675 rows it
+-- did not fit: EXPLAIN showed "NOT (SubPlan 4)" and "NOT (SubPlan 6)" --
+-- unhashed -- which means the whole CTE is rescanned FOR EVERY OUTER ROW. The
+-- node cost 1.5e11 and the query had run fifteen minutes without finishing
+-- (2026-11-19). Only firsts, at 929 rows, got "hashed SubPlan".
+--
+-- NOT EXISTS carries no such obligation and the planner reads it as the
+-- anti-join it is. Equivalent here beyond any doubt: txn_id is the PRIMARY
+-- KEY, so it is never NULL, which is the only case where the two differ.
+--
+-- It did not show on the former corpus. 555,719 rows hashed inside work_mem;
+-- 1,296,675 did not. The defect was always there, under a threshold.
 rest AS (
-    SELECT txn_id
-    FROM   fd_transactions
-    WHERE  txn_id NOT IN (SELECT txn_id FROM tied)
-      AND  txn_id NOT IN (SELECT txn_id FROM firsts)
-      AND  txn_id NOT IN (SELECT txn_id FROM stale)
+    SELECT t.txn_id
+    FROM   fd_transactions t
+    WHERE  NOT EXISTS (SELECT 1 FROM tied   d WHERE d.txn_id = t.txn_id)
+      AND  NOT EXISTS (SELECT 1 FROM firsts f WHERE f.txn_id = t.txn_id)
+      AND  NOT EXISTS (SELECT 1 FROM stale  s WHERE s.txn_id = t.txn_id)
     ORDER BY random()
     LIMIT  1000
 ),
-sample AS (
+-- MATERIALIZED, which is the other half of the repair and the bigger half.
+--
+-- Inlined, this CTE lets the planner move the LATERAL call to the other side
+-- of a join: EXPLAIN showed a Nested Loop whose outer side was an index scan
+-- over the WHOLE table, so fd_client_features was called 2.6 million times
+-- instead of about two thousand. Cost 8.9e9 on that node alone.
+--
+-- MATERIALIZED forces the sample to be computed first -- a few thousand rows
+-- -- and the lateral then runs over those and nothing else. It changes no
+-- semantics: it is an instruction about execution, not a different query.
+--
+-- WHY THE PLANNER GOT IT SO WRONG, and it is worth knowing because no amount
+-- of ANALYZE fixes it: backfill_features rewrites every feature of this table
+-- and then runs this query IN THE SAME TRANSACTION. The statistics necessarily
+-- predate the UPDATE, so the estimate for stale -- rows whose features are
+-- still NULL -- is the opposite of the truth, by the full height of the table.
+-- A query planned on statistics that cannot describe the data it will read
+-- needs its plan constrained, not its statistics refreshed.
+sample AS MATERIALIZED (
     SELECT t.txn_id, t.client_key, t.txn_ts, t.f_tx_count, t.f_avg_amount,
            CASE WHEN t.txn_id IN (SELECT txn_id FROM tied)   THEN 'tie'
                 WHEN t.txn_id IN (SELECT txn_id FROM stale)  THEN 'stale'

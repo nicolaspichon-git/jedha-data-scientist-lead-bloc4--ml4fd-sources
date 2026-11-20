@@ -18,3 +18,59 @@ pyarrow>=16            # Parquet, the second store technology (EC05)
 # numpy is left to pandas and scikit-learn to agree on: pinning it between two
 # packages that both constrain it is how a resolver deadlock is built.
 # lightgbm            # uncomment if a later lot picks it over scikit-learn
+# L4: monitoring. EC38 requires a named tool and the referential names two --
+# Evidently or Aporia. Evidently, because it runs in-process against a
+# DataFrame: no account, no service, nothing to reach over the network, which
+# is what lets the whole loop be shown on one machine.
+#
+# BOUNDED, and this is the one line in this file that is not a bare floor.
+# Evidently rewrote its API at 0.7: up to 0.6.7 a report came from
+# evidently.report with a metric_preset and took two DataFrames, while 0.7
+# wraps them in Dataset objects described by a DataDefinition and moved the
+# presets to evidently.presets. The older imports raise ImportError on 0.7, so
+# a floor alone would let a future rebuild install an API this code cannot
+# call -- which is the ruff incident of L2 exactly: an unpinned ruff>=0.5 let
+# CI resolve a newer default rule set, 972 findings against 32 locally.
+#
+# ml4fd/monitor.py is written against 0.7 (0.7.23 was current in late 2026).
+# The resolved version is recorded by M8 in requirements.lock and in every row
+# of fd_monitoring: run `.\fd-manager.ps1 lock` after the build.
+evidently>=0.7,<0.8
+
+# L4 / the corpora. Both moved to a private S3 bucket on 2026-11-19, so
+# ml4fd/fetch.py needs a signed client. boto3 rather than SigV4 by hand: the
+# signing is a specification whose subtle failures are silent, and this project
+# already ships pandas, scikit-learn and mlflow -- saving ten megabytes by
+# hand-rolling a cryptographic protocol would be false economy.
+#
+# A FLOOR, as above. boto3 reads AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and
+# AWS_DEFAULT_REGION from the environment by itself; no module of this project
+# names them.
+#
+# MEASURED AFTERWARDS: boto3 was already in the image, at 1.35.36, pulled by
+# apache-airflow-providers-amazon through aiobotocore -- which pins botocore to
+# the patch. So this line declares what the project imports rather than adding
+# anything, and declaring it is still right: a module that imports boto3 should
+# not depend on a provider's transitive choice to keep working.
+boto3>=1.34
+
+# pyOpenSSL: NOT A FEATURE, A REPAIR, and the clearest argument this file holds
+# for running `.\fd-manager.ps1 lock`.
+#
+# The image resolved cryptography 50.0.2 beside pyOpenSSL 24.3.0, and those two
+# cannot live together: pyOpenSSL 24.x still defines a class X509Extension
+# whose body reads _lib.GEN_EMAIL, a binding cryptography has since removed.
+# The class fails AT IMPORT, so everything that touches OpenSSL.crypto falls --
+# and botocore is merely the first to, through urllib3.contrib.pyopenssl. The
+# traceback blames boto3 and boto3 is innocent.
+#
+# pyOpenSSL 25.0 removed X509Extension outright, which is exactly the repair.
+#
+# HOW THE MISMATCH GOT IN, because the mechanism matters more than the fix: the
+# floors in this file let pip resolve cryptography to its newest while
+# pyOpenSSL came in pinned by Airflow. Floors are still the right default here
+# -- the comment at the top of this file says why -- but they make M8's lock
+# the thing that holds a working set together, not a formality. This defect sat
+# in the image unnoticed from the day it was built, because nothing had yet
+# imported OpenSSL.crypto.
+pyopenssl>=25.0

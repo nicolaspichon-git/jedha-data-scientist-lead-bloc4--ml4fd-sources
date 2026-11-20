@@ -13,3 +13,4 @@ runtime/channels/ops/*
 runtime/channels/frauds/*
 runtime/reports/202*.*
 ws/
+_to_delete/
