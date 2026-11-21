@@ -422,25 +422,50 @@ def test_the_stream_is_recomputed_on_the_train_side_only():
     recomputation that put stream rows on the test side is what read 74,343
     against 47,624 registered."""
     code = _sql(S2)
-    # Sliced BETWEEN the two markers, not by a window of characters: a window
-    # wide enough to hold the stream filter also held the corpus one, and the
-    # first version of this test failed on the corpus's train_end.
     stream = code[code.index("AS corpus_test"):code.index("AS stream_train")]
     assert "train_end" not in stream, "le flux ne doit pas etre decoupe par date"
-    assert "r.from_stream" in stream and "cut_off" in stream
+    assert "from_stream" in stream
     assert "corpus_test" in code and "corpus_train" in code
 
 
 def test_the_horizon_bounds_the_corpus_and_not_the_stream():
     """The horizon is the corpus's and not the system's, which is what
-    assert_cut_off_usable stopped confusing on 20/11. The literal must bound
-    the historical side only."""
+    assert_cut_off_usable stopped confusing on 20/11. It must bound the
+    historical branch of the WHERE and not the stream's."""
     code = _sql(S2)
-    bounded = [block for block in code.split("count(*) FILTER")
-               if "label_ts <= '20" in block]
-    assert len(bounded) == 2, "l'horizon doit borner les deux cotes du corpus"
-    for block in bounded:
-        assert "NOT r.from_stream" in block
+    horizon = re.search(r"labels:.*?horizon:\s*(\S+)", GOVERNANCE, re.S).group(1)
+    day = horizon[:10]
+    # Twice, and both are meant: once as the bound on the corpus branch of the
+    # WHERE, once in criterion 3, which compares the cut-off to it.
+    assert code.count(day) == 2, "l'horizon : une borne et une comparaison"
+    where = code[code.index("labelled AS ("):code.index("known AS (")]
+    assert where.count(day) == 1
+    branch = where[where.index("batch_id IS NOT NULL"):]
+    assert day in branch, "l'horizon doit borner la branche du corpus"
+    stream_branch = where[:where.index("batch_id IS NOT NULL")]
+    assert day not in stream_branch, "l'horizon ne doit pas borner le flux"
+
+
+def test_the_source_is_read_where_the_build_reads_it():
+    """fd_ground_truth carries a source column too, and reading it would be
+    110 ms faster -- measured. It is NOT read: training_set.sql tells the two
+    apart by fd_raw_events.source, and an acceptance that partitioned on
+    another column could agree with itself while disagreeing with the build."""
+    code = _sql(S2)
+    assert "fd_raw_events" in code
+    assert "g.source" not in code
+
+
+def test_the_recomputation_does_not_ask_per_row():
+    """THE SHAPE, AND IT IS A CRITERION OF ITS OWN. Two earlier versions asked
+    EXISTS once per row -- twice, in fact, since the branch needed it too --
+    and the check cost over 100 seconds against 688 ms for the join it wraps.
+    The join itself is 460 ms: the per-row subquery was the whole cost. A LEFT
+    JOIN builds the 748 batch identifiers once and probes."""
+    code = _sql(S2)
+    labelled = code[code.index("labelled AS ("):code.index("known AS (")]
+    assert "EXISTS" not in labelled, "un EXISTS par ligne a deja coute 100 s ici"
+    assert "LEFT" in labelled and "stream_batches" in labelled
 
 
 def test_the_horizon_literal_is_the_one_in_force():

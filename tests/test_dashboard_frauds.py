@@ -298,11 +298,13 @@ def test_the_entry_point_declares_the_pages_that_exist(monkeypatch):
     # In menu order, sections included: Analyse, Exploitation, Suivi.
     # THE ORDER IS PINNED, so reordering the menu is a deliberate edit of two
     # files rather than one. operations before ops since 2026-11-20: a reader
-    # meets the controls before the alerts they raise.
-    assert declared == ["pages/report.py", "pages/frauds.py",
+    # meets the controls before the alerts they raise. decisions after frauds
+    # since 2026-11-21: Analyse answers what was decided about payments, Suivi
+    # answers how the model and the ingestion are doing.
+    assert declared == ["pages/report.py", "pages/frauds.py",       
                         "pages/operations.py", "pages/ops.py",
                         "pages/rejects.py", "pages/monitoring.py",
-                        "pages/performances.py"]
+                        "pages/performances.py", "pages/decisions.py"]
     assert all((APP / p).is_file() for p in declared)
     on_disk = {"pages/%s" % path.name for path in (APP / "pages").glob("*.py")}
     assert on_disk == set(declared), (

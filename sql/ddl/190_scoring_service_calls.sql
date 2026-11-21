@@ -75,9 +75,28 @@ CREATE INDEX IF NOT EXISTS fd_scoring_service_calls_by_client
 
 GRANT SELECT, INSERT ON fd_scoring_service_calls TO fd_scoring_service;
 GRANT USAGE, SELECT ON SEQUENCE fd_scoring_service_calls_call_id_seq TO fd_scoring_service;
-GRANT SELECT ON fd_scoring_service_calls TO fd_report;
-GRANT SELECT ON fd_scoring_service_calls TO fd_dashboard;
 REVOKE UPDATE, DELETE, TRUNCATE ON fd_scoring_service_calls FROM fd_scoring_service;
+
+-- NO READER OF THIS TABLE BUT THE SERVICE, and the two grants that used to sit
+-- here are revoked rather than deleted: a GRANT is not undone by replaying the
+-- DDL, so removing the lines would have left the privilege standing in silence
+-- on every database that had already run them. Written 21/11/2026, after
+-- s6_acceptance.sql refused a reading list that had grown by a grant nobody
+-- decided -- which is exactly what that duplicated list exists for.
+--
+-- THE REASON, and it is not tidiness. A view runs with the privileges of its
+-- OWNER unless security_invoker says otherwise, and fd_scoring_decisions does
+-- not: it reads this table whatever fd_report and fd_dashboard may do. So the
+-- grants bought nothing, and they cost the narrowing the view performs -- it
+-- exposes the nine columns OF A DECISION, while this table also holds
+-- client_key, merchant, category, amt and the three history features. A
+-- narrowing a privilege walks around is not a narrowing.
+--
+-- They also defeat the convergence 195_scoring_decisions.sql names: readers
+-- query the view so that the day the service becomes the only journal, the
+-- view changes and the readers do not. A reader holding the table can skip it.
+REVOKE SELECT ON fd_scoring_service_calls FROM fd_report;
+REVOKE SELECT ON fd_scoring_service_calls FROM fd_dashboard;
 
 -- AND THE ONE REVOCATION THAT COULD NOT LIVE WITH THE ROLE. 145 declares
 -- everything this service may not touch, but fd_monitoring is created by

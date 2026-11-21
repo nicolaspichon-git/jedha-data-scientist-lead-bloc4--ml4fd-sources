@@ -71,17 +71,44 @@ historical_batch AS (
       FROM fd_raw_events
      WHERE source <> (SELECT name FROM stream_source)
 ),
+-- THE LINES AND NOT THE PAYLOADS, measured 21/11/2026. This CTE is read twice,
+-- so PostgreSQL materialises it -- and with SELECT * that meant 650 MB of jsonb
+-- carried through a temporary file to answer two counts: 1.7 s to scan and
+-- 1.9 s to read back, out of 12.3 s for the whole check. Narrowed to the one
+-- column those counts need, the check is 6.7 s.
 historical_raw AS (
-    SELECT * FROM fd_raw_events
+    SELECT batch_id
+      FROM fd_raw_events
      WHERE source <> (SELECT name FROM stream_source)
+),
+-- THE PAYLOADS OF ONE BATCH, for criterion 7, which is the only reader of a
+-- payload and reads one batch. Scoped like every other CTE here -- the source
+-- filter is what keeps the stream out of a measurement of the historical load,
+-- and reading fd_raw_events from a criterion would break the rule
+-- tests/test_acceptance_files.py states: below the scoping block, no criterion
+-- may name a shared table. THE MARKER IS NOT QUOTED HERE on purpose -- that
+-- test finds the block by its first occurrence, and a comment repeating it
+-- moves the boundary; four tests failed that way on 21/11. Read once, so this
+-- CTE is inlined and nothing is materialised.
+first_batch_raw AS (
+    SELECT r.payload
+      FROM fd_raw_events r
+     WHERE r.source <> (SELECT name FROM stream_source)
+       AND r.batch_id = (SELECT batch_id FROM historical_batch
+                         ORDER BY batch_id LIMIT 1)
 ),
 historical_quarantine AS (
     SELECT q.* FROM fd_quarantine q
      WHERE EXISTS (SELECT 1 FROM historical_batch b
                     WHERE b.batch_id = q.batch_id)
 ),
+-- THE SEVEN COLUMNS THE CRITERIA READ, and not the thirteen: read thirteen
+-- times, this CTE is materialised too, and merchant, category and the merchant
+-- coordinates were being carried for nobody.
 historical_txn AS (
-    SELECT t.* FROM fd_transactions t
+    SELECT t.txn_id, t.txn_ts, t.client_key, t.amt,
+           t.f_tx_count, t.f_avg_amount, t.f_home_distance_km
+      FROM fd_transactions t
      WHERE EXISTS (SELECT 1 FROM historical_batch b
                     WHERE b.batch_id = t.batch_id)
 ),
@@ -184,11 +211,13 @@ criteria AS (
     -- event_id_includes_time=False, so event_id() returns the trimmed
     -- trans_num and nothing else. S1 stores the row itself as the payload.
     SELECT 7, 'L3 somme des montants = zone brute',
+           -- first_batch_raw, which carries the payloads of that one batch
+           -- and nothing else. Verified identical to the former reading over
+           -- every payload of the raw zone: 584,060,225 either way on the test
+           -- corpus.
            (SELECT coalesce(sum((r.payload->>'amt')::numeric), 0)::text
-            FROM   historical_raw r
-            WHERE  r.batch_id = (SELECT batch_id FROM historical_batch
-                                 ORDER BY batch_id LIMIT 1)
-              AND  EXISTS (SELECT 1 FROM historical_txn t
+            FROM   first_batch_raw r
+            WHERE  EXISTS (SELECT 1 FROM historical_txn t
                             WHERE t.txn_id = trim(r.payload->>'trans_num'))),
            coalesce(sum(amt), 0)::text
     FROM   historical_txn

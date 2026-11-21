@@ -166,6 +166,13 @@ STREAM_TABLES = ("fd_transactions", "fd_ground_truth", "fd_raw_events",
                  "fd_quarantine", "fd_pipeline_runs")
 
 
+def _code(text: str) -> str:
+    """The SQL with its comments stripped. Every assertion about the shape of a
+    query must read the query: a comment quoting a marker has already moved a
+    boundary and failed four tests at once."""
+    return "\n".join(line.split("--")[0] for line in text.splitlines())
+
+
 def _criteria_block(name: str) -> str:
     """The criteria themselves, without the scoping CTEs above them."""
     text = _text(name)
@@ -243,3 +250,31 @@ def test_the_load_dag_scopes_its_own_acceptance_assertion_too():
                      body.index("The dissociation is structural")]
     assert "FROM   fd_ground_truth WHERE source = %s" in assertion
     assert "str(bid)" in assertion
+
+# --- what a materialised CTE costs, held in place -----------------------------
+# Added 21/11/2026. s1_acceptance.sql took 12.3 s on 1.3 M raw lines, and half
+# of it was two CTEs read several times -- so materialised -- carrying columns
+# nobody read: SELECT * over 650 MB of jsonb to answer two counts, and the
+# thirteen columns of fd_transactions where seven are used. Narrowed, the check
+# is 6.7 s. Nothing but a stopwatch would notice the regression coming back.
+
+def test_no_acceptance_file_materialises_a_whole_raw_row():
+    """SELECT * on fd_raw_events carries the payload through a temporary file.
+
+    A REGULAR EXPRESSION OVER WHITESPACE, not two literal spellings: the first
+    version of this test listed the two line breaks it had seen and would have
+    passed on the third.
+    """
+    for name in FILES:
+        code = _code(_text(name))
+        assert not re.search(r"SELECT\s+\*\s+FROM\s+fd_raw_events", code), name
+
+
+def test_the_historical_transactions_are_read_column_by_column():
+    """The CTE is read thirteen times; every column it carries is carried
+    thirteen times."""
+    code = _code(_text("s1_acceptance.sql"))
+    cte = code[code.index("historical_txn AS ("):]
+    cte = cte[:cte.index("),")]
+    assert "t.*" not in cte, "les treize colonnes pour sept lues"
+    assert "t.txn_id" in cte
