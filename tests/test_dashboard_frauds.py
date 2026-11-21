@@ -296,9 +296,13 @@ def test_the_entry_point_declares_the_pages_that_exist(monkeypatch):
     runpy.run_path(str(APP / "app.py"))
     declared = [c[1][0] for c in fake.calls if c[0] == "Page"]
     # In menu order, sections included: Analyse, Exploitation, Suivi.
-    assert declared == ["pages/report.py", "pages/frauds.py", "pages/ops.py",
-                        "pages/operations.py", "pages/rejects.py",
-                        "pages/performances.py", "pages/monitoring.py"]
+    # THE ORDER IS PINNED, so reordering the menu is a deliberate edit of two
+    # files rather than one. operations before ops since 2026-11-20: a reader
+    # meets the controls before the alerts they raise.
+    assert declared == ["pages/report.py", "pages/frauds.py",
+                        "pages/operations.py", "pages/ops.py",
+                        "pages/rejects.py", "pages/monitoring.py",
+                        "pages/performances.py"]
     assert all((APP / p).is_file() for p in declared)
     on_disk = {"pages/%s" % path.name for path in (APP / "pages").glob("*.py")}
     assert on_disk == set(declared), (

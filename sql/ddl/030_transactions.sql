@@ -45,3 +45,22 @@ CREATE INDEX IF NOT EXISTS fd_transactions_client_ts_idx
     ON fd_transactions (client_key, txn_ts);
 CREATE INDEX IF NOT EXISTS fd_transactions_ts_idx
     ON fd_transactions (txn_ts);
+
+-- THE BATCH, added 21/11/2026 after measurement. fd_transactions is written and
+-- read BY BATCH -- sql/scoring/rows_to_score.sql and sql/features/apply_batch.sql
+-- both filter on batch_id -- and PostgreSQL does not index a foreign key on its
+-- own. Without this index every dag_ingest run scanned the whole table twice to
+-- find the five rows of its own batch.
+--
+-- MEASURED on PostgreSQL 16 with 1,300,400 rows: rows_to_score went from 60 ms
+-- of parallel sequential scan to 0.07 ms of index scan, a factor of 850, for
+-- 9 MB of index. Cached, on a machine with no other load; on a container disk
+-- the sequential side is worse, not better.
+--
+-- AND IT IS WHAT MADE `fd-manager accept` TAKE TWO MINUTES. s4_acceptance.sql
+-- asks which transactions came from the stream; with no index on batch_id the
+-- planner chose a nested loop and rescanned the 1,300,406 rows ONCE PER BATCH
+-- -- 748 times, 972,699,957 rows rejected by the join filter, 161 seconds. The
+-- same plan with this index: 1.6 seconds. The check was never the problem.
+CREATE INDEX IF NOT EXISTS fd_transactions_batch_idx
+    ON fd_transactions (batch_id);

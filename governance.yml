@@ -130,6 +130,20 @@ retention:
       months later. It is also what makes the decision idempotent -- purging it
       would re-arm every standing alert at once. No personal data: a timestamp,
       a run identifier, control names and a sentence.
+    fd_scoring_service_calls: >-
+      What the scoring service answered, and what it was shown. Kept, like
+      fd_scores and fd_promotions, because a decision taken about somebody's
+      payment has to be answerable months later -- and answerable means
+      re-derivable, which is why the features are stored beside the score
+      rather than only the score. Re-running the model against today's history
+      would answer a different question: the history has moved.
+      THE PSEUDONYM IS THE SAME MINIMISATION fd_transactions carries. The
+      caller sends a card number and a home location; the table has no column
+      for either, so client_key and a distance are what remains, and a purge
+      would remove the record of a decision without removing any identity --
+      there is none left to remove.
+      A duration was considered and refused on that ground: the thing a
+      duration would protect is already absent.
     fd_monitoring: >-
       The monitoring measurements. Kept, and not given a duration: EC45 exists
       to show an evolution over the long run, so a window that purges the
@@ -193,6 +207,34 @@ scoring:
   # decides. A policy nobody can see is a number nobody can challenge.
   threshold_policy: capacity
   alert_capacity_per_day: 60
+
+  # ---- WHERE THE SCORING IS DONE, since L5 (20/11/2026)
+  #
+  # THE PIPELINE NO LONGER LOADS THE MODEL. dag_ingest.score_batch used to call
+  # score.load() in the scheduler, so the model lived in two processes -- the
+  # scheduler's and the service's -- each resolving the champion alias on its
+  # own. A service nobody calls is not a decoupling, it is a second path.
+  #
+  # THE CONTAINER PORT AND NOT THE PUBLISHED ONE, the same rule as
+  # realtime.endpoint: inside the compose network a service is reached on the
+  # port it listens on, and the 5001 of docker-compose.yml only publishes it to
+  # the host's loopback for a browser.
+  #
+  # Changing this line needs the scheduler recreated, since config.load() runs
+  # per task but the compose environment does not.
+  endpoint: http://scoring-service:5000
+
+  # HOW LONG A BATCH MAY TAKE. A batch is about five rows -- realtime
+  # calls_per_run -- and the model answers in milliseconds, so this budget is
+  # for the first call after a promotion, when the service resolves the alias
+  # and pulls the model from the registry. Measured on the batch path before
+  # the move: 8 ms median once warm.
+  #
+  # SHORTER THAN realtime.timeout_seconds (35), deliberately: that one waits on
+  # a third party over the internet, this one on a container on the same
+  # network. A long timeout here would turn "the service is down" into "the DAG
+  # hangs", and dag_ingest runs every minute.
+  endpoint_timeout_seconds: 20
   cost_false_alert: 4.0          # euros of analyst time for one review
 
   # The threshold is chosen on the LAST SLICE OF THE TRAINING PERIOD, never on

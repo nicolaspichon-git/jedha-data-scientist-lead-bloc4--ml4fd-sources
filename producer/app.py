@@ -245,7 +245,7 @@ Rate limited, as the original was. The served window and the amount drift are
 declared in the environment and in runtime/producer/drift.json.
 """
 
-app = FastAPI(title="ML4FD - Real-time payments producer",
+app = FastAPI(title="ML4FD : Real-time payments producer",
               description=description, version="1.0")
 
 limiter = Limiter(key_func=get_remote_address)

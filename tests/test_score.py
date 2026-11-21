@@ -403,3 +403,166 @@ def test_the_loader_reads_the_version_for_the_path():
     assert 'recipe_version = params.get("dataset_version")' in body
     assert "manifest_path(settings, recipe_version)" in body
     assert "manifest_path(settings, digest)" not in body
+
+
+# --- L5: the pipeline asks the service instead of loading the model ---------
+
+ENDPOINT = "http://scoring-service:5000"
+
+
+def batch_frame(n=3):
+    from decimal import Decimal
+
+    return pd.DataFrame([
+        {"txn_id": "t%d" % i, "amt": Decimal("120.50"), "f_tx_count": 1403,
+         "f_avg_amount": Decimal("67.61"),
+         "f_home_distance_km": Decimal("5.12"), "category": "grocery_pos",
+         "txn_hour": 15, "txn_weekday": 5}
+        for i in range(n)])
+
+
+class FakePost:
+    """requests.post, recorded. Returns what the test tells it to."""
+
+    def __init__(self, status=200, body=None):
+        self.status, self.body, self.seen = status, body or {}, {}
+
+    def __call__(self, url, json=None, timeout=None):
+        self.seen = {"url": url, "payload": json, "timeout": timeout}
+        outer = self
+
+        class Answer:
+            status_code = outer.status
+            text = str(outer.body)
+
+            def json(self_inner):
+                return outer.body
+        return Answer()
+
+
+def answered(frame, **over):
+    body = {"model_version": "4", "recipe_digest": "93d16ede49b5",
+            "threshold": 0.93,
+            "decisions": [{"txn_id": txn_id, "score": 0.1, "flagged": False}
+                           for txn_id in frame["txn_id"]]}
+    body.update(over)
+    return body
+
+
+def posted(monkeypatch, frame, status=200, body=None):
+    import requests
+
+    fake = FakePost(status, body if body is not None else answered(frame))
+    monkeypatch.setattr(requests, "post", fake)
+    return fake
+
+
+def test_the_request_goes_to_the_batch_path_of_the_declared_endpoint(monkeypatch):
+    frame = batch_frame(2)
+    fake = posted(monkeypatch, frame)
+    score.remote_rows(frame, ENDPOINT, timeout=20)
+    assert fake.seen["url"] == ENDPOINT + "/score/batch"
+    assert fake.seen["timeout"] == 20
+
+
+def test_a_trailing_slash_on_the_endpoint_does_not_double(monkeypatch):
+    frame = batch_frame(1)
+    fake = posted(monkeypatch, frame)
+    score.remote_rows(frame, ENDPOINT + "/", timeout=20)
+    assert fake.seen["url"] == ENDPOINT + "/score/batch"
+
+
+def test_every_row_travels_with_its_features_and_its_identifier(monkeypatch):
+    frame = batch_frame(3)
+    fake = posted(monkeypatch, frame)
+    score.remote_rows(frame, ENDPOINT, timeout=20)
+    rows = fake.seen["payload"]["rows"]
+    assert [row["txn_id"] for row in rows] == ["t0", "t1", "t2"]
+    assert "txn_id" not in rows[0]["features"]
+    assert set(rows[0]["features"]) == {
+        "amt", "f_tx_count", "f_avg_amount", "f_home_distance_km",
+        "category", "txn_hour", "txn_weekday"}
+
+
+def test_a_decimal_travels_as_a_number_and_never_as_a_string(monkeypatch):
+    """json cannot serialise a Decimal, and sending it as a string would be
+    worse: the service builds a frame from what it receives, and a numeric
+    column of strings beside a genuinely textual category is how a silent dtype
+    confusion starts. train.py fits on floats, so nothing is lost."""
+    frame = batch_frame(1)
+    fake = posted(monkeypatch, frame)
+    score.remote_rows(frame, ENDPOINT, timeout=20)
+    features = fake.seen["payload"]["rows"][0]["features"]
+    assert features["amt"] == 120.50
+    assert isinstance(features["amt"], float)
+    assert features["category"] == "grocery_pos"
+    # and the whole payload must survive a real json round trip
+    assert json.loads(json.dumps(fake.seen["payload"]))["rows"][0]["txn_id"] \
+        == "t0"
+
+
+def test_the_rows_returned_are_exactly_what_fd_scores_expects(monkeypatch):
+    """The same shape as as_rows(), so write() and everything downstream are
+    untouched: the seam is the middle of score_batch and nothing else."""
+    frame = batch_frame(2)
+    posted(monkeypatch, frame)
+    rows = score.remote_rows(frame, ENDPOINT, timeout=20)
+    wanted = set(re.findall(r"%\((\w+)\)s", db.sql_path(
+        "scoring/write_scores.sql").read_text(encoding="utf-8")))
+    for row in rows:
+        assert wanted <= set(row), sorted(wanted - set(row))
+
+
+def test_the_decision_comes_from_the_service_and_is_not_recomputed(monkeypatch):
+    """One place compares, one rounding, one answer. Recomputing the flag here
+    against a locally read threshold is how two comparisons end up disagreeing
+    about a score four billionths from the line."""
+    frame = batch_frame(1)
+    body = answered(frame)
+    body["decisions"][0] = {"txn_id": "t0", "score": 0.95, "flagged": True}
+    posted(monkeypatch, frame, body=body)
+    row = score.remote_rows(frame, ENDPOINT, timeout=20)[0]
+    assert row["flagged"] is True and row["score"] == 0.95
+    assert row["threshold"] == 0.93
+
+
+def test_a_refusal_names_the_service_and_how_to_look(monkeypatch):
+    frame = batch_frame(1)
+    posted(monkeypatch, frame, status=503, body={"detail": "no model"})
+    with pytest.raises(RuntimeError) as raised:
+        score.remote_rows(frame, ENDPOINT, timeout=20)
+    message = str(raised.value)
+    assert "503" in message and "/health" in message
+    assert "logs -Service scoring-service" in message
+
+
+def test_a_response_short_of_one_row_writes_nothing(monkeypatch):
+    """fd_scores would otherwise hold a partial batch, and nothing downstream
+    would say so."""
+    frame = batch_frame(3)
+    body = answered(frame)
+    body["decisions"] = body["decisions"][:2]
+    posted(monkeypatch, frame, body=body)
+    with pytest.raises(RuntimeError, match="lot different"):
+        score.remote_rows(frame, ENDPOINT, timeout=20)
+
+
+def test_a_response_carrying_a_row_nobody_asked_about_is_refused(monkeypatch):
+    frame = batch_frame(2)
+    body = answered(frame)
+    body["decisions"].append({"txn_id": "intruder", "score": 0.9,
+                              "flagged": True})
+    posted(monkeypatch, frame, body=body)
+    with pytest.raises(RuntimeError, match="lot different"):
+        score.remote_rows(frame, ENDPOINT, timeout=20)
+
+
+def test_the_rows_come_back_in_the_order_they_were_asked(monkeypatch):
+    """fd_scores does not care, but a log line that lists them does, and so
+    does anybody comparing a request with its answer."""
+    frame = batch_frame(3)
+    body = answered(frame)
+    body["decisions"].reverse()
+    posted(monkeypatch, frame, body=body)
+    rows = score.remote_rows(frame, ENDPOINT, timeout=20)
+    assert [row["txn_id"] for row in rows] == ["t0", "t1", "t2"]

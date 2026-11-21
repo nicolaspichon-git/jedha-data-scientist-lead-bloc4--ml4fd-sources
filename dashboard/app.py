@@ -9,7 +9,7 @@ its own connection, as fd_dashboard, through common.connection().
 """
 import streamlit as st
 
-st.set_page_config(page_title="Automatic Fraud Detection", layout="wide")
+st.set_page_config(page_title="ML4FD : Fraud Detection Dashboard", layout="wide")
 
 PAGES = {
     "Analyse": [
@@ -22,8 +22,8 @@ PAGES = {
     ],
     "Suivi": [
         st.Page("pages/rejects.py", title="Rejets de validation", url_path="rejects"),
+        st.Page("pages/monitoring.py", title="Surveillance du modèle", url_path="monitoring"),
         st.Page("pages/performances.py", title="Performances du modèle", url_path="performances"),
-        st.Page("pages/monitoring.py", title="Surveillance du modèle (monitoring)", url_path="monitoring"),
     ],
 }
 

@@ -36,11 +36,26 @@ BEGIN
     EXECUTE format('GRANT CONNECT ON DATABASE %I TO %I',
                    current_database(), current_user);
 
-    -- The dashboard, the only role of this stack that logs in on its own
-    -- (140_dashboard_role.sql). The guard keeps this file playable on a
-    -- database built before 140 ever ran.
+    -- The dashboard, one of the two roles of this stack that log in on their
+    -- own (140_dashboard_role.sql; the scoring service is the other, below,
+    -- since 2026-11-20). The guard keeps this file playable on a database
+    -- built before 140 ever ran.
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fd_dashboard') THEN
         EXECUTE format('GRANT CONNECT ON DATABASE %I TO fd_dashboard',
+                       current_database());
+    END IF;
+
+    -- The scoring service, the second role of this stack that logs in on its
+    -- own (145_scoring_service_role.sql). Same guard, same reason: this file
+    -- stays playable on a database built before that role existed.
+    --
+    -- AND THE GUARD ONLY HOLDS IF THE ROLE IS CREATED FIRST. It was numbered
+    -- 185 for one evening, after this file, so the IF EXISTS found nothing,
+    -- the grant was skipped in silence, and the service failed on its first
+    -- real call with "User does not have CONNECT privilege". The numbering IS
+    -- the guarantee this file rests on, and a test now ties the two.
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fd_scoring_service') THEN
+        EXECUTE format('GRANT CONNECT ON DATABASE %I TO fd_scoring_service',
                        current_database());
     END IF;
 

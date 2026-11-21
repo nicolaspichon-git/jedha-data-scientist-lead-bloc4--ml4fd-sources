@@ -91,6 +91,19 @@ def _function(name: str) -> str:
     raise AssertionError("pas de fonction %s dans %s" % (name, SOURCE))
 
 
+def _task_source(name: str) -> str:
+    """The source of a @task function of the DAG, which is NESTED in the dag
+    function and so invisible to _function, which reads the module level only.
+    That is what the first version of the L5 tests called: _function raised on
+    score_batch, a task that is very much there."""
+    body = _body()
+    for node in ast.walk(ast.parse(body)):
+        if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == name):
+            return ast.get_source_segment(body, node) or ""
+    raise AssertionError("pas de tache %s dans %s" % (name, SOURCE))
+
+
 def _calls(source: str) -> set:
     """Every function CALLED in a piece of source, by name.
 
@@ -434,3 +447,48 @@ def test_the_raw_reader_refuses_a_string_and_names_the_fix():
 
     with _pytest.raises(TypeError, match="uuid.UUID"):
         list(raw.read_batch(None, "4d4fb164-3734-57ff-a04c-01ea278876b8"))
+
+
+# --- L5: the pipeline no longer loads the model -----------------------------
+
+def test_the_scoring_task_no_longer_loads_a_model():
+    """THE DECOUPLING, HELD IN PLACE. Until L5 this task called score.load()
+    in the scheduler, so the model lived in two processes -- this one and the
+    service -- each resolving the champion alias on its own. A service nobody
+    calls is not a decoupling, it is a second path. Without this test the
+    coupling comes back at the first convenient edit."""
+    called = _calls(_task_source("score_batch"))
+    assert "score.remote_rows" in called
+    assert "score.load" not in called
+    assert "MLFLOW_TRACKING_URI" not in _task_source("score_batch")
+
+
+def test_the_endpoint_is_read_from_governance_and_not_written_here():
+    """The same rule as realtime.endpoint: an address in a DAG is an address
+    nobody can change without editing a DAG."""
+    body = _task_source("score_batch")
+    assert "settings.scoring_endpoint" in body
+    assert "settings.scoring_endpoint_timeout_seconds" in body
+    assert "http://" not in body
+
+
+def test_the_rows_are_still_read_and_written_here():
+    """Only the middle moved. fd_scores keeps its foreign key to
+    fd_transactions, and that guarantee belongs to whoever owns the data:
+    fd_scoring_service has no write on it at all."""
+    called = _calls(_task_source("score_batch"))
+    assert "score.rows_to_score" in called
+    assert "score.write" in called
+
+
+def test_an_empty_batch_reports_no_model_version():
+    """Nothing was scored, so no model answered. Asking the service which
+    version it WOULD have used would put a name on a decision never taken."""
+    body = _task_source("score_batch")
+    empty = body[body.index("if not len(frame)"):]
+    assert '"model_version": None' in empty
+
+
+def test_the_whole_dag_holds_no_model_load():
+    """Belt and braces across the file: another task could reintroduce it."""
+    assert "score.load" not in _calls(_body())

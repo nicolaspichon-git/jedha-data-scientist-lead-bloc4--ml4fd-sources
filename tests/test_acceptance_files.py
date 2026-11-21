@@ -28,7 +28,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ("s1_acceptance.sql", "s2_acceptance.sql", "s3_acceptance.sql")
+# FOUND AND NOT LISTED. The literal list held s1, s2 and s3 only: s4, s5 and
+# s6 were written later and escaped these four tests for months, and l5 would
+# have escaped them too. The form is the contract, so every file that claims to
+# be an acceptance file is held to it.
+FILES = tuple(sorted(path.name for path in
+                     (ROOT / "sql" / "checks").glob("*_acceptance.sql")))
 
 
 def _text(name: str) -> str:
@@ -51,10 +56,15 @@ def test_a_failing_criterion_raises(name):
 
 @pytest.mark.parametrize("name", FILES)
 def test_the_table_is_displayed_before_the_raise(name):
-    """The operator must see attendu/constate, not only an error."""
+    """The operator must see attendu/constate, not only an error.
+
+    THE LAST RAISE AND NOT THE FIRST. l5 and s6 open with a guard that names a
+    missing role and its remedy, deliberately before anything else can fail on
+    an unknown name -- a first-occurrence test read that guard as the summary
+    and called both files defective."""
     text = _text(name)
     display = text.index("FROM   acceptance")
-    raising = text.index("RAISE EXCEPTION")
+    raising = text.rindex("RAISE EXCEPTION")
     assert display < raising
 
 

@@ -488,8 +488,8 @@ def render(data: dict, settings) -> str:
         add("- Alertes qui étaient de vraies fraudes : **%s** "
             "*(précision)*" % _percent(verdicts_["precision_observed"]))
         if reference_ is None:
-            add("- Référence de M5 : **indisponible** \u2014 la recette n'a "
-                "pas de mesure enregistrée en base, la comparaison est "
+            add("- Référence : **indisponible** \u2014 la recette n'a pas "
+                "de mesure enregistrée en base, la comparaison est "
                 "impossible sur cette édition.")
         else:
             add("- Pour comparaison, mesuré à la mise en service sur des "

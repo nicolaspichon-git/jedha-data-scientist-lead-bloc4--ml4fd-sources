@@ -1,0 +1,17 @@
+# The scoring service's own dependencies. Pinned loosely, like the producer's
+# and the Airflow image's, and for the same reason: these were written without
+# being able to reach PyPI.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+gunicorn>=21.2
+pydantic>=2.6
+
+# What ml4fd itself needs on this path: the database, the frame handed to the
+# model, the governance file, and MLflow to resolve the champion alias and load
+# the model it points at -- the same path L3 uses, never a Parquet of its own.
+psycopg[binary]>=3.1
+pandas>=2.0
+PyYAML>=6.0
+mlflow>=2.12
+scikit-learn>=1.4
+joblib>=1.3

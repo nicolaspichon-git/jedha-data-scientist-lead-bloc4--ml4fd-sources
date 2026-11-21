@@ -1,18 +1,46 @@
 -- The acceptance criteria of S2, lots M0 to M4. Every verdict must read OK.
 -- Covers: EC05, EC23, EI02, EI04   Lot: M8   Competency: C1, C2, C5
 --
--- The decisive one is the fourth: n_train + n_test must equal the number of
--- rows whose VERDICT WAS KNOWN at the cut-off. If the build had filtered on the
--- transaction date instead of label_ts, that count would be larger -- and the
--- recall of the model trained on it would be optimistic by exactly the
--- difference. The check compares the registered counts with what the data says.
+-- The decisive one is the sixth: the registered counts must NOT EXCEED the rows
+-- whose verdict was attributable to the cut-off. If the build had filtered on
+-- the transaction date instead of label_ts, it would have used rows labelled
+-- later -- and the recall of the model trained on them would be optimistic by
+-- exactly the difference.
+--
+-- BY SOURCE SINCE L5 (21/11/2026), and an inequality on one side. Until then
+-- this file recomputed ONE count, split by date, and demanded equality. Three
+-- criteria then failed on the first dataset built with the stream admitted,
+-- and none of the three was a defect of the data:
+--
+--   * sql/datasets/training_set.sql sends EVERY stream row to train, bounded
+--     only by the cut-off, and bounds the HISTORICAL rows by the horizon as
+--     well. A recomputation that splits by txn_ts puts the whole of November
+--     2026 on the test side, which is how the test count read 74,343 against
+--     47,624 registered. Two rules, not two datasets.
+--   * the verdict ROW is written by a daily DAG while its label_ts is the
+--     instant the verdict FELL DUE. So "the rows whose verdict was known at
+--     the cut-off" is not a stable set: it grows after a build, as
+--     dag_ingest_verdicts catches up, with label_ts values already in the
+--     past. A recomputation hours later legitimately finds more rows than the
+--     build could see.
+--   * the horizon literal below was fraudTest.csv's, the corpus this project
+--     abandoned at the swap. It was never updated.
+--
+-- Hence: the TEST side is pure corpus and frozen, so it stays an equality. The
+-- TRAIN side mixes corpus and stream and fd_datasets records no breakdown of
+-- it, so it is bounded on both sides -- it must hold the whole labelled corpus
+-- and must not exceed corpus + attributable stream. A build that used later
+-- information breaks the upper bound; a build that lost the corpus breaks the
+-- lower one. Equality there would mean demanding that no verdict has been
+-- recorded since the build, which nothing guarantees and nothing should.
 --
 -- test_end is derived from the split rule string rather than duplicated: the
 -- rule is the recipe's identity, so reading it back is the only honest source.
 --
 -- The horizon is written here as a literal, mirroring labels.horizon in
 -- governance.yml. A duplication, and a deliberate one: an acceptance check that
--- read its expected value from the thing it checks would verify nothing.
+-- read its expected value from the thing it checks would verify nothing. A
+-- literal that outlives a corpus swap is the cost of it, paid once here.
 
 -- THE VERDICT MUST REACH THE SHELL, and until N9 it did not. psql exits 0
 -- whatever the column below says, and Invoke-Step reads only the exit code: so
@@ -39,13 +67,47 @@ WITH latest AS (
     ORDER  BY created_at DESC
     LIMIT  1
 ),
+-- The batches of the stream, named once because `labelled` below needs the
+-- source PER ROW and not as a filter. Reading fd_raw_events is not the cost
+-- here: measured, that scan is 73 ms, and an index on (source, batch_id) made
+-- it SLOWER -- a bitmap heap scan over rows carrying a jsonb payload instead of
+-- a parallel sequential scan. What this query depends on is the index on
+-- fd_transactions (batch_id), added to the DDL on 21/11/2026: without it the
+-- planner rescans the whole table once per batch.
+stream_batches AS (
+    SELECT DISTINCT batch_id
+    FROM   fd_raw_events
+    WHERE  source = 'current-transactions'
+),
+-- BY SOURCE AND NEVER BY A DATE, for the reason training_set.sql gives: telling
+-- the two apart by txn_ts works today and breaks the day a corpus is replayed
+-- with recent timestamps.
+labelled AS (
+    SELECT t.txn_ts,
+           g.label_ts,
+           EXISTS (SELECT 1 FROM stream_batches b WHERE b.batch_id = t.batch_id)
+               AS from_stream
+    FROM   fd_transactions t
+    JOIN   fd_ground_truth g ON g.txn_id = t.txn_id
+),
 known AS (
-    SELECT count(*) AS n,
-           count(*) FILTER (WHERE t.txn_ts <  l.train_end) AS n_train,
-           count(*) FILTER (WHERE t.txn_ts >= l.train_end) AS n_test
-    FROM   latest l
-    JOIN   fd_transactions t ON t.txn_ts < l.test_end
-    JOIN   fd_ground_truth g ON g.txn_id = t.txn_id AND g.label_ts <= l.cut_off
+    SELECT
+      count(*) FILTER (WHERE NOT r.from_stream
+                         AND r.label_ts <= l.cut_off
+                         AND r.label_ts <= '2020-06-21 03:59:46+00'::timestamptz
+                         AND r.txn_ts  <  l.test_end
+                         AND r.txn_ts  <  l.train_end)   AS corpus_train,
+      count(*) FILTER (WHERE NOT r.from_stream
+                         AND r.label_ts <= l.cut_off
+                         AND r.label_ts <= '2020-06-21 03:59:46+00'::timestamptz
+                         AND r.txn_ts  <  l.test_end
+                         AND r.txn_ts  >= l.train_end)   AS corpus_test,
+      -- All to train, never to test: the gate of L3 compares a candidate to the
+      -- champion on ONE test set, and a test set that moved with every
+      -- retraining would make the published figures incomparable.
+      count(*) FILTER (WHERE r.from_stream
+                         AND r.label_ts <= l.cut_off)     AS stream_train
+    FROM   latest l, labelled r
 ),
 criteria AS (
     SELECT 1 AS ord, 'M0 jeux enregistres (>= 1)' AS criterion,
@@ -56,20 +118,52 @@ criteria AS (
     SELECT 2, 'M2 empreinte de recette sur 64 hexa', '64',
            length(recipe_digest)::text FROM latest
     UNION ALL
-    SELECT 3, 'M2 coupure dans l''horizon d''etiquetage', 'oui',
-           CASE WHEN cut_off <= '2020-12-22 23:13:39+00'::timestamptz
-                THEN 'oui' ELSE 'NON : ' || cut_off::text END
+    -- ASKED OF THE DATA AND NOT OF THE SETTING. The rule
+    -- datasets.assert_cut_off_usable applies since 20/11 is not "the cut-off is
+    -- within the horizon" but "a cut-off beyond the horizon is admissible
+    -- BECAUSE the stream is labelled as it goes". Expressed here on the set
+    -- itself, so it also catches the failure of 20/11 that no setting showed: a
+    -- present-day cut-off on a dataset holding not one stream row -- the
+    -- retraining that refitted the very same Parquet files.
+    SELECT 3, 'M2 coupure au-dela de l''horizon admise par le flux', 'oui',
+           CASE WHEN l.cut_off <= '2020-06-21 03:59:46+00'::timestamptz
+                  THEN 'oui'
+                WHEN (SELECT stream_train FROM known) > 0
+                  THEN 'oui'
+                ELSE 'NON : coupure ' || l.cut_off::text
+                     || ' et aucune ligne de flux dans le jeu'
+           END
+    FROM   latest l
+    UNION ALL
+    -- PURE CORPUS AND FROZEN, so an equality. The stream never reaches the test
+    -- side, and the corpus stopped being written in S1.
+    -- FROM latest, so the three bounds VANISH when no dataset is registered
+    -- rather than reading ECHEC on nulls: criterion 1 already names that cause,
+    -- and three more lines saying it differently help nobody.
+    SELECT 4, 'M3 cote test = corpus etiquete du cote test',
+           (SELECT corpus_test::text FROM known), n_test::text
     FROM   latest
     UNION ALL
-    SELECT 4, 'M3 n_train + n_test = lignes au verdict CONNU',
-           (SELECT n::text FROM known),
-           (SELECT (l.n_train + l.n_test)::text FROM latest l)
+    -- THE LOWER BOUND: the labelled corpus must be there whole. A build that
+    -- lost part of it would train on less than it claims.
+    SELECT 5, 'M3 cote train contient tout le corpus etiquete', 'oui',
+           CASE WHEN l.n_train >= (SELECT corpus_train FROM known)
+                THEN 'oui'
+                ELSE 'NON : ' || l.n_train::text || ' < '
+                     || (SELECT corpus_train::text FROM known)
+           END
+    FROM   latest l
     UNION ALL
-    SELECT 5, 'M3 repartition train conforme a la regle',
-           (SELECT n_train::text FROM known), n_train::text FROM latest
-    UNION ALL
-    SELECT 6, 'M3 repartition test conforme a la regle',
-           (SELECT n_test::text FROM known), n_test::text FROM latest
+    -- THE UPPER BOUND, AND THE DECISIVE CRITERION. Exceeding corpus + stream
+    -- attributable to the cut-off means the build used rows whose verdict was
+    -- not knowable then -- the optimistic recall this whole file exists for.
+    SELECT 6, 'M3 cote train n''excede pas corpus + flux attribuable', 'oui',
+           CASE WHEN l.n_train <= (SELECT corpus_train + stream_train FROM known)
+                THEN 'oui'
+                ELSE 'NON : ' || l.n_train::text || ' > '
+                     || (SELECT (corpus_train + stream_train)::text FROM known)
+           END
+    FROM   latest l
     UNION ALL
     SELECT 7, 'M4 regle de decoupage temporelle', 'oui',
            CASE WHEN split_rule LIKE 'temporal:%' THEN 'oui'
@@ -105,6 +199,23 @@ criteria AS (
     UNION ALL
     SELECT 16, 'info features', array_length(features, 1)::text || ' colonnes',
            array_length(features, 1)::text || ' colonnes' FROM latest
+    -- The arithmetic of criteria 4 to 6, in one line: without it an operator
+    -- reading a bound cannot see which side moved.
+    UNION ALL
+    -- FROM latest, like the information lines above it, and not a scalar
+    -- subquery: with no dataset registered the row must VANISH rather than
+    -- appear holding nulls, which compare unequal and read as a failure. Found
+    -- on an empty cluster -- the only place the difference shows.
+    SELECT 17, 'info recompte par source (corpus train / test / flux)',
+           (SELECT corpus_train || ' / ' || corpus_test || ' / ' || stream_train
+              FROM known),
+           (SELECT corpus_train || ' / ' || corpus_test || ' / ' || stream_train
+              FROM known)
+    FROM   latest
+    UNION ALL
+    SELECT 18, 'info enregistre (train / test)',
+           n_train || ' / ' || n_test, n_train || ' / ' || n_test
+    FROM   latest
 )
 SELECT ord, criterion, expected, actual,
        CASE WHEN expected = actual THEN 'OK' ELSE '<<< ECHEC' END AS verdict

@@ -141,8 +141,16 @@ def test_the_image_finds_its_configuration_and_its_code():
 
 
 def test_the_manager_knows_the_service():
+    """THE ASSERTION PINNED A SPELLING, corrected 2026-11-20. It read
+    "'dashboard')" -- the service followed by the array's closing paren -- so
+    it held only while the dashboard was the LAST expected service, and broke
+    the day L5 added one after it. The property is membership in status's
+    list, not position in it."""
     text = (ROOT / "fd-manager.ps1").read_text(encoding="utf-8")
-    assert "'dashboard')" in text, "status expects it"
+    expected = re.search(r"\$expected\s*=\s*@\(([^)]*)\)", text)
+    assert expected, "status no longer declares the services it expects"
+    assert "dashboard" in re.findall(r"'([^']+)'", expected.group(1)), \
+        "status expects it"
     # Always a new process: a mounted ml4fd/ is NOT re-imported by a running
     # Streamlit, and a page newer than its module fails (AttributeError).
     assert "docker compose up -d --build --force-recreate dashboard" in text

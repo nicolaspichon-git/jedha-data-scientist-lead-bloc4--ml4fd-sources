@@ -89,13 +89,30 @@ def test_the_default_period_is_a_month_ending_today(state):
     assert state["window"].start.date() == view["first"]
 
 
+def reference_column(row: dict) -> str:
+    """The name of the reference column, found and never spelled out.
+
+    THE THIRD TEST OF THE EVENING TO BREAK ON A SPELLING. This assertion read
+    "Mesuré en M5 (test)", then "Mesuré à l’entraînement (test)" with a
+    typographic apostrophe, then the same with a straight one -- three edits to
+    a test whose subject is that the observed figure and the reference sit side
+    by side, which is true whatever the column is called. The property is that
+    there are exactly two value columns beside the indicator; the wording of
+    the second belongs to whoever writes the page.
+    """
+    others = [key for key in row if key not in ("Indicateur", "Observé")]
+    assert len(others) == 1, sorted(row)
+    return others[0]
+
+
 def test_observed_and_reference_sit_side_by_side(state):
     rows = {r["Indicateur"]: r for r in
             dashboard.performances_view(None, settings(), DAY, DAY)["comparison"]}
     rappel = rows["Fraudes retrouvées (rappel)"]
+    column = reference_column(rappel)
     assert rappel["Observé"] == report._percent(0.8)
-    assert rappel["Mesuré en M5 (test)"] == report._percent(0.7512)
-    assert rows["Part de fraudes"]["Mesuré en M5 (test)"] == report._share(0.0058, 3)
+    assert rappel[column] == report._percent(0.7512)
+    assert rows["Part de fraudes"][column] == report._share(0.0058, 3)
 
 
 def test_no_reference_is_said_with_its_remedy(state):
@@ -103,7 +120,8 @@ def test_no_reference_is_said_with_its_remedy(state):
     view = dashboard.performances_view(None, settings(), DAY, DAY)
     assert levels(view)[0] == dashboard.WARNING
     assert "fd-manager.ps1 reference" in view["notices"][0].text
-    assert view["comparison"][0]["Mesuré en M5 (test)"] == "indisponible"
+    first = view["comparison"][0]
+    assert first[reference_column(first)] == "indisponible"
 
 
 def test_no_verdict_yet_is_explained_by_the_delay(state):

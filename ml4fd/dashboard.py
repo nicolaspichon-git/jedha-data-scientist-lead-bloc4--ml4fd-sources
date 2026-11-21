@@ -428,7 +428,7 @@ def frauds_view(conn, settings, first: dt.date | None = None,
         notices.append(Notice(WARNING,
             "Plafond de notification atteint : %s sur les dernières 24 heures "
             "glissantes, pour une capacité de %s. Les alertes suivantes sont "
-            "levées mais leur notification est retenue (N5) : c'est une "
+            "levées mais leur notification est retenue : c'est une "
             "décision, pas une panne. Un réentraînement qui sur-alerte se "
             "voit ici."
             % (report._count(cap["notified_24h"]), report._count(cap["capacity"]))))
@@ -693,9 +693,8 @@ def performances_view(conn, settings, first: dt.date | None = None,
                 MAX_PERIOD_DAYS, report._day(first), report._day(last))))
     if ref is None:
         notices.append(Notice(WARNING,
-            "Référence de M5 indisponible : la recette la plus récente n'a pas "
-            "de mesure enregistrée en base. Si elle a été entraînée avant R10 : "
-            ".\\fd-manager.ps1 reference"))
+            "Référence indisponible : la recette la plus récente n'a pas de "
+            "mesure enregistrée en base. Pour l'enregistrer : .\\fd-manager.ps1 reference"))
     if not seen["verdicts"]:
         notices.append(Notice(INFO,
             "Aucun verdict reçu %s. Un verdict arrive quand le porteur "
@@ -718,13 +717,13 @@ def performances_view(conn, settings, first: dt.date | None = None,
     comparison = [
         {"Indicateur": "Fraudes retrouvées (rappel)",
          "Observé": report._percent(seen["recall_observed"]),
-         "Mesuré en M5 (test)": reference_of("recall")},
+         "Mesuré à l'entraînement (test)": reference_of("recall")},
         {"Indicateur": "Alertes justes (précision)",
          "Observé": report._percent(seen["precision_observed"]),
-         "Mesuré en M5 (test)": reference_of("precision")},
+         "Mesuré à l'entraînement (test)": reference_of("precision")},
         {"Indicateur": "Part de fraudes",
          "Observé": report._share(seen["base_rate_observed"], 3),
-         "Mesuré en M5 (test)": (report._share(ref["base_rate_test"], 3)
+         "Mesuré à l'entraînement (test)": (report._share(ref["base_rate_test"], 3)
                                  if ref else "indisponible")},
     ]
     matrix = [
@@ -742,9 +741,9 @@ def performances_view(conn, settings, first: dt.date | None = None,
                  "Verdicts": report._count(m["verdicts"]),
                  "Fraudes": report._count(m["frauds"]),
                  "Rappel observé": report._percent(m["recall_observed"]),
-                 "Rappel M5": report._percent(m["test_recall"]),
+                 "Rappel à l'entraînement": report._percent(m["test_recall"]),
                  "Précision observée": report._percent(m["precision_observed"]),
-                 "Précision M5": report._percent(m["test_precision"])}
+                 "Précision à l'entraînement": report._percent(m["test_precision"])}
                 for m in models]
 
     if seen["verdicts"]:
