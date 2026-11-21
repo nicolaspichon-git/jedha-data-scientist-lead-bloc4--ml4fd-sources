@@ -64,7 +64,15 @@ ROOT = Path(__file__).resolve().parent.parent          # step-2/
 REQUIREMENTS = (ROOT.parent / "step-0"
                 / "ml4fd-project--d0-requirements.md")
 MATRIX = ROOT / "TRACEABILITY.md"
-SCANNED = ("ml4fd", "sql", "tests", "tools", "airflow", "dashboard")
+# EVERY TOP-LEVEL DIRECTORY THAT CARRIES "Covers:" MARKS, and a test ties
+# this tuple to what the repository actually holds. scoring_service/ was
+# missing on the day it was created, 2026-11-20: its seven marks -- EC15
+# to EC23, the whole of L5 -- were simply not seen, so the matrix reported
+# EC23 as carried by no code at all while the service that carries it sat
+# beside it. A list of places to look is a list that goes stale the moment
+# somebody adds a place.
+SCANNED = ("ml4fd", "sql", "tests", "tools", "airflow", "dashboard",
+           "scoring_service", "producer")
 
 # IN SCOPE and OUT OF SCOPE, declared apart. The first is what the matrix is
 # complete about; the second is what the code may legitimately mark while the
@@ -217,7 +225,15 @@ def tagged() -> tuple[dict, dict, dict]:
                     if enclosing:
                         scope = " " + enclosing.group(1) + "()"
                         break
-                where = "%s:%d%s" % (path.relative_to(ROOT), number + 1, scope)
+                # as_posix(), NOT str(): on Windows str() yields
+                # "ml4fd\\serve.py", so the generated matrix differed
+                # from the one generated on Linux -- the same
+                # repository, two documents -- and a reader comparing
+                # two dossiers would see every path change. It also
+                # broke a test of tests/test_traceability.py, which
+                # looked for a path the repository spells with slashes.
+                where = "%s:%d%s" % (path.relative_to(ROOT).as_posix(),
+                                     number + 1, scope)
                 # THE SECOND DECLARATION OF THE SAME BLOCK. Covers: and
                 # Competency: are written together, three lines apart, and they
                 # say the same thing twice -- which is what makes them

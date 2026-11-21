@@ -112,6 +112,8 @@ class Settings:
     promotion_respects_capacity: bool
     promote_first_unopposed: bool
     max_amount: float
+    scoring_endpoint: str
+    scoring_endpoint_timeout_seconds: int
     systematic_share: float
     # NOT A URL ANY MORE, which is why it is not called one. Since the
     # corpora moved to a private bucket this carries whatever governance.yml
@@ -781,6 +783,9 @@ def load(path: Path | None = None) -> Settings:
         cost_false_alert=float(g["scoring"]["cost_false_alert"]),
         validation_share=_share(g["scoring"]["validation_share"]),
         max_amount=float(g["validation"]["max_amount"]),
+        scoring_endpoint=str(g["scoring"]["endpoint"]),
+        scoring_endpoint_timeout_seconds=int(
+            g["scoring"]["endpoint_timeout_seconds"]),
         systematic_share=float(g["validation"]["systematic_share"]),
         csv_source=g["sources"]["historical_csv"],
         drift_switch=str(g["sources"]["drift_switch"]),

@@ -65,7 +65,6 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-import os
 
 import pendulum
 from airflow.decorators import dag, task
@@ -112,7 +111,7 @@ def _mark_failed(context) -> None:
 
 @dag(
     dag_id=DAG_ID,
-    description="S3/N7: real-time ingestion, scoring and alerting",
+    description="real-time ingestion, scoring and alerting",
     schedule="* * * * *",
     start_date=pendulum.datetime(2026, 11, 16, tz="Europe/Paris"),
     catchup=False,                      # 1,440 runs a day: never backfill
@@ -266,13 +265,32 @@ def ingest_realtime():
     def score_batch(polled: dict, n_typed: int) -> dict:
         """Score the batch with the registered model version.
 
-        A RED TASK IF THE REGISTRY IS UNREACHABLE, and that is the point of
+        A RED TASK IF THE SERVICE IS UNREACHABLE, and that is the point of
         separating it: the transactions are already stored, so nothing is lost,
         but the operator must see which stage stopped rather than read a warning
         inside a green run.
 
-        Covers: EE09, EI04, EC24
-        Lot: N7
+        THE SERVICE DECIDES, SINCE L5 (20/11/2026). This task used to call
+        score.load() here, so the model lived in TWO processes -- this
+        scheduler and the scoring service -- each resolving the champion alias
+        on its own. A service nobody calls is not a decoupling, it is a second
+        path. The middle of this task moved to an HTTP call; the reading of the
+        rows and the writing of fd_scores did not.
+
+        THE FAILURE IS EXCHANGED, NOT ADDED. This task was already red when the
+        registry was unreachable; it is now red when the service is. One
+        external dependency replaces another, and the remedy is named in the
+        message rather than left in a traceback.
+
+        fd_scores IS STILL WRITTEN HERE, deliberately: its foreign key to
+        fd_transactions guarantees the row exists, and that guarantee belongs
+        to whoever owns the data. fd_scoring_service records only the calls it
+        answers for third parties -- a decision is recorded once, by whoever
+        holds what makes it re-derivable. sql/ddl/195_scoring_decisions.sql is
+        the view that reads the two journals as one.
+
+        Covers: EE09, EI04, EC16, EC24
+        Lot: N7 (decouple en L5, 20/11/2026)
         Competency: C3
         """
         import uuid as _uuid
@@ -283,24 +301,29 @@ def ingest_realtime():
         batch_id = _uuid.UUID(polled["batch_id"])
 
         with db.connect("fd_ingest") as conn:
-            scorer = score.load(
-                settings, tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"))
             frame = score.rows_to_score(conn, batch_id)
             if not len(frame):
+                # NO MODEL VERSION TO REPORT, and None rather than a lookup:
+                # nothing was scored, so no model answered. Asking the service
+                # which version it WOULD have used would put a name on a
+                # decision that was never taken.
                 log.info("aucune ligne a scorer dans ce lot")
                 conn.commit()
-                return {"scored": 0, "flagged": 0,
-                        "model_version": scorer.model_version}
-            rows = score.as_rows(frame, scorer.scores(frame), scorer)
+                return {"scored": 0, "flagged": 0, "model_version": None}
+            rows = score.remote_rows(
+                frame, settings.scoring_endpoint,
+                settings.scoring_endpoint_timeout_seconds)
             written = score.write(conn, rows)
             conn.commit()
 
+        version = rows[0]["model_version"]
+        threshold = rows[0]["threshold"]
         flagged = sum(1 for row in rows if row["flagged"])
-        log.info("score %d transaction(s) avec la version %s, seuil %.2f : "
-                 "%d au-dessus", written, scorer.model_version,
-                 scorer.threshold, flagged)
+        log.info("score %d transaction(s) par %s avec la version %s, seuil "
+                 "%.2f : %d au-dessus", written, settings.scoring_endpoint,
+                 version, threshold, flagged)
         return {"scored": written, "flagged": flagged,
-                "model_version": scorer.model_version}
+                "model_version": version}
 
     @task
     def raise_and_notify_fraud(scored: dict) -> dict:

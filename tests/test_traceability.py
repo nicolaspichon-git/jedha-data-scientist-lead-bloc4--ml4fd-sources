@@ -293,3 +293,41 @@ def test_competence_five_is_complete_and_undoubted():
         assert code.get(name), "%s carries no code" % name
     assert not [row for row in suspect
                 if req[row[0]]["competency"] == "C5"], suspect
+
+
+def test_every_directory_that_carries_marks_is_scanned():
+    """THE LIST OF PLACES TO LOOK GOES STALE THE MOMENT SOMEBODY ADDS A PLACE,
+    and it did: scoring_service/ was created on 2026-11-20 and SCANNED was not
+    extended, so the seven marks of L5 -- EC15 to EC23 -- were not seen at all.
+    The matrix reported EC23 as carried by no code while the service carrying
+    it sat in the next directory.
+
+    _to_delete/ is excluded deliberately: it holds what is on its way out, and
+    counting its marks would credit the dossier with code nobody runs."""
+    root = Path(__file__).resolve().parents[1]
+    carrying = set()
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        if folder.name.startswith((".", "_")) or folder.name == "vendor":
+            continue
+        for path in folder.rglob("*"):
+            if path.suffix in (".py", ".sql") \
+                    and "__pycache__" not in str(path) \
+                    and "Covers:" in path.read_text(encoding="utf-8"):
+                carrying.add(folder.name)
+                break
+    assert carrying <= set(bt.SCANNED), \
+        "ces repertoires portent des marques et ne sont pas balayes : %s" \
+        % sorted(carrying - set(bt.SCANNED))
+
+
+def test_the_whole_of_l5_is_visible_to_the_matrix():
+    """The consequence, pinned on the lot that paid for the defect."""
+    code, _outside, _declared = bt.tagged()
+    for name in ("EC15", "EC16", "EC17", "EC19", "EC20", "EC21", "EC23"):
+        # NORMALISED, because this ran green on Linux and red on Windows: the
+        # generator built its locations with str(relative_to(ROOT)), which
+        # yields a backslash there. The generator now uses as_posix(), and this
+        # normalisation stays so the test states what it means rather than
+        # resting on the fix.
+        places = [place.replace("\\", "/") for place in code.get(name, [])]
+        assert any("scoring_service/app.py" in place for place in places), name

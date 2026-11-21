@@ -320,6 +320,90 @@ def load(settings, tracking_uri: str | None = None,
     return scorer
 
 
+BATCH_PATH = "/score/batch"
+
+
+def _jsonable(value):
+    """One feature value, in a form json can carry.
+
+    DECIMAL BECOMES FLOAT, and that loses nothing that matters: train.py fits
+    on floats -- the Parquet columns are cast before the fit -- so the model
+    has never seen a Decimal. json cannot serialise one, and sending it as a
+    STRING would be worse: the service builds a frame from what it receives,
+    and a numeric column of strings beside a genuinely textual `category` is
+    how a silent dtype confusion starts.
+    """
+    import decimal
+
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    return value
+
+
+def remote_rows(frame, endpoint: str, timeout: int) -> list[dict]:
+    """The rows fd_scores expects, decided by the service and not in-process.
+
+    WHY THE PIPELINE NO LONGER LOADS THE MODEL. Until L5 dag_ingest called
+    load() in the scheduler, so the model lived in two processes -- the
+    scheduler's and the service's -- each resolving the champion alias on its
+    own. A service nobody calls is not a decoupling, it is a second path. After
+    this, exactly one process holds a model for serving.
+
+    THE SAME SHAPE as as_rows() returns, so write() and everything downstream
+    are untouched: the seam is the middle of score_batch and nothing else.
+
+    THE DECISION COMES FROM THE SERVICE, flag included, and is not recomputed
+    here against a locally read threshold. One place compares, one rounding,
+    one answer -- the alternative is two comparisons that can disagree about a
+    score four billionths from the line (see SCORE_SCALE).
+
+    EVERY ROW IS ACCOUNTED FOR. A response short of one txn_id, or carrying one
+    that was not asked about, is refused rather than written: fd_scores would
+    otherwise hold a partial batch, and nothing downstream would say so.
+
+    Covers: EC16, EC19, EC24
+    Lot: L5
+    Competency: C3
+    """
+    import requests
+
+    features = [name for name in frame.columns if name != "txn_id"]
+    payload = {"rows": [
+        {"txn_id": str(row["txn_id"]),
+         "features": {name: _jsonable(row[name]) for name in features}}
+        for _, row in frame.iterrows()]}
+
+    url = endpoint.rstrip("/") + BATCH_PATH
+    answer = requests.post(url, json=payload, timeout=timeout)
+    if answer.status_code != 200:
+        raise RuntimeError(
+            "le service de scoring a refuse le lot (%d) : %s\n"
+            "  son etat :  %s/health\n"
+            "  ses journaux :  .\\fd-manager.ps1 logs -Service scoring-service"
+            % (answer.status_code, answer.text[:400], endpoint.rstrip("/")))
+    body = answer.json()
+
+    asked = [str(value) for value in frame["txn_id"].tolist()]
+    decided = {str(one["txn_id"]): one for one in body["decisions"]}
+    missing = [txn_id for txn_id in asked if txn_id not in decided]
+    extra = [txn_id for txn_id in decided if txn_id not in set(asked)]
+    if missing or extra:
+        raise RuntimeError(
+            "le service a repondu sur un lot different de celui demande : "
+            "%d ligne(s) sans reponse, %d reponse(s) non demandee(s). Rien "
+            "n'est ecrit : fd_scores porterait un lot partiel sans que rien "
+            "ne le dise." % (len(missing), len(extra)))
+
+    threshold = float(body["threshold"])
+    return [{"txn_id": txn_id,
+             "score": round(float(decided[txn_id]["score"]), SCORE_SCALE),
+             "threshold": threshold,
+             "model_version": str(body["model_version"]),
+             "recipe_digest": str(body["recipe_digest"]),
+             "flagged": bool(decided[txn_id]["flagged"])}
+            for txn_id in asked]
+
+
 def forget() -> None:
     """Drop the cached model. For the tests, and for a deliberate reload."""
     _CACHE.clear()

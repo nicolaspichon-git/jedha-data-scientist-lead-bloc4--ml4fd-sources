@@ -386,3 +386,109 @@ def test_the_query_and_its_caller_agree_on_every_parameter():
     body = caller[caller.index("def fetch_rows"):caller.index("def build(")]
     passed = set(re.findall(r'"(\w+)":', body))
     assert expected == passed, (expected ^ passed)
+
+
+# --- the acceptance of S2 against the rule that builds the set ---------------
+# Added 21/11/2026. Three criteria of s2_acceptance.sql failed on the first
+# dataset built with the stream admitted, and not one was a defect of the data:
+# the file still held the rule of before L4. Nothing had tied the two together,
+# so the recomputation and the build drifted apart in silence for a day.
+
+S2 = (ROOT / "sql" / "checks" / "s2_acceptance.sql").read_text(encoding="utf-8")
+GOVERNANCE = (ROOT / "governance.yml").read_text(encoding="utf-8")
+TRAINING_SET = (ROOT / "sql" / "datasets" / "training_set.sql").read_text(
+    encoding="utf-8")
+
+
+def _sql(text):
+    """The code, comments stripped: every assertion below is about the query
+    and a comment quoting a rule is not the rule."""
+    return "\n".join(line.split("--")[0] for line in text.splitlines())
+
+
+def test_the_acceptance_tells_the_sources_apart_by_source():
+    """training_set.sql states it: telling the two apart by txn_ts works today
+    and breaks the day a corpus is replayed with recent timestamps. A
+    recomputation that splits by date cannot check a build that splits by
+    source."""
+    code = _sql(S2)
+    assert "fd_raw_events" in code
+    assert "'current-transactions'" in code
+    assert "from_stream" in code
+
+
+def test_the_stream_is_recomputed_on_the_train_side_only():
+    """The gate of L3 compares a candidate to the champion on ONE test set. A
+    recomputation that put stream rows on the test side is what read 74,343
+    against 47,624 registered."""
+    code = _sql(S2)
+    # Sliced BETWEEN the two markers, not by a window of characters: a window
+    # wide enough to hold the stream filter also held the corpus one, and the
+    # first version of this test failed on the corpus's train_end.
+    stream = code[code.index("AS corpus_test"):code.index("AS stream_train")]
+    assert "train_end" not in stream, "le flux ne doit pas etre decoupe par date"
+    assert "r.from_stream" in stream and "cut_off" in stream
+    assert "corpus_test" in code and "corpus_train" in code
+
+
+def test_the_horizon_bounds_the_corpus_and_not_the_stream():
+    """The horizon is the corpus's and not the system's, which is what
+    assert_cut_off_usable stopped confusing on 20/11. The literal must bound
+    the historical side only."""
+    code = _sql(S2)
+    bounded = [block for block in code.split("count(*) FILTER")
+               if "label_ts <= '20" in block]
+    assert len(bounded) == 2, "l'horizon doit borner les deux cotes du corpus"
+    for block in bounded:
+        assert "NOT r.from_stream" in block
+
+
+def test_the_horizon_literal_is_the_one_in_force():
+    """Two horizons have existed: fraudTest.csv's, 2020-12-22, and the current
+    corpus's. The literal here was the abandoned one for months, which is the
+    cost of a deliberate duplication nobody revisits at a corpus swap."""
+    horizon = re.search(r"labels:.*?horizon:\s*(\S+)", GOVERNANCE, re.S)
+    assert horizon, "labels.horizon absent de governance.yml"
+    day = horizon.group(1)[:10]
+    assert day in S2, "s2_acceptance ne porte pas l'horizon en vigueur (%s)" % day
+    assert "2020-12-22" not in S2
+
+
+def test_the_train_side_is_bounded_and_not_equal():
+    """fd_datasets records no breakdown of n_train, and the set of rows whose
+    verdict is attributable to a cut-off GROWS after a build: the verdict row is
+    written by a daily DAG while its label_ts is the instant the verdict fell
+    due. Demanding equality would demand that no verdict has been recorded
+    since, which nothing guarantees."""
+    code = _sql(S2)
+    assert "n_train >= (SELECT corpus_train" in code.replace("l.", "")
+    assert "n_train <= (SELECT corpus_train + stream_train" in code.replace("l.", "")
+
+
+def test_the_test_side_stays_an_equality():
+    """Pure corpus and frozen since S1: nothing can make it move, so a bound
+    there would hide a loss."""
+    code = _sql(S2)
+    assert "corpus_test::text" in code
+
+
+def test_the_cut_off_criterion_is_asked_of_the_data():
+    """The rule is not "the cut-off is within the horizon" but "a cut-off beyond
+    the horizon is admissible BECAUSE the stream is labelled as it goes". Asked
+    of the set, it also catches the failure of 20/11 that no setting showed: a
+    present-day cut-off on a dataset holding not one stream row -- the
+    retraining that refitted the very same Parquet files."""
+    code = _sql(S2)
+    criterion = code[code.index("SELECT 3,"):code.index("SELECT 4,")]
+    assert "stream_train" in criterion
+    assert "cut_off <=" in criterion
+
+
+def test_the_build_still_sends_every_stream_row_to_train():
+    """The assertion that makes the five above worth anything: if
+    training_set.sql ever splits the stream by date, the acceptance must be
+    changed with it rather than quietly checking the wrong rule."""
+    code = _sql(TRAINING_SET)
+    rule = code[:code.index("AS split")]
+    assert "THEN 'train'" in rule
+    assert rule.index("stream_batches") < rule.index("THEN 'train'")

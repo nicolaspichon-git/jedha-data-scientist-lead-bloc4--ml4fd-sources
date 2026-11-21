@@ -331,6 +331,78 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
 
+  # ---------------------------------------------------------------- L5
+  # THE SCORING SERVICE, decoupled from the pipeline. It answers about payments
+  # the pipeline has never seen, which is why it writes fd_scoring_service_calls and not
+  # fd_scores -- see sql/ddl/190_scoring_service_calls.sql.
+  scoring-service:
+    build: ./scoring_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: "5000"
+      POSTGRES_HOST: postgres
+      # ITS OWN CREDENTIALS, never the owner's. 145_scoring_service_role.sql argues it: the
+      # two containers a network talks to must not be one SET ROLE away from
+      # the owner's privileges.
+      POSTGRES_USER: fd_scoring_service
+      POSTGRES_PASSWORD: ${FD_SCORING_SERVICE_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # THE PEPPER, which the dashboard deliberately does not receive. This
+      # service must compute the SAME pseudonym as the ingestion path, or a
+      # call and a transaction of one cardholder would stop joining -- so it
+      # needs the secret the HMAC is keyed on. It never writes it down.
+      ML4FD_PEPPER: ${ML4FD_PEPPER}
+      # The champion is resolved through the registry, like every other reader.
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+    volumes:
+      # MOUNTED, never copied: ml4fd.serve, ml4fd.score and the feature query
+      # are the scoring path itself, and a copy in the image would be a second
+      # version of it.
+      - ./ml4fd:/opt/project/ml4fd:ro
+      - ./sql:/opt/project/sql:ro
+      - ./governance.yml:/opt/project/governance.yml:ro
+      # THE MANIFESTS, AND NOT THE MODEL. Found missing on the first /health,
+      # 2026-11-20 22:38: the service resolved the champion in MLflow, read its
+      # dataset_version, and could not open run.json -- "Recipes present:
+      # aucune", because nothing of runtime/ was mounted here.
+      #
+      # score.load() loads the MODEL from the registry
+      # (mlflow.sklearn.load_model("models:/...")) and reads only the manifest
+      # from disk: the feature list, the threshold, and the digest it
+      # cross-checks against the run's logged parameters. That split is
+      # deliberate -- M8 wants the chain from a model back to its rows to
+      # survive a tracking server that is down, moved or wiped -- so the
+      # manifest lives beside the dataset and not only in MLflow.
+      #
+      # THE WHOLE DIRECTORY, because the manifests sit one per recipe folder
+      # beside the Parquet. What that grants is read access to the training
+      # splits, which carry datasets.STORED_COLUMNS and nothing else: txn_id,
+      # txn_ts, the features, the label. No client_key, no card number, no
+      # location -- the splits hold no identity by construction, and this
+      # service already reads three columns of fd_transactions, which is the
+      # stronger grant. Read-only: it opens a manifest, it never writes one.
+      - ./runtime/datasets:/opt/project/runtime/datasets:ro
+    # THIS MACHINE ONLY, like the dashboard. The service is reachable from the
+    # compose network as scoring-service:5000; a browser reaches it on 5001 to keep 5000
+    # free on the host, where it is taken on macOS and often elsewhere.
+    ports:
+      - "127.0.0.1:5001:5000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # /health answers while no champion carries the alias -- degraded, not
+      # down -- so the check asks for a reachable endpoint and not for a model.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   pgdata:
   mlruns:

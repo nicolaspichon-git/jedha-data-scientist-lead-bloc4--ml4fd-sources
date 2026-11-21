@@ -122,12 +122,27 @@ def main(argv=None) -> int:
         # reported and the cycle continues.
         n_scored = 0
         try:
+            # THIS TOOL KEEPS LOADING THE MODEL ITSELF, and that is a
+            # decision rather than a leftover. Since L5 (20/11/2026)
+            # dag_ingest asks the scoring service instead, so exactly one
+            # process serves a model -- except this one, on purpose: when the
+            # DAG goes red, the question is "is the pipeline broken, or the
+            # service?", and a diagnostic that goes through the service cannot
+            # answer it. This path is the control group.
+            #
+            # SAID AT RUN TIME, just below, because the danger is the opposite
+            # mistake: running this, seeing it work, and concluding the service
+            # works. It does not exercise the service at all.
+            #
             # From the environment, as dag_train reads it: the URI
             # is infrastructure, so it lives in docker-compose.yml and
             # not in governance.yml, which holds decisions.
             scorer = score.load(
                 settings,
                 tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"))
+            log.info("scoring en direct, sans passer par %s : ce chemin est "
+                     "le temoin, il ne prouve rien sur le service",
+                     settings.scoring_endpoint)
             frame = score.rows_to_score(conn, batch_id)
             if len(frame):
                 rows = score.as_rows(frame, scorer.scores(frame), scorer)

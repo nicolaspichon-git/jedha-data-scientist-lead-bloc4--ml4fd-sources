@@ -283,7 +283,7 @@ def test_a_missing_reference_degrades_and_does_not_remove_the_section():
     """A morning report that refuses to exist because a comparison is missing
     has failed at its one job."""
     text = report.render(_data(reference=None), _settings())
-    assert "R\u00e9f\u00e9rence de M5 : **indisponible**" in text
+    assert "R\u00e9f\u00e9rence : **indisponible**" in text
     assert "Fraudes retrouv\u00e9es par le mod\u00e8le" in text
 
 

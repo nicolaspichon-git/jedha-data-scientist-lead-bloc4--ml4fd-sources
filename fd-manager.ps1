@@ -41,7 +41,7 @@ param(
                  'promote',
                  'monitor',
                  'drift',
-                 'replay', 'forget', 'dashboard',
+                 'replay', 'forget', 'dashboard', 'scoring-service',
                  'tasklog', 'dag-test', 'accept', 'test', 'lint', 'traceability',
                  'typology',
                  'check')]
@@ -50,7 +50,8 @@ param(
     [string]$Batch,
 
     [ValidateSet('postgres', 'airflow-init', 'airflow-scheduler',
-                 'airflow-webserver', 'mlflow', 'dashboard', 'producer')]
+                 'airflow-webserver', 'mlflow', 'dashboard', 'producer',
+                 'scoring-service')]
     [string]$Service,
 
     [string]$TaskId = 'preflight',
@@ -355,6 +356,7 @@ switch ($Task) {
             @{ n = 'replay';       d = 'replay a batch: .\fd-manager.ps1 replay -Batch <uuid>' }
             @{ n = 'forget';       d = 'forget a failed batch: forget -Batch <uuid> [-Apply]' }
             @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8501) [-Stop]' }
+            @{ n = 'scoring-service'; d = 'start the scoring service (http://localhost:5001/docs) [-Stop]' }
             @{ n = 'tasklog';      d = 'show the last log: .\fd-manager.ps1 tasklog -TaskId backfill_features' }
             @{ n = 'dag-test';     d = 'run one task live: .\fd-manager.ps1 dag-test -TaskId preflight' }
             @{ n = 'test';         d = 'unit tests, with no database and no Airflow' }
@@ -432,7 +434,17 @@ switch ($Task) {
         # L1 lacks it, and a replace-only loop would leave the value empty,
         # which Assert-Env then refuses at `up` for no reason anybody would
         # guess.
-        foreach ($name in @('AIRFLOW_DB_PASSWORD', 'MLFLOW_DB_PASSWORD')) {
+        # THE COMMENT FOLLOWS THE ROLE, since 2026-11-20. The loop wrote
+        # "owner of a service database" above every line it added, which was
+        # true of the two it had and false of FD_SCORING_SERVICE_PASSWORD -- a secret
+        # whose own .env line would have described someone else.
+        $secrets = @(
+            @{ n = 'AIRFLOW_DB_PASSWORD'; c = 'Password of the owner of a service database (L1).' }
+            @{ n = 'MLFLOW_DB_PASSWORD';  c = 'Password of the owner of a service database (L1).' }
+            @{ n = 'FD_SCORING_SERVICE_PASSWORD';     c = 'Password of fd_scoring_service, the role the scoring service logs in as (L5).' }
+        )
+        foreach ($secret in $secrets) {
+            $name = $secret.n
             $lines = @(Get-Content '.env')
             if ($lines -match ('^' + $name + '=.+')) {
                 Write-Host "  $name deja renseigne, laisse intact" -ForegroundColor Yellow
@@ -446,7 +458,7 @@ switch ($Task) {
             }
             else {
                 $lines += ''
-                $lines += '# Password of the owner of a service database (L1).'
+                $lines += ('# ' + $secret.c)
                 $lines += "$name=$v"
             }
             [System.IO.File]::WriteAllLines(
@@ -549,7 +561,7 @@ switch ($Task) {
         # airflow-init is absent from this list: it migrates the schema and
         # then exits. Seeing it as "Exited (0)" is the expected behaviour.
         $expected = @('postgres', 'airflow-scheduler', 'airflow-webserver',
-                      'mlflow', 'producer', 'dashboard')
+                      'mlflow', 'producer', 'dashboard', 'scoring-service')
         $up = 0
         foreach ($svc in $expected) {
             $id = @(& docker compose ps -q $svc) -join ''
@@ -1488,6 +1500,15 @@ LIMIT  14;
 
     'init' {
         Assert-Env; Assert-Docker
+        # BEFORE THE DDL, and the order is the point. L5 renamed fd_api_calls
+        # to fd_scoring_service_calls; the DDL is replayable through
+        # CREATE TABLE IF NOT EXISTS, so on a database where init had already
+        # run it would create an EMPTY table under the new name and leave the
+        # recorded calls in the old one. Renaming first makes the DDL a no-op.
+        # Idempotent: it says so and does nothing when there is nothing to do.
+        Invoke-Step 'renommage des objets du service de scoring' {
+            & docker @Psql -f '/work/sql/maintenance/060_rename_scoring_service_objects.sql'
+        }
         foreach ($f in Get-ChildItem 'sql/ddl/*.sql' | Sort-Object Name) {
             $name = $f.Name          # captured: $_ does not exist in the block
             Invoke-Step "DDL $name" {
@@ -1516,6 +1537,22 @@ LIMIT  14;
         }
         else {
             Write-Host "--- fd_dashboard : pas de FD_DASHBOARD_PASSWORD dans .env, le role ne peut pas se connecter" -ForegroundColor Yellow
+            Write-Host "    Le generer :  .\fd-manager.ps1 setup   puis   .\fd-manager.ps1 init" -ForegroundColor Yellow
+        }
+        # The scoring service's password, same treatment and same reasons
+        # (sql/roles/scoring_service_password.sql, 185_scoring_service_role.sql).
+        if ($env:FD_SCORING_SERVICE_PASSWORD) {
+            if ($env:FD_SCORING_SERVICE_PASSWORD -notmatch '^[0-9a-f]{64}$') {
+                Write-Host "FD_SCORING_SERVICE_PASSWORD n'a pas la forme attendue (64 caracteres hexadecimaux)." -ForegroundColor Red
+                Write-Host "Videz la ligne dans .env puis relancez :  .\fd-manager.ps1 setup" -ForegroundColor Yellow
+                exit 1
+            }
+            Invoke-Step 'mot de passe de fd_scoring_service' {
+                & docker @Psql -v "scoring_service_password=$($env:FD_SCORING_SERVICE_PASSWORD)" -f '/work/sql/roles/scoring_service_password.sql'
+            }
+        }
+        else {
+            Write-Host "--- fd_scoring_service : pas de FD_SCORING_SERVICE_PASSWORD dans .env, le role ne peut pas se connecter" -ForegroundColor Yellow
             Write-Host "    Le generer :  .\fd-manager.ps1 setup   puis   .\fd-manager.ps1 init" -ForegroundColor Yellow
         }
         Write-Host "`nDDL applique. Le relancer ne doit produire aucune erreur.`n" -ForegroundColor Green
@@ -1561,6 +1598,51 @@ LIMIT  14;
         Write-Host "Tableau de bord : http://localhost:8501" -ForegroundColor Cyan
         Write-Host "  connecte en fd_dashboard : lecture de fd_reports, fd_frauds, fd_transactions et quelques autres, rien de plus"
         Write-Host "  journaux :  .\fd-manager.ps1 logs -Service dashboard"
+        Write-Host ""
+    }
+
+    'scoring-service' {
+        Assert-Env; Assert-Docker
+        if ($Stop) {
+            Invoke-Step 'arret du service de scoring' { & docker compose stop scoring-service }
+            return
+        }
+        # WITHOUT ITS PASSWORD the service starts and every call fails on the
+        # database. Said here, before building, rather than found in a log.
+        if (-not $env:FD_SCORING_SERVICE_PASSWORD) {
+            Write-Host ""
+            Write-Host "FD_SCORING_SERVICE_PASSWORD est vide dans .env : fd_scoring_service ne peut pas se connecter." -ForegroundColor Red
+            Write-Host "  .\fd-manager.ps1 setup   puis   .\fd-manager.ps1 init" -ForegroundColor Yellow
+            Write-Host ""
+            exit 1
+        }
+        # AND WITHOUT THE PEPPER the pseudonyms would differ from the
+        # pipeline's, so a call and a transaction of one cardholder would stop
+        # joining -- a defect no error would announce.
+        if (-not $env:ML4FD_PEPPER) {
+            Write-Host ""
+            Write-Host "ML4FD_PEPPER est vide dans .env : les pseudonymes du service" -ForegroundColor Red
+            Write-Host "ne correspondraient pas a ceux de l'ingestion." -ForegroundColor Red
+            Write-Host "  .\fd-manager.ps1 pepper" -ForegroundColor Yellow
+            Write-Host ""
+            exit 1
+        }
+        $env:BUILDKIT_PROGRESS = 'plain'
+        # --force-recreate, for the reason the dashboard's block states at
+        # length: the code is mounted, but a running container keeps the
+        # ml4fd modules it imported at start-up.
+        Invoke-Step 'docker compose up --build --force-recreate scoring-service' {
+            & docker compose up -d --build --force-recreate scoring-service
+        }
+        Write-Host ""
+        Write-Host "Service de scoring : http://localhost:5001" -ForegroundColor Cyan
+        Write-Host "  contrat    : http://localhost:5001/openapi.json"
+        Write-Host "  doc lisible: http://localhost:5001/docs"
+        Write-Host "  etat       : http://localhost:5001/health   (dit la version servie)"
+        Write-Host "  (scoring-service:5000 depuis les conteneurs)" -ForegroundColor DarkGray
+        Write-Host "  connecte en fd_scoring_service : trois colonnes de fd_transactions en lecture," -ForegroundColor DarkGray
+        Write-Host "  fd_scoring_service_calls en ajout seul, rien de plus" -ForegroundColor DarkGray
+        Write-Host "  journaux :  .\fd-manager.ps1 logs -Service scoring-service"
         Write-Host ""
     }
 
@@ -1773,6 +1855,15 @@ LIMIT  14;
         & python tools/check_s6.py
 
         Write-Host ""
+        Write-Host "=== L5 : le service de scoring, lu dans le catalogue"
+        & docker @Psql -f '/work/sql/checks/l5_acceptance.sql'
+
+        Write-Host ""
+        Write-Host "=== L5 : le service de scoring, tel qu'il repond"
+        # On the HOST too: it calls the service on 127.0.0.1:5001.
+        & python tools/check_l5.py
+
+        Write-Host ""
         Write-Host "=== Les fichiers Parquet sur le disque"
         if (Test-Path 'datasets') {
             Get-ChildItem -Path 'datasets' -Recurse -Filter '*.parquet' |
@@ -1828,6 +1919,14 @@ LIMIT  14;
         }
         Invoke-Step 'conteneur du tableau de bord (S6)' {
             & python tools/check_s6.py
+        }
+        Invoke-Step 'criteres d''acceptation de L5' {
+            & docker @Psql -f '/work/sql/checks/l5_acceptance.sql'
+        }
+        Invoke-Step 'service de scoring reel (L5)' {
+            # On the HOST, like check_s6: there is no Docker inside a container,
+            # and the service answers on 127.0.0.1:5001 here.
+            & python tools/check_l5.py
         }
         Invoke-Step 'absence de fuite du verdict' {
             & docker compose exec -T airflow-scheduler `
