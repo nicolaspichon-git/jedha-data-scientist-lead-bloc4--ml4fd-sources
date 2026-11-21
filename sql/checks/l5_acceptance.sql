@@ -186,16 +186,38 @@ criteria AS (
                          AND a.attname IN ('model_version', 'recipe_digest'))
            END
     UNION ALL
-    SELECT 19, 'info appels tiers enregistres', 'mesure',
+    -- THE VIEW IS THE ONLY WAY IN, and this is asked of the catalogue because
+    -- a file test would only say what the DDL writes. A view runs with its
+    -- OWNER's privileges unless security_invoker says otherwise, so a reader
+    -- needs nothing on the two journals -- and holding one anyway walks around
+    -- the narrowing the view performs: it exposes the nine columns of a
+    -- decision, while fd_scoring_service_calls also holds client_key,
+    -- merchant, category, amt and the three history features.
+    --
+    -- Measured 21/11/2026: both grants were there, and s6_acceptance.sql is
+    -- what refused them.
+    SELECT 19, 'L5 aucun lecteur ne tient le journal des appels en direct', 'aucun',
+           CASE WHEN to_regclass('public.fd_scoring_service_calls') IS NULL
+                THEN 'indecidable'
+                ELSE coalesce((SELECT string_agg(r, ', ' ORDER BY r)
+                                 FROM (SELECT unnest(ARRAY['fd_report',
+                                                           'fd_dashboard']) AS r) x
+                                WHERE has_any_column_privilege(
+                                          x.r, 'fd_scoring_service_calls',
+                                          'SELECT')),
+                              'aucun')
+           END
+    UNION ALL
+    SELECT 20, 'info appels tiers enregistres', 'mesure',
            coalesce((SELECT count(*)::text FROM fd_scoring_service_calls), '0')
     UNION ALL
-    SELECT 20, 'info decisions vues comme un seul journal', 'mesure',
+    SELECT 21, 'info decisions vues comme un seul journal', 'mesure',
            coalesce((SELECT string_agg(source || ' ' || n, ', ' ORDER BY source)
                        FROM (SELECT source, count(*)::text AS n
                                FROM fd_scoring_decisions GROUP BY source) s),
                     'aucune')
     UNION ALL
-    SELECT 21, 'info versions de modele presentes dans le journal des appels', 'mesure',
+    SELECT 22, 'info versions de modele presentes dans le journal des appels', 'mesure',
            coalesce((SELECT string_agg(DISTINCT model_version, ', ')
                        FROM fd_scoring_service_calls), 'aucune')
 )

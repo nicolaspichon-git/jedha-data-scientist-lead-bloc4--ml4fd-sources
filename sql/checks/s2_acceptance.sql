@@ -82,31 +82,46 @@ stream_batches AS (
 -- BY SOURCE AND NEVER BY A DATE, for the reason training_set.sql gives: telling
 -- the two apart by txn_ts works today and breaks the day a corpus is replayed
 -- with recent timestamps.
+--
+-- THE WHERE IS training_set.sql's WHERE, clause for clause, and that is the
+-- point: the recomputation must restrict the same rows the build restricted.
+--
+-- A LEFT JOIN AND NOT AN EXISTS, measured. Two earlier versions of this CTE
+-- cost more than the whole check: the first carried no predicate at all and
+-- materialised the 1.3 M x 1.2 M join before discarding anything; the second
+-- pushed the predicates into the join and was no better, because label_ts <=
+-- cut_off with a 2026 cut-off discards nothing from a corpus labelled in 2020.
+-- The cost was never the join -- that is 460 ms -- it was the EXISTS, evaluated
+-- once per row and TWICE per row here, since the CASE below needs it too:
+-- over 100 seconds against 688 ms for the join below. One hash build of 748
+-- batch identifiers, one probe per row, and from_stream falls out of the same
+-- join instead of being asked for a second time.
 labelled AS (
     SELECT t.txn_ts,
            g.label_ts,
-           EXISTS (SELECT 1 FROM stream_batches b WHERE b.batch_id = t.batch_id)
-               AS from_stream
-    FROM   fd_transactions t
+           (b.batch_id IS NOT NULL) AS from_stream
+    FROM   latest l
+    JOIN   fd_transactions t ON true
     JOIN   fd_ground_truth g ON g.txn_id = t.txn_id
+    LEFT   JOIN stream_batches b ON b.batch_id = t.batch_id
+    WHERE  g.label_ts <= l.cut_off
+      -- The stream is labelled as it goes, so the cut-off above is the only
+      -- bound it needs. The corpus is trustworthy only up to the horizon, and
+      -- the recipe's own test_end bounds it besides.
+      AND  (b.batch_id IS NOT NULL
+            OR (t.txn_ts < l.test_end
+                AND g.label_ts <= '2020-06-21 03:59:46+00'::timestamptz))
 ),
 known AS (
     SELECT
       count(*) FILTER (WHERE NOT r.from_stream
-                         AND r.label_ts <= l.cut_off
-                         AND r.label_ts <= '2020-06-21 03:59:46+00'::timestamptz
-                         AND r.txn_ts  <  l.test_end
-                         AND r.txn_ts  <  l.train_end)   AS corpus_train,
+                         AND r.txn_ts <  l.train_end)   AS corpus_train,
       count(*) FILTER (WHERE NOT r.from_stream
-                         AND r.label_ts <= l.cut_off
-                         AND r.label_ts <= '2020-06-21 03:59:46+00'::timestamptz
-                         AND r.txn_ts  <  l.test_end
-                         AND r.txn_ts  >= l.train_end)   AS corpus_test,
+                         AND r.txn_ts >= l.train_end)   AS corpus_test,
       -- All to train, never to test: the gate of L3 compares a candidate to the
       -- champion on ONE test set, and a test set that moved with every
       -- retraining would make the published figures incomparable.
-      count(*) FILTER (WHERE r.from_stream
-                         AND r.label_ts <= l.cut_off)     AS stream_train
+      count(*) FILTER (WHERE r.from_stream)              AS stream_train
     FROM   latest l, labelled r
 ),
 criteria AS (

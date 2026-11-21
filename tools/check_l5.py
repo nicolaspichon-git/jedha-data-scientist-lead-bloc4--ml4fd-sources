@@ -51,6 +51,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import urllib.error
@@ -81,7 +82,13 @@ PAYMENT = {"cc_num": OUTSIDE_THE_CORPUS,
            "home_lat": "48.8566", "home_long": "2.3522"}
 # Three fields wrong at once, on purpose: a service that stops at the first one
 # makes a caller discover its contract one round trip at a time.
-MALFORMED = dict(PAYMENT, amt="quarante", merch_lat="", txn_ts="2026-11-21")
+#
+# PRESENT AND INVALID, NOT EMPTY. An empty field trips serve.missing(), which
+# short-circuits and returns ONE sentence listing the empty fields -- so
+# merch_lat="" produced a single problem where this asks for three. Measured on
+# the real service, 21/11: 0 of 3.
+MALFORMED = dict(PAYMENT, amt="quarante", merch_lat="quatre-vingts",
+                 txn_ts="2026-11-21")
 
 
 def docker(args: list[str]) -> str:
@@ -148,12 +155,41 @@ def alias_version(get) -> str:
 
 
 def fields_named(body) -> set:
-    """The field names a 422 names. FastAPI puts them in detail[].loc."""
+    """The field names a 422 names, in whichever of the two shapes it arrives.
+
+    THE SERVICE HAS TWO 422 PATHS AND THEY DO NOT LOOK ALIKE. pydantic refuses
+    a body whose SHAPE is wrong, and FastAPI reports that as detail[].loc.
+    serve.problems refuses VALUES pydantic accepted -- every field of Payment
+    is declared str, so "quarante" is a valid amt as far as the schema goes --
+    and it returns detail as a LIST OF SENTENCES, each opening with the field
+    it is about, because EC20 asks for an error a caller can read.
+
+    This file read the first shape only. Against the real service it therefore
+    found no field at all and the criterion read 0 of 3 on 21/11. Worse, the
+    fixture in tests/test_check_l5.py carried the same assumption, so
+    thirty-five tests passed while the service answered otherwise: a test whose
+    data I invented tested my idea of the contract and not the contract.
+
+    A NAME COUNTS ONLY IF IT IS A FIELD OF THE PAYLOAD, which also reads the
+    "champ(s) absent(s) ou vide(s) : a, b" sentence without a rule of its own.
+    """
+    if not isinstance(body, dict):
+        return set()
+    detail = body.get("detail")
+    if isinstance(detail, (str, dict)):
+        detail = [detail]
+    if not isinstance(detail, list):
+        return set()
     found = set()
-    for item in (body or {}).get("detail", []) if isinstance(body, dict) else []:
-        for part in (item or {}).get("loc", []):
-            if isinstance(part, str) and part != "body":
-                found.add(part)
+    for item in detail:
+        if isinstance(item, dict):
+            words = {part for part in (item.get("loc") or [])
+                     if isinstance(part, str)}
+        elif isinstance(item, str):
+            words = set(re.findall(r"[a-z_]+", item))
+        else:
+            words = set()
+        found |= words & set(PAYMENT)
     return found
 
 
@@ -224,10 +260,11 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
            else "manque %s" % sorted(EXPECTED_ROUTES - paths))
 
     status, sante = get("%s/health" % BASE)
-    served = str((sante or {}).get("model_version", "aucune"))
+    if not isinstance(sante, dict):
+        sante = {}
+    served = str(sante.get("model_version", "aucune"))
     yield ("L5 etat de sante lu de cette machine", "ok",
-           (sante or {}).get("state", "injoignable")
-           if isinstance(sante, dict) else "injoignable")
+           sante.get("state", "injoignable"))
     yield ("L5 le point de sante annonce la version servie", "oui",
            "oui" if served not in ("aucune", "None") else "NON")
 
@@ -275,8 +312,7 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
                    found)
 
     # ---- /score/batch : the path dag_ingest takes
-    features = list((sante or {}).get("features") or []) \
-        if isinstance(sante, dict) else []
+    features = list(sante.get("features") or [])
     if features:
         rows = [{"txn_id": "check-l5-a",
                  "features": {name: 1 for name in features}},
@@ -332,8 +368,7 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
 
     yield ("info version annoncee par le service", "mesure", served)
     yield ("info seuil en service", "mesure",
-           str((sante or {}).get("threshold", "aucun"))
-           if isinstance(sante, dict) else "aucun")
+           str(sante.get("threshold", "aucun")))
 
 
 def main() -> int:
@@ -343,7 +378,13 @@ def main() -> int:
     try:
         rows = list(criteria())
     except Exception as problem:
-        print("  Docker ne repond pas : %s" % problem)
+        # NAMED FOR WHAT IT IS. This used to read "Docker ne repond pas"
+        # whatever had failed, and on 21/11 it hid a TypeError of this file's
+        # own making. A diagnosis printed by a check must not be invented by
+        # the check.
+        print("  echec du controle : %s : %s"
+              % (type(problem).__name__, problem))
+        print("  Si Docker est en cause, .\\fd-manager.ps1 status le dira.")
         return 1
     width = max(len(r[0]) for r in rows)
     failed = 0

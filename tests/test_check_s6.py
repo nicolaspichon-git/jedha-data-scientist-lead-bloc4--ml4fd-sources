@@ -41,16 +41,49 @@ def _code(text):
 
 def test_the_expected_tables_are_the_ones_r0_grants():
     """Two places name the readable tables; they must name the same ones --
-    whole tables and the table granted by column alike."""
-    ddl = _code((ROOT / "sql" / "ddl" / "140_dashboard_role.sql").read_text(
-        encoding="utf-8"))
-    whole = re.search(r"GRANT\s+SELECT\s+ON\s+(.+?)\s+TO\s+fd_dashboard", ddl,
-                      re.I | re.S).group(1)
-    by_column = re.findall(r"GRANT\s+SELECT\s*\([^)]*\)\s*ON\s+(\w+)", ddl, re.I)
+    whole tables and the table granted by column alike.
+
+    THE WHOLE DDL AND NOT 140 ALONE, since L4. This test read
+    140_dashboard_role.sql only, on the premise that a role's privileges are
+    declared where the role is. That premise broke the day a table created
+    LATER had to be granted: the DDL glob runs in name order, so a GRANT cannot
+    precede its table -- the trap 150_database_connect.sql paid for with a 500,
+    and the reason 190_scoring_service_calls.sql revokes fd_monitoring where
+    the table exists rather than where the role is declared. fd_monitoring
+    (170), fd_retrain_requests (180) and the view fd_scoring_decisions (195)
+    each grant at their own creation.
+
+    What the test still checks is the thing that matters: the two lists agree.
+    A grant added anywhere in the DDL must be admitted in s6_acceptance.sql --
+    which is how the grant on fd_scoring_service_calls was caught on
+    21/11/2026 and revoked rather than admitted.
+    """
+    granted, by_column = set(), set()
+    for path in sorted((ROOT / "sql" / "ddl").glob("*.sql")):
+        ddl = _code(path.read_text(encoding="utf-8"))
+        # [^;] AND NOT . -- a dot with DOTALL walks across "TO fd_report;"
+        # to reach the next fd_dashboard and captures both statements as one
+        # table name. 170, 180 and 195 grant to the two readers on consecutive
+        # lines, so this is not hypothetical: it is how this test first failed.
+        for whole in re.findall(
+                r"GRANT\s+SELECT\s+ON\s+([^;]+?)\s+TO\s+fd_dashboard",
+                ddl, re.I | re.S):
+            granted |= {name.strip() for name in whole.split(",")}
+        for one in re.findall(
+                r"GRANT\s+SELECT\s*\([^)]*\)\s*ON\s+(\w+)\s+TO\s+fd_dashboard",
+                ddl, re.I):
+            by_column.add(one)
+        # A grant revoked later is not a readable table: 190 grants nothing to
+        # the readers any more, but an older database still had to be told.
+        for revoked in re.findall(
+                r"REVOKE\s+SELECT\s+ON\s+(\w+)\s+FROM\s+fd_dashboard",
+                ddl, re.I):
+            granted.discard(revoked)
+            by_column.discard(revoked)
     expected = re.search(r"'R0 tables lisibles, colonnes comprises',\s*'([^']+)'",
                          SQL).group(1)
-    assert sorted({t.strip() for t in whole.split(",")} | set(by_column)) == \
-        [t.strip() for t in expected.split(",")]
+    assert sorted(granted | by_column) == \
+        [name.strip() for name in expected.split(",")]
 
 
 def test_the_quarantine_columns_expected_are_the_ones_granted():

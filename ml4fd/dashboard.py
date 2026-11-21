@@ -1046,3 +1046,130 @@ def monitoring_view(conn, settings, first: dt.date | None = None,
                      "modèle en est sorti : l'enregistrement suit le "
                      "déclenchement, donc une exécution qui a échoué ensuite "
                      "laisse une demande sans modèle derrière elle.")}
+
+
+# --- the decisions served, pipeline and third parties as one journal (L5) -----
+#
+# WHAT THIS ANSWERS AND NOTHING DID. 195_scoring_decisions.sql created
+# fd_scoring_decisions so the two journals could be read as one, and for a day
+# the view existed and no reader used it -- which is how a journal becomes
+# decoration. EC19 asks that every call and its answer be persisted; a journal
+# nobody can read is a claim nobody can check.
+#
+# THE VIEW AND NEVER THE TABLES. fd_dashboard holds no privilege on fd_scores
+# nor on fd_scoring_service_calls -- 190 revokes them, and the view runs with
+# its owner's privileges -- so this page cannot drift onto the tables by
+# accident, and the day the service becomes the only journal it needs no edit.
+
+DECISIONS_BY_SOURCE_SQL = "dashboard/decisions_by_source.sql"
+DECISIONS_THIRD_PARTY_SQL = "dashboard/decisions_third_party.sql"
+DECISIONS_LISTED = 200
+
+SOURCE_LABELS = {"pipeline": "Pipeline d'ingestion (/score/batch)", "tiers": "Requêtes tierces (/score)"}
+
+
+def decisions_view(conn, settings, first: dt.date | None = None,
+                   last: dt.date | None = None,
+                   now: dt.datetime | None = None) -> dict:
+    """Everything the decisions page shows, for days first..last."""
+    first = first or today(settings, now)
+    last = last or first
+    first, last, clipped = bounded(first, last)
+    period = period_label(first, last)
+    window = report.span_for(settings, first, last)
+    params = window.params()
+    by_source = report._rows(conn, DECISIONS_BY_SOURCE_SQL, params)
+    calls = report._rows(conn, DECISIONS_THIRD_PARTY_SQL, dict(params, listed=DECISIONS_LISTED))
+    notices: list[Notice] = []
+
+    if clipped:
+        notices.append(Notice(INFO,
+            "Période ramenée à %d jours, du %s au %s." % (
+                MAX_PERIOD_DAYS, report._day(first), report._day(last))))
+
+    counted = {row["source"]: row for row in by_source}
+    pipeline = counted.get("pipeline")
+    tiers = counted.get("tiers")
+    total = sum(int(row["decisions"]) for row in by_source)
+    flagged = sum(int(row["flagged"]) for row in by_source)
+
+    if not by_source:
+        notices.append(Notice(INFO,
+            "Aucune décision %s. Les deux journaux sont vides sur cette "
+            "période : ni le pipeline ni un tiers n'a demandé de score." % period))
+    elif tiers is None:
+        # NOT AN ERROR, and worth saying so: the service answers the pipeline
+        # on /score/batch whether or not anybody else calls it.
+        notices.append(Notice(INFO,
+            "Aucun appel tiers %s. Le service a pourtant servi le pipeline : "
+            "c'est le même modèle par le même alias, et les deux sources "
+            "n'écrivent pas dans le même journal." % period))
+    # THE ONE DIVERGENCE WORTH AN ALERT. Since the decoupling of L5 the
+    # pipeline's decisions ARE the service's answers, so a version served to a
+    # third party that the pipeline never recorded means the two paths did not
+    # see the same champion -- or that a promotion fell between them, which the
+    # promotion journal dates.
+    if pipeline and tiers and pipeline["version_list"] != tiers["version_list"]:
+        notices.append(Notice(WARNING,
+            "Versions de modèle différentes selon la source : "
+            "%s depuis le pipeline, %s depuis les tiers. "
+            "Les deux sources étant servis par le même service, "
+            "un écart de version peut venir d'une promotion survenue dans la "
+            "période que fd_promotions date." % (pipeline["version_list"], tiers["version_list"])))
+
+    figures = [
+        ("Décisions servies", report._count(total)),
+        ("Par le pipeline d'ingestion",
+         report._count(pipeline["decisions"]) if pipeline else "0"),
+        ("Par une requête tierce",
+         report._count(tiers["decisions"]) if tiers else "0"),
+        ("Signalées", report._count(flagged)),
+    ]
+    table = [{"Source": SOURCE_LABELS.get(row["source"], row["source"]),
+              "Décisions": report._count(row["decisions"]),
+              "Signalées": report._count(row["flagged"]),
+              "Première": _local(settings, row["first_at"]),
+              "Dernière": _local(settings, row["last_at"]),
+              "Versions servies": row["version_list"] or "--"}
+             for row in by_source]
+    listed = [{"Requêtes": row["call_id"],
+               "Décidé le": _local(settings, row["decided_at"]),
+               "Modèle": row["model_version"],
+               "Recette": _short(row["recipe_digest"]),
+               "Score": "%.4f" % float(row["score"]),
+               "Seuil": "%.2f" % float(row["threshold"]),
+               "Signalée": "oui" if row["flagged"] else "non"}
+              for row in calls]
+    # WHAT "SIGNALEE" MEANS, written here because a reader asked and the page
+    # did not say. Three notions are distinct in this project and the word
+    # names only the first: flagged is score >= threshold; an alert RAISED is a
+    # row in fd_frauds; a notification SENT is bounded by the declared
+    # capacity. The figures of the fraud alerts page differ from this one for
+    # that reason, and a reader comparing them deserves to know why.
+    flagged_note = (
+        "« Signalée » signifie simplement que le score supérieur ou égal au "
+        "seuil de décision : la fraudulosité de la transaction devra être établie "
+        "par des vérificateurs humains mais elle n'est pas comptée comme une "
+        "fraude établie. « Signalée » n'est pas « notifiée » : une alerte "
+        "levée attend sous le plafond de capacité déclaré, et la page des "
+        "alertes de fraude compte les notifications, pas les signalements.\n\n"
+        "La conséquence d'une signalisation différe selon la source de la "
+        "transaction : une décision signalée depuis le pipeline leve une "
+        "alerte (*fd_frauds*), puis la notifie sous plafond, une décision signalée depuis " 
+        "une requête tierce ne déclenche rien : le service répond et journalise, "
+        "il n'alerte pas (aucune écriture hors de son propre journal). "
+        "Le seuil est embarqué dans la réponse pour que l'appelant décide lui-même.")
+    return {"first": first, "last": last, "notices": notices,
+            "figures": figures, "table": table, "calls": listed,
+            "flagged_note": flagged_note,
+            "title": "Décisions %s" % period,
+            "note": ("Lu dans la vue *fd_scoring_decisions*, qui réunit les tables "
+                     "*fd_scores* et *fd_scoring_service_calls* : une décision est "
+                     "enregistrée une fois, par celui qui détient ce qui la "
+                     "rend re-dérivable. Le pipeline écrit *fd_scores* parce que "
+                     "sa clé étrangère garantit que la transaction existe ; un "
+                     "appel tiers porte sur un paiement que le pipeline n'a "
+                     "jamais vu, et cette clé le refuserait. Cette page ne "
+                     "montre aucun porteur, aucun commerçant et aucun "
+                     "montant : la vue ne les charge pas, et le rôle du "
+                     "tableau de bord n'a aucun droit sur les deux tables.")}

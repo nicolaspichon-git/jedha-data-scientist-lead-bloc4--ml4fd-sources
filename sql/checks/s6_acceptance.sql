@@ -90,8 +90,18 @@ criteria AS (
                         ELSE 'autre format' END
               FROM pg_authid a WHERE a.rolname = 'fd_dashboard')
     UNION ALL
+    -- THREE NAMES ADDED 21/11/2026, AND ONE REFUSED. L4 gave the surveillance
+    -- page fd_monitoring and fd_retrain_requests; L5 gave fd_scoring_decisions,
+    -- the view that reads the two decision journals as one. All three are read
+    -- by a page. The fourth that appeared, fd_scoring_service_calls, was a
+    -- grant nobody decided: the view already reads that table with its owner's
+    -- privileges, and the table carries the cardholder's pseudonym and the
+    -- history features the view deliberately leaves out. It is revoked in
+    -- 190_scoring_service_calls.sql rather than admitted here.
+    --
+    -- This list is a duplication, and this is the day it earned its keep.
     SELECT 5, 'R0 tables lisibles, colonnes comprises',
-           'fd_datasets, fd_frauds, fd_ground_truth, fd_ops_notifications, fd_ops_state, fd_pipeline_runs, fd_quarantine, fd_reports, fd_scores, fd_transactions',
+           'fd_datasets, fd_frauds, fd_ground_truth, fd_monitoring, fd_ops_notifications, fd_ops_state, fd_pipeline_runs, fd_quarantine, fd_reports, fd_retrain_requests, fd_scores, fd_scoring_decisions, fd_transactions',
            (SELECT coalesce(string_agg(relname, ', ' ORDER BY relname), 'aucune')
               FROM readable)
     UNION ALL

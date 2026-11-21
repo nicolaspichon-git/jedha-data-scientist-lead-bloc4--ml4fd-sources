@@ -147,9 +147,21 @@ DECISION = {"call_id": 1, "decision": "acceptee", "flagged": False,
             "texte": "Transaction acceptee sans signalement. Score de fraude "
                      "0.0043 pour un seuil de decision de 0.8600, et aucune "
                      "transaction anterieure pour ce porteur."}
-REFUSED = {"detail": [{"loc": ["body", "amt"], "msg": "x"},
-                      {"loc": ["body", "merch_lat"], "msg": "x"},
-                      {"loc": ["body", "txn_ts"], "msg": "x"}]}
+# THE SHAPE THE SERVICE REALLY ANSWERS, taken from serve.problems and not
+# imagined. The former fixture here carried FastAPI's detail[].loc, which is
+# what pydantic produces -- and every field of Payment is declared str, so
+# pydantic accepts "quarante" and never gets to complain. So the check parsed a
+# shape the service does not send, thirty-five tests passed on my assumption,
+# and the criterion read 0 of 3 against the real container on 21/11.
+REFUSED = {"detail": [
+    "amt : 'quarante' n'est pas un montant",
+    "merch_lat : 'quatre-vingts' n'est pas une coordonnee",
+    "txn_ts : '2026-11-21' n'est pas un horodatage ISO 8601 avec fuseau"]}
+# The other 422 path, which does exist: a body whose SHAPE is wrong never
+# reaches serve.problems, and FastAPI reports it its own way.
+REFUSED_BY_PYDANTIC = {"detail": [{"loc": ["body", "amt"], "msg": "x"},
+                                  {"loc": ["body", "merch_lat"], "msg": "x"},
+                                  {"loc": ["body", "txn_ts"], "msg": "x"}]}
 
 
 def answers(info, health=None, decision=None, batch=None, running=True,
@@ -476,3 +488,73 @@ def test_the_malformed_payload_breaks_three_fields_and_not_one():
     broken = {k for k, v in check_l5.MALFORMED.items()
               if check_l5.PAYMENT.get(k) != v}
     assert broken == {"amt", "merch_lat", "txn_ts"}
+
+def test_a_detail_that_is_a_sentence_does_not_crash_the_check(tmp_path):
+    """THE DEFECT OF 21/11. A 503 or a 500 answers {"detail": "une phrase"} --
+    a string, not a list. Iterating it yields characters, and a character has
+    no .get: the whole check died with "'str' object has no attribute 'get'",
+    and said Docker was unreachable. The 32 tests then in this file all passed,
+    because every one of them fed a well-formed 422."""
+    run, get = answers(inspect())
+    original = get
+
+    def sentence(url, body=None, timeout=20):
+        if url.endswith("/score") and (body or {}).get("amt") == "quarante":
+            return 503, {"detail": "aucun modele en service"}
+        return original(url, body, timeout)
+    rows = verdicts(run, sentence, tmp_path)
+    assert "L5 requete non conforme refusee" in rows
+    assert rows["L5 les trois champs en cause nommes d'un coup"][1] == "0"
+
+
+def test_a_health_that_is_not_an_object_does_not_crash_the_check(tmp_path):
+    """Same family: a proxy or an error page answers text where an object was
+    expected."""
+    run, get = answers(inspect(), health="service indisponible")
+    rows = verdicts(run, get, tmp_path)
+    assert rows["L5 etat de sante lu de cette machine"][1] == "injoignable"
+    assert "L5 le point de sante annonce la version servie" in failures(rows)
+
+
+def test_the_catch_all_does_not_blame_docker_for_anything(monkeypatch, capsys):
+    """A diagnosis printed by a check must not be invented by the check. The
+    former message named Docker whatever had failed, which is what sent me
+    looking at a container for a TypeError of my own."""
+    monkeypatch.setattr(check_l5, "criteria",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            TypeError("'str' object has no attribute 'get'")))
+    assert check_l5.main() == 1
+    printed = capsys.readouterr().out
+    assert "TypeError" in printed
+    assert "Docker ne repond pas" not in printed
+
+def test_both_shapes_of_the_422_are_read(tmp_path):
+    """pydantic's detail[].loc and serve.problems's sentences both name fields,
+    and the check must read either: a caller does not choose which one it gets.
+    """
+    run, get = answers(inspect())
+    original = get
+
+    def pydantic(url, body=None, timeout=20):
+        if url.endswith("/score") and (body or {}).get("amt") == "quarante":
+            return 422, REFUSED_BY_PYDANTIC
+        return original(url, body, timeout)
+    rows = verdicts(run, pydantic, tmp_path)
+    assert rows["L5 les trois champs en cause nommes d'un coup"][1] == "3"
+    assert failures(rows) == []
+
+
+def test_a_name_that_is_not_a_field_is_not_counted():
+    """The sentences are French prose; only a field of the payload counts."""
+    named = check_l5.fields_named(
+        {"detail": ["le montant est hors de l'intervalle accepte",
+                    "amt : 'quarante' n'est pas un montant"]})
+    assert named == {"amt"}
+
+
+def test_the_malformed_payload_leaves_no_field_empty():
+    """An empty field trips serve.missing(), which short-circuits and returns
+    ONE sentence for all of them -- so an empty merch_lat asked for three
+    problems and got one. That is how this criterion read 0 of 3."""
+    for name, value in check_l5.MALFORMED.items():
+        assert str(value).strip(), name

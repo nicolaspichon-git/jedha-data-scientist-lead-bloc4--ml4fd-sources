@@ -24,6 +24,7 @@ PAGES = {
         st.Page("pages/rejects.py", title="Rejets de validation", url_path="rejects"),
         st.Page("pages/monitoring.py", title="Surveillance du modèle", url_path="monitoring"),
         st.Page("pages/performances.py", title="Performances du modèle", url_path="performances"),
+        st.Page("pages/decisions.py", title="Décisions du service de scoring", url_path="decisions"),
     ],
 }
 

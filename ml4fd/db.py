@@ -16,11 +16,33 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
-
-import psycopg
+from typing import TYPE_CHECKING, Any, Iterator
 
 from ml4fd import config
+
+# THE DRIVER IS IMPORTED WHERE IT IS USED, which is the convention every other
+# module of ml4fd/ already follows: build.py, datasets.py and features.py all
+# annotate "psycopg.Connection" as a string so that importing them does not
+# require the driver. This module was the only exception, by accident rather
+# than by decision -- it needs psycopg in exactly two places at run time,
+# connect() and the UndefinedObject it catches there.
+#
+# WHAT IT BUYS, measured 2026-11-21: the test suite imports db for its SQL
+# loading and its constants and never opens a connection, so a machine where
+# libpq cannot load had the WHOLE suite refuse to collect -- Windows
+# application control blocked the DLL inside psycopg_binary, and sixty test
+# modules died on an import none of them needed. The suite now runs there.
+# ml4fd/config.py's own note on pinning the rule set applies here too: a
+# dependency that only some code needs should be imported by that code.
+if TYPE_CHECKING:  # pragma: no cover - annotations only
+    import psycopg
+
+# THE ANNOTATIONS ARE QUOTED, like build.py's and features.py's. Under
+# `from __future__ import annotations` they are never evaluated, so an unquoted
+# one would run fine -- but tests/test_module_scope.py reads the SYNTAX, and it
+# guards a defect worth guarding: a name imported inside one function and used
+# in another. Quoting says to that reader what the future import says to the
+# interpreter, rather than asking it to be less strict.
 
 SQL_DIRS = (Path("/opt/project/sql"), Path(__file__).resolve().parent.parent / "sql")
 
@@ -43,7 +65,7 @@ def sql_path(relative: str) -> Path:
 
 @contextmanager
 def connect(role: str = "fd_ingest", settings: config.Settings | None = None
-            ) -> Iterator[psycopg.Connection]:
+            ) -> Iterator["psycopg.Connection"]:
     """Open a connection, then switch to the requested role.
 
     fd_ingest and fd_report have no LOGIN attribute: we connect as POSTGRES_USER
@@ -51,6 +73,8 @@ def connect(role: str = "fd_ingest", settings: config.Settings | None = None
     so the revocation on fd_raw_events genuinely applies and the append-only
     property becomes verifiable at run time.
     """
+    import psycopg
+
     s = settings or config.load()
     with psycopg.connect(**s.pg_params()) as conn:
         if role:
@@ -97,21 +121,21 @@ def staging_table(cur, name: str, like: str) -> None:
     cur.execute("TRUNCATE %s" % name)
 
 
-def execute_file(conn: psycopg.Connection, relative: str, **params: Any) -> int:
+def execute_file(conn: "psycopg.Connection", relative: str, **params: Any) -> int:
     """Run a single-statement .sql file. Returns the number of rows affected."""
     with conn.cursor() as cur:
         cur.execute(sql_path(relative).read_text(encoding="utf-8"), params or None)
         return cur.rowcount
 
 
-def query_file(conn: psycopg.Connection, relative: str, **params: Any) -> list[tuple]:
+def query_file(conn: "psycopg.Connection", relative: str, **params: Any) -> list[tuple]:
     """Run a single-statement .sql file and return its rows."""
     with conn.cursor() as cur:
         cur.execute(sql_path(relative).read_text(encoding="utf-8"), params or None)
         return cur.fetchall()
 
 
-def query_file_columns(conn: psycopg.Connection, relative: str, **params: Any
+def query_file_columns(conn: "psycopg.Connection", relative: str, **params: Any
                        ) -> tuple[list[tuple], list[str]]:
     """Run a single-statement .sql file and return its rows AND column names.
 
@@ -133,7 +157,7 @@ def query_file_columns(conn: psycopg.Connection, relative: str, **params: Any
         return cur.fetchall(), names
 
 
-def table_counts(conn: psycopg.Connection) -> dict[str, int]:
+def table_counts(conn: "psycopg.Connection") -> dict[str, int]:
     """Row count of the five stores. Serves as a plumbing check."""
     out = {}
     with conn.cursor() as cur:
