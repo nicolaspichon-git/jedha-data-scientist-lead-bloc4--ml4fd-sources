@@ -269,6 +269,10 @@ function Assert-Env {
 function Assert-Docker {
     <#  The daemon is not answering: Docker Desktop is closed, or WSL2 is not
         ready.  #>
+    # 'Continue' in this function only: under 'Stop', the stderr of a daemon
+    # that does not answer would end the script with a stack trace before
+    # the message below (same cause as in 'status').
+    $ErrorActionPreference = 'Continue'
     $global:LASTEXITCODE = 0
     $null = & docker info 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -595,6 +599,10 @@ switch ($Task) {
                 Write-Host ""
             }
         }
+        if ($up -eq 0) {
+            Write-Host "Aucun service ne tourne. Pour lancer la pile :  .\fd-manager.ps1 up" -ForegroundColor Yellow
+            Write-Host ""
+        }
         if ($up -eq $expected.Count) {
             Write-Host "Les $($expected.Count) services tournent." -ForegroundColor Green
             Write-Host "(airflow-init apparait << Exited (0) >> : travail fini.)" -ForegroundColor DarkGray
@@ -627,12 +635,28 @@ switch ($Task) {
             @{ id = 'dag_daily';           note = 'daily 06:00, catches up missed days' }
             @{ id = 'dag_purge';           note = 'Sunday 04:00, the only one that deletes' }
         )
-        $listing = @(& docker compose exec -T airflow-scheduler `
-                        airflow dags list -o plain 2>&1)
-        if ($listing.Count -eq 0) {
-            Write-Host "  listing unavailable: the scheduler did not answer." -ForegroundColor Red
+        # ASKED ONLY OF A RUNNING SCHEDULER. Under $ErrorActionPreference =
+        # 'Stop', Windows PowerShell 5.1 turns a native command's stderr,
+        # once redirected with 2>&1, into a terminating error: "service is not
+        # running" stopped the whole task with a stack trace (2026-11-22).
+        # The call itself runs under 'Continue' for the same reason, and its
+        # lines are made plain strings so error records match like text.
+        $listing = @()
+        $scheduler = @(& docker compose ps -q airflow-scheduler) -join ''
+        if (-not $scheduler) {
+            Write-Host "  indisponible : airflow-scheduler ne tourne pas." -ForegroundColor Red
+            Write-Host ""
         }
         else {
+            $ErrorActionPreference = 'Continue'
+            $listing = @(& docker compose exec -T airflow-scheduler `
+                            airflow dags list -o plain 2>&1 | ForEach-Object { "$_" })
+            $ErrorActionPreference = 'Stop'
+            if ($listing.Count -eq 0) {
+                Write-Host "  indisponible : le scheduler n'a pas repondu." -ForegroundColor Red
+            }
+        }
+        if ($listing.Count -gt 0) {
             $paused = 0
             foreach ($d in $declared) {
                 $line = $listing |
@@ -1008,9 +1032,11 @@ switch ($Task) {
             airflow dags details $dagId
         Write-Host ""
         Write-Host "Dix dernieres executions :" -ForegroundColor Cyan
+        $ErrorActionPreference = 'Continue'     # stderr redirected: see 'status'
         & docker compose exec -T airflow-scheduler `
             airflow dags list-runs -d $dagId --no-backfill -o table 2>&1 |
-            Select-Object -First 14
+            ForEach-Object { "$_" } | Select-Object -First 14
+        $ErrorActionPreference = 'Stop'
         Write-Host ""
         Write-Host "Un DAG nouvellement cree est EN PAUSE : demarrez-le avec" -ForegroundColor DarkGray
         Write-Host "  .\fd-manager.ps1 realtime -Start" -ForegroundColor Cyan
@@ -1241,10 +1267,12 @@ LIMIT  10;
         # cuts the other way as well, and worse: the ingestion asks for up to
         # 10 of the 13 (5 calls, each retried once on a 429), so a campaign run
         # beside it can starve the very chain it is measuring.
+        $ErrorActionPreference = 'Continue'     # stderr redirected: see 'status'
         $ingest = @(& docker compose exec -T airflow-scheduler `
-                       airflow dags list -o plain 2>&1) |
+                       airflow dags list -o plain 2>&1 | ForEach-Object { "$_" }) |
                   Where-Object { $_ -match '^\s*dag_ingest\s' } |
                   Select-Object -First 1
+        $ErrorActionPreference = 'Stop'
         if ($ingest -and $ingest -match '\bFalse\b') {
             Write-Host "dag_ingest est actif, et il partage le limiteur du producer" -ForegroundColor Yellow
             Write-Host "avec cette campagne : meme conteneur, donc meme adresse." -ForegroundColor Yellow
@@ -1687,7 +1715,7 @@ LIMIT  14;
     # Block: B4.
     # Lot: B4-L6.
     # Competency: B4-C4.
-    # Covers: B4-EC27.
+    # Covers: B4-EC30.
     'rollback' {
         Assert-Env; Assert-Docker
         $journal = 'runtime\deployments\deployments.csv'

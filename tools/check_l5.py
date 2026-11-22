@@ -1,9 +1,9 @@
 """Acceptance criteria of B4-L5 that SQL cannot reach: the SERVICE, over HTTP.
 
 Block: B4.
-Lot: B4-L5.
-Competency: B4-C2, B4-C3, B4-C5.
-Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
+Lot: B4-L5, B4-L6.
+Competency: B4-C2, B4-C3, B4-C4, B4-C5.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21, B4-EC27.
 
 The criterion of B4-L5 has three clauses. sql/checks/l5_acceptance.sql holds the
 second one, because it is a question about rows and privileges. The other two
