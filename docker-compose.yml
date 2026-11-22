@@ -393,11 +393,16 @@ services:
       # several times with an exponential backoff by default: with mlflow down
       # (2026-11-22), /health hung while it waited, the healthcheck (4 s)
       # declared the container unhealthy, and the "degraded, not down" answer
-      # serve.health() is written to give never arrived. One retry half a
-      # second later, 5 s per request: an absent registry is reported in about
-      # a second, and a single blip is still absorbed.
+      # serve.health() is written to give never arrived. One retry about a
+      # second later, 5 s per request: an absent registry is reported in a
+      # second or two, and a single blip is still absorbed.
+      #
+      # INTEGERS, all three: MLflow types its own variables and converts them
+      # on first read. "0.5" here failed int() inside mlflow, every load of the
+      # champion with it, and the service answered degraded to every call
+      # (2026-11-22, the first deployment).
       MLFLOW_HTTP_REQUEST_MAX_RETRIES: "1"
-      MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR: "0.5"
+      MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR: "1"
       MLFLOW_HTTP_REQUEST_TIMEOUT: "5"
     volumes:
       # NO CODE IS MOUNTED, since L6: ml4fd/, sql/ and governance.yml are in the

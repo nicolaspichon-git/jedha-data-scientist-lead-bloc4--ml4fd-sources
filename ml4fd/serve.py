@@ -1,9 +1,4 @@
-"""B4-L5: the scoring service's own logic, kept out of the HTTP layer.
-
-Block: B4.
-Lot: B4-L5.
-Competency: B4-C2, B4-C3.
-Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
+"""The scoring service's own logic, kept out of the HTTP layer.
 
 WHY THIS MODULE EXISTS AND scoring_service/app.py IS THIN. The same arrangement the
 dashboard uses: everything a caller sees is decided here, where pytest can
@@ -21,6 +16,11 @@ WHAT IT NEVER KEEPS. The caller sends a card number and a home location. The
 number is turned into the same pseudonym ml4fd/transform.py writes
 (client_key), the location into a distance, and fd_scoring_service_calls has no column for
 either -- B4-EC17 enforced by the schema, not promised in a comment.
+\f
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C2, B4-C3.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
 """
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def problems(payload: dict, max_amount: float) -> list[str]:
     these sentences name the field, what was received and what is expected. The
     404 of a wrong route and the 422 of a wrong field are different answers and
     the caller must be able to tell them apart without reading our logs.
-
+    \f
     Block: B4.
     Lot: B4-L5.
     Competency: B4-C3.
@@ -141,7 +141,7 @@ def anonymous(payload: dict, pepper: str) -> dict:
     lets the two be compared at all. A second implementation here would be a
     second definition of the pseudonym, and the first mismatch would be
     invisible.
-
+    \f
     Block: B4.
     Lot: B4-L5.
     Competency: B4-C3, B4-C4.
@@ -279,7 +279,7 @@ def batch_answer(scorer: score.Scorer, rows: list) -> dict:
     THE SAME ROUNDING AS THE SINGLE CALL, through answer(): the score is
     rounded to the scale it will be stored at BEFORE the comparison, so the
     decision this returns and the CHECK on fd_scores cannot differ.
-
+    \f
     Block: B4.
     Lot: B4-L5.
     Competency: B4-C3.
@@ -315,7 +315,7 @@ def sentence(decision: dict, row: dict) -> str:
     THE FIGURES STAY IN THE RESPONSE BESIDE IT. The sentence is an addition,
     never a replacement: a caller that needs the number must not have to parse
     French to find it.
-
+    \f
     Block: B4.
     Lot: B4-L5.
     Competency: B4-C2.
@@ -377,7 +377,7 @@ def health(scorer: score.Scorer | None, problem: str | None = None,
     database may be reachable, and what is missing is a champion -- which is an
     ordinary state before the first promotion and a different problem from a
     process that has stopped.
-
+    \f
     Block: B4.
     Lot: B4-L5.
     Competency: B4-C3.
