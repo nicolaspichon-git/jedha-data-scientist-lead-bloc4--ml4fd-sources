@@ -13,6 +13,17 @@ name: CI
 on:
   push:
   pull_request:
+  # THE ROLLBACK (B4-L6, B4-EC27): run this workflow by hand from the Actions
+  # tab, give it a tag already in the registry, and the deploy job puts that
+  # image back in service -- with the same checks as a deployment, and a line
+  # in the same journal. Nothing is rebuilt: the image of a past commit is the
+  # one that was tested and published then.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to put back in service (sha-<7 hex>, see runtime/deployments/deployments.csv)"
+        required: true
+        type: string
 
 # LEAST PRIVILEGE BY DEFAULT: every job reads the repository and nothing else,
 # and the one job that writes -- the image, to the registry -- says so itself.
@@ -21,6 +32,9 @@ permissions:
 
 jobs:
   tests:
+    # A rollback tests nothing and builds nothing: it redeploys an image that
+    # passed both when its commit reached main.
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -77,6 +91,7 @@ jobs:
   # for people, the revision is for the check that a deployment landed.
   image:
     needs: tests
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -135,7 +150,15 @@ jobs:
   # unless /health announces the very commit it was asked to deploy.
   deploy:
     needs: image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # TWO WAYS IN. A push on main deploys the image just published, and only
+    # if it was. A manual run (the rollback) deploys the tag it was given; its
+    # image job is skipped, and !cancelled() keeps a skipped need from
+    # skipping this job too.
+    if: >-
+      !cancelled() && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.image.result == 'success')
+        || github.event_name == 'workflow_dispatch'
+      )
     runs-on: [self-hosted, ml4fd-host]
     # One deployment at a time on this machine; a second waits its turn.
     concurrency:
@@ -147,7 +170,10 @@ jobs:
     env:
       HOST_DIR: ${{ vars.ML4FD_HOST_DIRPATH }}
       IMAGE: ghcr.io/${{ github.repository }}/scoring-service
-      REVISION: ${{ github.sha }}
+      # The tag asked for by hand goes through env, never into the script
+      # text: an input is data, and the step validates it before use.
+      INPUT_TAG: ${{ inputs.tag }}
+      PUSHED_SHA: ${{ github.sha }}
       HEALTH_URL: http://127.0.0.1:8012/health
     defaults:
       run:
@@ -165,7 +191,15 @@ jobs:
               exit 1
             }
           }
-          $tag = 'sha-' + $env:REVISION.Substring(0, 7)
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $tag = "$env:INPUT_TAG".Trim()
+            if ($tag -notmatch '^sha-[0-9a-f]{7}$') {
+              Write-Host "::error::tag '$tag' is not of the form sha-<7 hex digits>"
+              exit 1
+            }
+          } else {
+            $tag = 'sha-' + $env:PUSHED_SHA.Substring(0, 7)
+          }
           # ASCII and not utf8: Windows PowerShell writes a BOM with utf8, and a
           # BOM at the head of GITHUB_ENV would become part of the variable name.
           Add-Content -Path $env:GITHUB_ENV -Value "SCORING_SERVICE_TAG=$tag" -Encoding ascii
@@ -187,6 +221,34 @@ jobs:
         run: |
           docker compose --project-directory $env:HOST_DIR -f (Join-Path $env:HOST_DIR 'docker-compose.yml') pull scoring-service
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # THE EXPECTED REVISION COMES FROM THE IMAGE, not from the run: a
+      # rollback runs on today's commit but deploys yesterday's image. The
+      # image job wrote the full commit into the OCI label at build time. On
+      # a push, the label must also be the commit just pushed.
+      - name: Read the commit the image was built from
+        run: |
+          $ref = "{0}:{1}" -f $env:IMAGE, $env:SCORING_SERVICE_TAG
+          $meta = (docker image inspect $ref) -join "`n" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $meta) {
+            Write-Host "::error::image $ref not found after the pull"
+            exit 1
+          }
+          $revision = $meta[0].Config.Labels.'org.opencontainers.image.revision'
+          if ($revision -notmatch '^[0-9a-f]{40}$') {
+            Write-Host "::error::image $ref carries no commit in its revision label ('$revision')"
+            exit 1
+          }
+          if (-not $revision.StartsWith($env:SCORING_SERVICE_TAG.Substring(4))) {
+            Write-Host "::error::image $ref was built from $revision, which its tag contradicts"
+            exit 1
+          }
+          if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch' -and $revision -ne $env:PUSHED_SHA) {
+            Write-Host "::error::image $ref was built from $revision, expected $env:PUSHED_SHA"
+            exit 1
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "REVISION=$revision" -Encoding ascii
+          Write-Host "deploying $ref, built from $revision"
 
       # THE TAG IS WRITTEN INTO .env, and not only into this process: compose
       # reads .env on every command, so a "docker compose up -d" typed by hand
@@ -241,8 +303,9 @@ jobs:
       # The rollback reads it to know what "the previous version" is.
       - name: Record the deployment
         run: |
-          $journal = Join-Path $env:HOST_DIR 'runtime\deployments.csv'
+          $journal = Join-Path $env:HOST_DIR 'runtime\deployments\deployments.csv'
           if (-not (Test-Path $journal)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $journal) | Out-Null
             'deployed_at,tag,revision,image_digest,model_version,run_url' | Set-Content -Path $journal -Encoding ascii
           }
           $health = Invoke-RestMethod -Uri $env:HEALTH_URL -TimeoutSec 10
