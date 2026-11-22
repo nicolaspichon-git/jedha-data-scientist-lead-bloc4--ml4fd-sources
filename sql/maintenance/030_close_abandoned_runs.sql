@@ -1,4 +1,8 @@
--- Close the runs nobody closed. Covers: EC14  Lot: N9 (revu le 20/11/2026)  C4
+-- Close the runs nobody closed.
+-- Block: B3, B4.
+-- Lot: B3-N9 (revu le 20/11/2026), B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14.
 --
 -- WRITES. sql/checks/abandoned_runs.sql lists what this will touch and carries
 -- the reasoning; this file carries the consequences. One looks before one

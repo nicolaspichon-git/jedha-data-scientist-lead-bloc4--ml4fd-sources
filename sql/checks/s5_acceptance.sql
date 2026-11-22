@@ -1,6 +1,8 @@
 -- The acceptance criteria of S5, lots Q0 to Q6. Every verdict must read OK.
--- Covers: EC14, EC16, EC18, EC19, EC23, EC27
--- Lot: Q6   Competency: C1, C4, C5
+-- Block: B3, B4.
+-- Lot: B3-Q6, B4-L0.
+-- Competency: B3-C1, B3-C4, B3-C5.
+-- Covers: B3-EC14, B3-EC16, B3-EC18, B3-EC19, B3-EC23, B3-EC27.
 --
 -- THE DECISIVE ONE IS CRITERION 4, and it is not a count: fd_purge holds NO
 -- privilege on the exploited layer. "The purge did not overflow" is therefore

@@ -1,8 +1,9 @@
 """The rejections of a calendar period, by class and by reason (F07.3).
 
-Covers: EC15, EC22
-Lot: R7, R8
-Competency: C4
+Block: B3, B4.
+Lot: B3-R7, B3-R8, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC15, B3-EC22.
 
 COUNTS ONLY. fd_dashboard reads five columns of the quarantine -- batch_id,
 line_no, reason_class, reason_code, rejected_at -- and neither the content of

@@ -1,8 +1,9 @@
 """Training the scoring model, and reporting it.
 
-Covers: EE08, EI04
-Lot: M5
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-M5, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EE08, B3-EI04.
 
 THE TRAP THIS MODULE IS BUILT AROUND. The source holds 0.414 % positives over
 the usable horizon, so A MODEL THAT NEVER PREDICTS FRAUD SCORES 99.6 %
@@ -61,7 +62,7 @@ class Evaluation:
     baseline_average_precision: float      # equals the base rate
     baseline_accuracy: float               # the figure that makes the trap plain
 
-    # At one stated threshold. A reference, not a verdict (M6 decides).
+    # At one stated threshold. A reference, not a verdict.
     threshold: float
     recall: float
     precision: float
@@ -119,9 +120,10 @@ class Evaluation:
 def render_report(ev: Evaluation) -> str:
     """The report. Carries no accuracy for the model, and never will.
 
-    Covers: EI04
-    Lot: M5
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-M5.
+    Competency: B3-C5.
+    Covers: B3-EI04.
     """
     lines = [
         "jeu          train=%d (%d pos, %.4f %%)  test=%d (%d pos, %.4f %%)"
@@ -174,9 +176,10 @@ def split_validation(frame, share: float):
     feature reconciliation of L4, and here it would leak the validation slice
     into the fit.
 
-    Covers: EE08
-    Lot: M6
-    Competency: C2, C5
+    Block: B3, B4.
+    Lot: B3-M6.
+    Competency: B3-C2, B3-C5.
+    Covers: B3-EE08.
     """
     ordered = frame.sort_values(["txn_ts", "txn_id"])
     index = int(len(ordered) * (1.0 - share))
@@ -203,9 +206,10 @@ def load_split(path: Path):
 def rule_scores(frame, min_amount: float, night_hours: tuple[int, ...]):
     """The analyst's rule, applied to a frame: amount high AND hour nocturnal.
 
-    Covers: EI04
-    Lot: M5
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-M5.
+    Competency: B3-C5.
+    Covers: B3-EI04.
     """
     return ((frame["amt"].astype(float) > min_amount)
             & frame["txn_hour"].isin(list(night_hours)))
@@ -263,9 +267,10 @@ def fit_and_evaluate(train_path: Path, test_path: Path, threshold: float,
     each cardholder's first transaction, by the convention of ruling 6 -- and it
     is fast enough on 300,000 rows to keep a weekly cadence cheap.
 
-    Covers: EE08
-    Lot: M5
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-M5.
+    Competency: B3-C2.
+    Covers: B3-EE08.
     """
     import sklearn
     from sklearn.metrics import (average_precision_score, confusion_matrix,

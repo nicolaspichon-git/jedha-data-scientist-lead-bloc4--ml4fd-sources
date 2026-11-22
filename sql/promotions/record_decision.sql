@@ -1,5 +1,8 @@
 -- Record a promotion decision, promoted or refused.
--- Covers: EC34, EC37   Lot: L3   Competency: C5
+-- Block: B4.
+-- Lot: B4-L3.
+-- Competency: B4-C5.
+-- Covers: B4-EC34, B4-EC37.
 --
 -- BOTH OUTCOMES, and that is the point of the table: a journal of promotions
 -- alone answers "what is in production" and never "why version 8 is not".

@@ -24,11 +24,11 @@ comment sa performance est surveillée, comment il est réentraîné sans interv
 
 Deux boucles, délibérément tenues séparées.
 
-La **boucle du code** (C4) est déclenchée par un *commit* : l'intégration
+La **boucle du code** (B4-C4) est déclenchée par un *commit* : l'intégration
 continue construit, analyse et teste chaque modification, et la livraison
 continue publie les images. Son artefact est une version du service.
 
-La **boucle du modèle** (C5, C6) est déclenchée par les données : la
+La **boucle du modèle** (B4-C5, B4-C6) est déclenchée par les données : la
 surveillance mesure la dérive et la performance, un seuil déclenche le
 réentraînement, et un modèle candidat n'est promu que s'il bat celui en service
 sur les critères du cahier des charges. Son artefact est une version de modèle
@@ -44,12 +44,19 @@ Six services, un projet Docker Compose (`aia-ml4fd`) :
 
 | Service | Rôle | Publié sur |
 |---|---|---|
-| `postgres` | trois bases, un rôle de connexion par service | `localhost:5432` |
+| `postgres` | trois bases, un rôle de connexion par service | `localhost:8432` |
 | `airflow-init` | migre le schéma de métadonnées, puis s'arrête | --- |
 | `airflow-scheduler` | exécute les DAG (LocalExecutor) | --- |
-| `airflow-webserver` | l'interface d'Airflow | http://localhost:8080 |
-| `mlflow` | serveur de suivi, registre de modèles, relais d'artefacts | http://localhost:5000 |
-| `dashboard` | Streamlit, en lecture seule sur ce qu'il affiche | http://127.0.0.1:8501 |
+| `airflow-webserver` | l'interface d'Airflow | http://localhost:8082 |
+| `mlflow` | serveur de suivi, registre de modèles, relais d'artefacts | http://localhost:8002 |
+| `dashboard` | Streamlit, en lecture seule sur ce qu'il affiche | http://127.0.0.1:8502 |
+| `producer` | la source simulée du flux de transactions | http://127.0.0.1:8802/current-transactions |
+| `scoring-service` | le service de scoring, pour les tiers | http://127.0.0.1:8012/docs |
+
+Tous les ports publiés sur la machine sont de la famille **8\*\*2**, pour que la
+pile tourne à côté de celle de BC03, qui publie 5432, 8080, 5000 et 8501. Dans le
+réseau Compose, chaque service garde son port propre (`mlflow:5000`,
+`scoring-service:5000`, `producer:4000`…).
 
 L'unique instance PostgreSQL porte trois bases, chacune avec son propriétaire :
 
@@ -168,14 +175,15 @@ durées de conservation, rôles.
 
 ## Avancement
 
-| Lot | Objet | Critère d'acceptation | État |
-|---|---|---|---|
-| L1 | Trois bases, un rôle / service | Le rôle d'Airflow échoue sur un `SELECT` dans les tables de fraude, et les DAG passent toujours par leurs rôles propres | fait |
-| L2 | Dépôt & intégration continue | Un *commit* qui casse un test ne peut pas être fusionné, et la page du dépôt le montre | fait |
-| L3 | Porte de promotion : aliasing `champion`, comparaison appariée | un entraînement délibérément dégradé produit une version enregistrée mais **non promue** ; le scoring sert toujours l'ancien champion, et la décision est en base avec son motif | en cours |
-| L4 | Surveillance et réentraînement automatique | dérive injectée, alerte émise, réentraînement déclenché, champion promu, nouveau modèle servi --- sans intervention, et en moins de cinq minutes | à venir |
-| L5 | Découplage du service de scoring | un tiers obtient un score par HTTP sans rien connaître de la pile ; l'appel est retrouvable en base ; une promotion change la version annoncée par le point de santé sans redémarrage | à venir |
-| L6 | Livraison continue des images | le service en production se relie à un *commit* précis par l'étiquette de son image, et la version précédente se remet en service | à venir |
+| Lot | Objet                                                          | Critère d'acceptation                                                                                                                                                                 | État     |
+| --- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| B4-L0  | Reprise de la base de code de BC03                              | Aucune marque de lot non résolue dans les sources : la matrice sépare ce que BC04 a produit de ce qu'il a reçu                                                             | fait     |
+| B4-L1  | Trois bases, un rôle / service                                 | Le rôle d'Airflow échoue sur un `SELECT` dans les tables de fraude, et les DAG passent toujours par leurs rôles propres                                                               | fait     |
+| B4-L2  | Dépôt & intégration continue                                   | Un *commit* qui casse un test ne peut pas être fusionné, et la page du dépôt le montre                                                                                                | fait     |
+| B4-L3  | Porte de promotion : aliasing `champion`, comparaison appariée | un entraînement délibérément dégradé produit une version enregistrée mais **non promue** ; le scoring sert toujours l'ancien champion, et la décision est en base avec son motif      | en cours |
+| B4-L4  | Surveillance et réentraînement automatique                     | dérive injectée, alerte émise, réentraînement déclenché, champion promu, nouveau modèle servi --- sans intervention, et en moins de cinq minutes                                      | à venir  |
+| B4-L5  | Découplage du service de scoring                               | un tiers obtient un score par HTTP sans rien connaître de la pile ; l'appel est retrouvable en base ; une promotion change la version annoncée par le point de santé sans redémarrage | à venir  |
+| B4-L6  | Livraison continue des images                                  | le service en production se relie à un *commit* précis par l'étiquette de son image, et la version précédente se remet en service                                                     | à venir  |
 
 Les critères sont résumés ici ; leur énoncé complet, les lots de travail et les
 pièges connus vivent dans le plan de travail, sous `step-0/ws/`.

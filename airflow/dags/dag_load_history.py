@@ -1,8 +1,9 @@
 """S1 -- historical data load. A thin DAG: it orders, it does not compute.
 
-Covers: EI06, EC08, EC12
-Lot: L7
-Competency: C3
+Block: B3, B4.
+Lot: B3-L1, B3-L2, B3-L3, B3-L4, B3-L5, B3-L7, B4-L0.
+Competency: B3-C3.
+Covers: B3-EI04, B3-EI05, B3-EI06, B3-EE07, B3-EC08, B3-EC12, B3-EC17, B3-EC20, B3-EC21, B3-EC22, B3-EC23, B3-EC24.
 
 All the logic sits in the ml4fd/ package, so it can be exercised without
 starting Airflow -- that is what makes the plan's acceptance criteria runnable.
@@ -66,9 +67,10 @@ def load_history():
     def preflight() -> dict:
         """Check the plumbing before any processing.
 
-        Covers: EC12
-        Lot: L0
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-L0, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC12.
         """
         from airflow.operators.python import get_current_context
 
@@ -143,9 +145,10 @@ def load_history():
     def fetch_csv() -> str:
         """Download the historical CSV, with cache and checksum. Returns its path.
 
-        Covers: EI04, EI05
-        Lot: L1
-        Competency: C2
+        Block: B3, B4.
+        Lot: B3-L1, B4-L0.
+        Competency: B3-C2.
+        Covers: B3-EI04, B3-EI05.
         """
         replay = _replay_batch()
         if replay:
@@ -162,9 +165,10 @@ def load_history():
     def write_raw(csv_path: str) -> str:
         """Write the payload as received. Returns the batch_id.
 
-        Covers: EC23, EC24
-        Lot: L1
-        Competency: C2
+        Block: B3, B4.
+        Lot: B3-L1, B4-L0.
+        Competency: B3-C2.
+        Covers: B3-EC23, B3-EC24.
         """
         import uuid as _uuid
         from pathlib import Path as _Path
@@ -212,9 +216,10 @@ def load_history():
     def validate(batch_id: str) -> str:
         """Validate in two classes, quarantine the rejects. Returns the batch_id.
 
-        Covers: EC20, EC21, EC22
-        Lot: L2
-        Competency: C5
+        Block: B3, B4.
+        Lot: B3-L2, B4-L0.
+        Competency: B3-C5.
+        Covers: B3-EC20, B3-EC21, B3-EC22.
         """
         import uuid as _uuid
 
@@ -276,9 +281,10 @@ def load_history():
     def type_and_pseudonymize(batch_id: str) -> str:
         """Type the valid records, strip identity. Returns the batch_id.
 
-        Covers: EC17, EC23
-        Lot: L3
-        Competency: C2, C4
+        Block: B3, B4.
+        Lot: B3-L3, B4-L0.
+        Competency: B3-C2, B3-C4.
+        Covers: B3-EC17, B3-EC23.
         """
         import uuid as _uuid
 
@@ -314,9 +320,10 @@ def load_history():
     def backfill_features(batch_id: str) -> int:
         """Backfill the features, then prove both modes agree.
 
-        Covers: EE07
-        Lot: L4
-        Competency: C5
+        Block: B3, B4.
+        Lot: B3-L4, B4-L0.
+        Competency: B3-C5.
+        Covers: B3-EE07.
         """
         from ml4fd import db, features
 
@@ -352,9 +359,10 @@ def load_history():
     def write_ground_truth(batch_id: str) -> int:
         """Write the verdict and the date it became known.
 
-        Covers: EI01, EI02, EC23
-        Lot: L5
-        Competency: C2
+        Block: B3, B4.
+        Lot: B3-L5, B4-L0.
+        Competency: B3-C2.
+        Covers: B3-EI01, B3-EI02, B3-EC23.
         """
         import uuid as _uuid
 
@@ -429,9 +437,10 @@ def load_history():
         data exactly, which is what EC23 and EC24 ask for and what no amount of
         row counting would establish.
 
-        Covers: EC12, EC23, EC24
-        Lot: L6, L7
-        Competency: C4, C5
+        Block: B3, B4.
+        Lot: B3-L6, B3-L7, B4-L0.
+        Competency: B3-C4, B3-C5.
+        Covers: B3-EC12, B3-EC23, B3-EC24.
         """
         from airflow.operators.python import get_current_context
 

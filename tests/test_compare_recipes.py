@@ -1,8 +1,9 @@
 """The loyalty conditions of a recipe comparison.
 
-Covers: EE08, EI04, EC24
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE08, B3-EI04, B3-EC24.
 
 The comparison itself needs two fitted models; what is tested here is what the
 tool REFUSES and what it warns about, which is where a comparison stops meaning
@@ -57,7 +58,7 @@ def _render(tables=None, current_cut=0.89, current_source="la ligne de commande"
 
 
 def test_the_report_renders():
-    assert _render().startswith("# N4")
+    assert _render().startswith("# B3-N4")
 
 
 def test_the_report_says_where_each_threshold_came_from():

@@ -1,8 +1,9 @@
 """Q7: forgetting ONE batch by name, and refusing to.
 
-Covers: EC18, EC19, EC23
-Lot: Q7
-Competency: C2, C4, C5
+Block: B3, B4.
+Lot: B3-Q7, B4-L0.
+Competency: B3-C2, B3-C4, B3-C5.
+Covers: B3-EC18, B3-EC19, B3-EC23.
 
 WHY THIS EXISTS. The retention purge cuts on an instant. Four interrupted loads
 of the historical CSV and the load that finished arrived minutes apart, so no

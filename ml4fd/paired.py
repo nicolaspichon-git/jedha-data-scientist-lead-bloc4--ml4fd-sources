@@ -1,8 +1,9 @@
 """Comparing two decisions on the SAME transactions, fraud by fraud.
 
-Covers: EI04, EC24
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EI04, B3-EC24.
 
 WHY NOT SIMPLY COMPARE TWO RECALLS. The test set holds 205 frauds. A recall
 measured on 205 positives carries a binomial noise of about +/-0.034, and the

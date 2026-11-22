@@ -1,7 +1,10 @@
--- Acceptance criteria of L5: what the database answers about the scoring service.
--- Covers: EC16, EC17, EC19, EC20   Lot: L5   Competency: C3, C5
+-- Acceptance criteria of B4-L5: what the database answers about the scoring service.
+-- Block: B4.
+-- Lot: B4-L5.
+-- Competency: B4-C3, B4-C5.
+-- Covers: B4-EC16, B4-EC17, B4-EC19, B4-EC20.
 --
--- The criterion of L5, as the development plan states it, has three clauses:
+-- The criterion of B4-L5, as the development plan states it, has three clauses:
 --   1. a third party obtains a score over HTTP knowing nothing of the stack;
 --   2. THE CALL IS RETRIEVABLE IN THE DATABASE;
 --   3. a promotion changes the version the health endpoint announces, with no
@@ -26,8 +29,8 @@
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fd_scoring_service') THEN
-        RAISE EXCEPTION 'L5 : le role fd_scoring_service n''existe pas dans cette base'
-            USING HINT = 'Le DDL n''y a pas ete rejoue depuis L5 :  .\fd-manager.ps1 init';
+        RAISE EXCEPTION 'B4-L5 : le role fd_scoring_service n''existe pas dans cette base'
+            USING HINT = 'Le DDL n''y a pas ete rejoue depuis B4-L5 :  .\fd-manager.ps1 init';
     END IF;
 END $$;
 
@@ -62,32 +65,32 @@ readable_txn AS (
        AND has_column_privilege('fd_scoring_service', a.attrelid, a.attname, 'SELECT')
 ),
 criteria AS (
-    SELECT 1 AS ord, 'L5 role fd_scoring_service peut se connecter' AS criterion,
+    SELECT 1 AS ord, 'B4-L5 role fd_scoring_service peut se connecter' AS criterion,
            'oui' AS expected,
            CASE WHEN (SELECT rolcanlogin FROM role) THEN 'oui' ELSE 'NON' END AS actual
     UNION ALL
     -- The 500 of 2026-11-20, in one criterion.
-    SELECT 2, 'L5 privilege CONNECT sur cette base', 'oui',
+    SELECT 2, 'B4-L5 privilege CONNECT sur cette base', 'oui',
            CASE WHEN has_database_privilege('fd_scoring_service',
                                             current_database(), 'CONNECT')
                 THEN 'oui'
                 ELSE 'NON : 150_database_connect.sql a tourne avant la creation du role'
            END
     UNION ALL
-    SELECT 3, 'L5 pas d''heritage des privileges', 'oui',
+    SELECT 3, 'B4-L5 pas d''heritage des privileges', 'oui',
            CASE WHEN (SELECT rolinherit FROM role) THEN 'NON' ELSE 'oui' END
     UNION ALL
-    SELECT 4, 'L5 pas de superutilisateur ni de creation', 'oui',
+    SELECT 4, 'B4-L5 pas de superutilisateur ni de creation', 'oui',
            CASE WHEN (SELECT rolsuper OR rolcreatedb OR rolcreaterole FROM role)
                 THEN 'NON' ELSE 'oui' END
     UNION ALL
-    SELECT 5, 'L5 limite de connexions declaree', '20',
+    SELECT 5, 'B4-L5 limite de connexions declaree', '20',
            (SELECT rolconnlimit::text FROM role)
     UNION ALL
-    SELECT 6, 'L5 colonnes de fd_transactions lisibles', 'amt, client_key, txn_ts',
+    SELECT 6, 'B4-L5 colonnes de fd_transactions lisibles', 'amt, client_key, txn_ts',
            (SELECT string_agg(attname, ', ' ORDER BY attname) FROM readable_txn)
     UNION ALL
-    SELECT 7, 'L5 aucune ecriture sur fd_transactions', 'oui',
+    SELECT 7, 'B4-L5 aucune ecriture sur fd_transactions', 'oui',
            CASE WHEN has_any_column_privilege('fd_scoring_service',
                                               'fd_transactions', 'INSERT')
                   OR has_any_column_privilege('fd_scoring_service',
@@ -96,23 +99,23 @@ criteria AS (
                                          'fd_transactions', 'DELETE')
                 THEN 'NON' ELSE 'oui' END
     UNION ALL
-    SELECT 8, 'L5 aucune ecriture sur fd_scores', 'oui',
+    SELECT 8, 'B4-L5 aucune ecriture sur fd_scores', 'oui',
            CASE WHEN has_any_column_privilege('fd_scoring_service',
                                               'fd_scores', 'INSERT')
                   OR has_any_column_privilege('fd_scoring_service',
                                               'fd_scores', 'UPDATE')
                 THEN 'NON' ELSE 'oui' END
     UNION ALL
-    SELECT 9, 'L5 tables interdites atteignables', 'aucune',
+    SELECT 9, 'B4-L5 tables interdites atteignables', 'aucune',
            coalesce((SELECT string_agg(relname, ', ' ORDER BY relname)
                        FROM reachable), 'aucune')
     UNION ALL
-    SELECT 10, 'L5 journal fd_scoring_service_calls present', 'oui',
+    SELECT 10, 'B4-L5 journal fd_scoring_service_calls present', 'oui',
            CASE WHEN to_regclass('public.fd_scoring_service_calls') IS NOT NULL
                 THEN 'oui' ELSE 'NON' END
     UNION ALL
     -- Append only: the service may add a call and may not revise one.
-    SELECT 11, 'L5 journal en ajout seul pour le service', 'oui',
+    SELECT 11, 'B4-L5 journal en ajout seul pour le service', 'oui',
            CASE WHEN to_regclass('public.fd_scoring_service_calls') IS NULL THEN 'indecidable'
                 WHEN has_any_column_privilege('fd_scoring_service',
                                               'fd_scoring_service_calls', 'UPDATE')
@@ -120,7 +123,7 @@ criteria AS (
                                          'fd_scoring_service_calls', 'DELETE')
                 THEN 'NON' ELSE 'oui' END
     UNION ALL
-    SELECT 12, 'L5 le service peut ecrire son journal', 'oui',
+    SELECT 12, 'B4-L5 le service peut ecrire son journal', 'oui',
            CASE WHEN to_regclass('public.fd_scoring_service_calls') IS NULL THEN 'indecidable'
                 WHEN has_any_column_privilege('fd_scoring_service',
                                               'fd_scoring_service_calls', 'INSERT')
@@ -128,7 +131,7 @@ criteria AS (
     UNION ALL
     -- The invariant fd_scores carries too: a decision and its threshold cannot
     -- disagree, whichever journal holds them.
-    SELECT 13, 'L5 contrainte flagged = (score >= threshold)', 'oui',
+    SELECT 13, 'B4-L5 contrainte flagged = (score >= threshold)', 'oui',
            CASE WHEN EXISTS (
                     SELECT 1 FROM pg_constraint
                      WHERE conrelid = to_regclass('public.fd_scoring_service_calls')
@@ -137,13 +140,13 @@ criteria AS (
                        AND pg_get_constraintdef(oid) LIKE '%threshold%')
                 THEN 'oui' ELSE 'NON' END
     UNION ALL
-    SELECT 14, 'L5 vue fd_scoring_decisions presente', 'oui',
+    SELECT 14, 'B4-L5 vue fd_scoring_decisions presente', 'oui',
            CASE WHEN to_regclass('public.fd_scoring_decisions') IS NOT NULL
                 THEN 'oui' ELSE 'NON' END
     UNION ALL
     -- The view is what readers must query. A reader without the grant would
     -- go back to the tables, and the convergence to one journal would break it.
-    SELECT 15, 'L5 vue lisible par fd_report et fd_dashboard', 'oui, oui',
+    SELECT 15, 'B4-L5 vue lisible par fd_report et fd_dashboard', 'oui, oui',
            CASE WHEN to_regclass('public.fd_scoring_decisions') IS NULL THEN 'indecidable'
                 ELSE concat_ws(', ',
                     CASE WHEN has_table_privilege('fd_report', 'fd_scoring_decisions',
@@ -154,7 +157,7 @@ criteria AS (
     UNION ALL
     -- Nothing is lost and nothing is counted twice when the two journals are
     -- read as one. The arithmetic is the whole claim of option 2.
-    SELECT 16, 'L5 la vue compte les deux journaux sans doublon', 'oui',
+    SELECT 16, 'B4-L5 la vue compte les deux journaux sans doublon', 'oui',
            CASE WHEN to_regclass('public.fd_scoring_decisions') IS NULL THEN 'indecidable'
                 WHEN (SELECT count(*) FROM fd_scoring_decisions)
                    = (SELECT count(*) FROM fd_scores)
@@ -163,7 +166,7 @@ criteria AS (
     UNION ALL
     -- Which side a row came from must be readable without a join: a pipeline
     -- row carries txn_id and no call_id, a third-party row the reverse.
-    SELECT 17, 'L5 chaque ligne de la vue est attribuable a une source', 'oui',
+    SELECT 17, 'B4-L5 chaque ligne de la vue est attribuable a une source', 'oui',
            CASE WHEN to_regclass('public.fd_scoring_decisions') IS NULL THEN 'indecidable'
                 WHEN EXISTS (SELECT 1 FROM fd_scoring_decisions
                               WHERE (source = 'pipeline'
@@ -177,7 +180,7 @@ criteria AS (
     -- rows: the two columns are NOT NULL, so a scan could not fail and would
     -- read as a check while testing nothing. What can still be lost is the
     -- constraint itself, in a migration.
-    SELECT 18, 'L5 modele et recette obligatoires dans le journal', 'oui, oui',
+    SELECT 18, 'B4-L5 modele et recette obligatoires dans le journal', 'oui, oui',
            CASE WHEN to_regclass('public.fd_scoring_service_calls') IS NULL THEN 'indecidable'
                 ELSE (SELECT string_agg(CASE WHEN a.attnotnull THEN 'oui' ELSE 'NON' END,
                                         ', ' ORDER BY a.attname)
@@ -196,7 +199,7 @@ criteria AS (
     --
     -- Measured 21/11/2026: both grants were there, and s6_acceptance.sql is
     -- what refused them.
-    SELECT 19, 'L5 aucun lecteur ne tient le journal des appels en direct', 'aucun',
+    SELECT 19, 'B4-L5 aucun lecteur ne tient le journal des appels en direct', 'aucun',
            CASE WHEN to_regclass('public.fd_scoring_service_calls') IS NULL
                 THEN 'indecidable'
                 ELSE coalesce((SELECT string_agg(r, ', ' ORDER BY r)
@@ -241,7 +244,7 @@ BEGIN
       FROM acceptance
      WHERE verdict LIKE '%ECHEC%';
     IF failed > 0 THEN
-        RAISE EXCEPTION 'L5 : % critere(s) en echec : %', failed, names
+        RAISE EXCEPTION 'B4-L5 : % critere(s) en echec : %', failed, names
             USING HINT = 'Le tableau ci-dessus donne attendu et constate pour chacun.';
     END IF;
 END $$;

@@ -1,15 +1,16 @@
 """What txn_hour does to the model once it comes from our clock, not the payment.
 
-Covers: EI04, EC24
-Lot: N4
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EI04, B3-EC24.
 
 THE QUESTION THIS SETTLES. The model was trained on the hour of the PAYMENT,
 where 22:00-03:59 carries a fraud rate of 1.389 % against 0.079 % elsewhere --
 a ratio of 17.5, and 35 between the extreme hours (22:00 at 1.937 %, 08:00 at
 0.056 %). On the stream, current_time is the instant our own call returned, and
 the simulator draws a row at random from 2020 and stamps it with that instant.
-Measured over the N0 campaign: indices spread over 16,227..553,065 with 29 of
+Measured over the B3-N0 campaign: indices spread over 16,227..553,065 with 29 of
 56 gaps positive, a coin flip. So the hour and the label are INDEPENDENT BY
 CONSTRUCTION on the stream, while they are anything but in training.
 
@@ -160,7 +161,7 @@ def main(argv=None) -> int:
     features = list(payload["dataset"]["features"])
     chosen = payload.get("threshold") or {}
     if not chosen.get("value"):
-        log.error("le manifeste %s ne porte pas de seuil : M6 n'a pas tranche "
+        log.error("le manifeste %s ne porte pas de seuil : B3-M6 n'a pas tranche "
                   "pour ce modele, il n'y a rien a mesurer", manifest_path)
         return 1
     cut = float(chosen["value"])
@@ -264,7 +265,7 @@ def render(rows, payload, cut, n_rows, settings) -> str:
     positives = (draws["as-is"][0].true_positives
                  + draws["as-is"][0].false_negatives)
     lines = [
-        "# N4 --- effet de txn_hour sur le flux",
+        "# B3-N4 --- effet de txn_hour sur le flux",
         "",
         "Recette `%s`, seuil %.2f (%s), %d lignes de test."
         % (payload["dataset"]["version"], cut,

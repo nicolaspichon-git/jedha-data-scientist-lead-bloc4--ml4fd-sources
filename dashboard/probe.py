@@ -1,8 +1,9 @@
 """What the dashboard container IS, seen from inside it. Prints JSON.
 
-Covers: EC19, EC27
-Lot: R5
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-R5, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EC19, B3-EC27.
 
 Run by tools/check_s6.py on the host:
     docker compose exec -T dashboard python /opt/project/dashboard/probe.py

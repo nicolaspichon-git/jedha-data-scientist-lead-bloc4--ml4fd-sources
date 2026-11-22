@@ -1,6 +1,9 @@
 """The real-time payments producer: the exercise's API, cached and windowed.
 
-Covers: EE02, EC25, EC39   Lot: L4   Competency: C2, C6
+Block: B4.
+Lot: B4-L4, B4-L0.
+Competency: B4-C2, B4-C6.
+Covers: B3-EE02, B3-EC25, B4-EC39.
 
 DERIVED FROM vendor/realtime-transactions-producer/app.py, which is kept
 untouched beside it as the pristine reference. The skeleton is theirs -- the
@@ -22,7 +25,7 @@ THREE DEFECTS OF THE ORIGINAL ARE REPAIRED, and each one had a consequence:
   2. IT SAMPLED THE WHOLE FILE, so every call drew from the full June-to-
      December range at once and the periods averaged together. The drift the
      data actually holds -- a base rate falling from 0.4425 % to 0.1849 % --
-     was therefore invisible, and C6 had nothing to find. Here the served
+     was therefore invisible, and B4-C6 had nothing to find. Here the served
      window is declared: PRODUCER_SKIP_ROWS and PRODUCER_MAX_ROWS.
 
   3. ITS "/" ROUTE ANSWERED 500, because it mounts Jinja2Templates on
@@ -98,7 +101,7 @@ MAX_ROWS = int(os.environ.get("PRODUCER_MAX_ROWS") or 100_000)
 # each retried once on a 429 is up to ten requests a minute against a budget
 # of five, and the overflow carried into the next run, refused on its FIRST
 # call at 0.0 s. Empty disables the limiter, but then nothing in the project
-# can reach EC25's 429 path again.
+# can reach B3-EC25's 429 path again.
 RATE_LIMIT = os.environ.get("PRODUCER_RATE_LIMIT", "13/minute").strip()
 # DRIFT_FILE is resolved further down, from governance.yml: see drift_switch().
 GOVERNANCE = Path(os.environ.get("PRODUCER_GOVERNANCE",
@@ -159,7 +162,7 @@ def drift_switch(declared: dict) -> Path:
         declared_path = Path(str(declared["sources"]["drift_switch"]))
     except (KeyError, TypeError):
         log.warning("sources.drift_switch not declared: no drift can be "
-                    "injected, and the demonstration of C6 needs it")
+                    "injected, and the demonstration of B4-C6 needs it")
         return GOVERNANCE.parent / "runtime" / "producer" / "drift.json"
     return (declared_path if declared_path.is_absolute()
             else GOVERNANCE.parent / declared_path)
@@ -177,7 +180,7 @@ def corpus(declared: dict) -> Path:
 
     sources.replay_csv AND NOT sources.historical_csv: this serves what the
     model was NOT trained on. Serving the training corpus would hand the model
-    its own memory, and every figure C6 measures would be flattering and
+    its own memory, and every figure B4-C6 measures would be flattering and
     meaningless.
     """
     from ml4fd import fetch

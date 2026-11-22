@@ -1,8 +1,9 @@
-"""L5: the scoring service as it is deployed -- its image, its service, its role.
+"""B4-L5: the scoring service as it is deployed -- its image, its service, its role.
 
-Covers: EC16, EC17, EC19, EC20, EC21, EC22, EC23
-Lot: L5
-Competency: C3, C4
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C3, B4-C4.
+Covers: B4-EC16, B4-EC17, B4-EC19, B4-EC20, B4-EC21, B4-EC22, B4-EC23, B4-EC28.
 
 READ FROM THE FILES rather than exercised, like tests/test_dashboard_service.py
 and for the same reason: fastapi, uvicorn and mlflow live in the api image and
@@ -122,7 +123,7 @@ def test_it_receives_the_pepper_and_that_is_deliberate():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     # KEYED ON THE SERVICE NAME DECLARED ABOVE and not on a literal: this read
     # "\n  api:" and broke the day the service was renamed, which is the same
-    # spelling-pinned assertion L5 already corrected in
+    # spelling-pinned assertion B4-L5 already corrected in
     # test_the_manager_knows_the_service.
     block = compose[compose.index("\n  %s:" % SERVICE_NAME):]
     assert "MEME pseudonyme" in block or "SAME pseudonym" in block
@@ -195,7 +196,7 @@ def test_the_three_routes_exist():
 
 
 def test_the_contract_is_generated_and_not_written_beside_the_code():
-    """EC17 asks for a queryable specification. FastAPI derives OpenAPI from
+    """B4-EC17 asks for a queryable specification. FastAPI derives OpenAPI from
     the models, so the document cannot describe a route that does not exist or
     a field the service does not read."""
     assert "openapi.json" in APP
@@ -205,7 +206,7 @@ def test_the_contract_is_generated_and_not_written_beside_the_code():
 
 
 def test_the_request_is_judged_by_our_own_rules_and_not_only_by_the_schema():
-    """pydantic checks shapes; EC20 asks for an explicit error, and "string
+    """pydantic checks shapes; B4-EC20 asks for an explicit error, and "string
     expected" does not say that fifty thousand is the maximum the pipeline
     accepts."""
     assert "serve.problems(" in APP
@@ -245,7 +246,7 @@ def test_an_unforeseen_failure_is_logged_and_not_returned():
 
 
 def test_the_response_carries_the_figures_and_the_sentence():
-    """EC15 is an addition, never a replacement: a caller that needs the
+    """B4-EC15 is an addition, never a replacement: a caller that needs the
     number must not have to parse French to find it."""
     model = APP[APP.index("class Decision"):APP.index("def _settings")]
     for field in ("score", "threshold", "flagged", "model_version", "texte"):

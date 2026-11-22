@@ -1,6 +1,9 @@
 -- Section 3 of the morning report: verdicts that fell yesterday.
 -- ON THE KNOWLEDGE AXIS, which is the whole point of this file.
--- Covers: EE04, EI02, EI03   Lot: P1   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-P1, B4-L0.
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EE04, B3-EI02, B3-EI03.
 --
 -- THE SECTION A NAIVE DESIGN OMITS, and the only place in the whole system
 -- where the model's real performance becomes measurable. It filters on

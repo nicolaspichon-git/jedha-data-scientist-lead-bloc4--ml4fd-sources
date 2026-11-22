@@ -1,5 +1,8 @@
 -- Stream batches holding transactions with no verdict.
--- Covers: EI03, EC14, EC23   Lot: N6   Competency: C3, C4
+-- Block: B3, B4.
+-- Lot: B3-N6, B4-L0.
+-- Competency: B3-C3, B3-C4.
+-- Covers: B3-EI03, B3-EC14, B3-EC23.
 --
 -- WHAT "AWAITING" MEANS HERE, and it is not what one would guess. The verdict
 -- is not held back by delaying its WRITE: S1 writes it immediately with

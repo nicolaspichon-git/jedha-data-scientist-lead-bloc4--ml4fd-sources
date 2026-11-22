@@ -1,6 +1,9 @@
 """Monitoring the model in service: drift, performance, and what follows.
 
-Covers: EC38, EC39, EC40, EC42, EC45   Lot: L4   Competency: C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C6.
+Covers: B4-EC38, B4-EC39, B4-EC40, B4-EC42, B4-EC45.
 
 WHAT THIS WATCHES THAT S3 DID NOT. ml4fd/health.py watches the CHAIN -- is it
 running, is it rejecting, is it fresh. This watches the MODEL: are the
@@ -9,7 +12,7 @@ at the rate it was tuned for, is it still catching what the specification
 requires. A chain in perfect health can serve a model that has quietly stopped
 working, and no control of S3 would say so.
 
-THE TOOL MEASURES, THE POLICY JUDGES, and the split is the same one L3 made
+THE TOOL MEASURES, THE POLICY JUDGES, and the split is the same one B4-L3 made
 between paired.py and promote.py. Evidently computes the statistics; the
 verdict is a comparison with a threshold from governance.yml, taken in the pure
 functions below. Two consequences: the whole decision layer is testable without
@@ -145,9 +148,10 @@ def drift_columns(features, not_comparable) -> list[str]:
     columns, drift_measurements would read 0.0, and the control would publish a
     serene ok forever.
 
-    Covers: EC39, EC45
-    Lot: L4
-    Competency: C6
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C6.
+    Covers: B4-EC39, B4-EC45.
     """
     names = list(features)
     excluded = list(not_comparable)
@@ -221,9 +225,10 @@ def comparable(frame, features):
     happens before the tool is called. The test added beside this function is
     the one that closes that gap.
 
-    Covers: EC39
-    Lot: L4
-    Competency: C6
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C6.
+    Covers: B4-EC39.
     """
     import decimal
 
@@ -291,9 +296,10 @@ def thin_window(n_rows: int, min_rows: int) -> list[Measurement]:
     one query over fd_monitoring returns the series with its gaps in place
     rather than two series to be joined by a reader.
 
-    Covers: EC39, EC45
-    Lot: L4
-    Competency: C6
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C6.
+    Covers: B4-EC39, B4-EC45.
     """
     if n_rows >= min_rows:
         return []
@@ -662,9 +668,10 @@ def notify(conn, settings, report: dict) -> dict:
     health.payload_of is reused rather than copied, so the one check that no
     transaction field reaches a channel lives in one place.
 
-    Covers: EC44
-    Lot: L4
-    Competency: C6
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C6.
+    Covers: B4-EC44.
     """
     from ml4fd import health
 
@@ -774,14 +781,15 @@ def retraining_due(stored, answered, allowed, cooldown: dt.timedelta,
 
     WHY IT IS ALLOWED TO BE WRONG. It may fire on a drift that turns out
     harmless; the cost is a training nobody needed. It cannot put a bad model
-    in service, because registering is not promoting: the gate of L3 judges the
+    in service, because registering is not promoting: the gate of B4-L3 judges the
     candidate against the champion and refuses it. So this is tuned to miss
     little rather than to be right -- the expensive mistake is downstream, and
     it is already guarded.
 
-    Covers: EC33
-    Lot: L4
-    Competency: C5, C6
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C5, B4-C6.
+    Covers: B4-EC33.
     """
     alerting = [row for row in stored
                 if row["control"] in allowed

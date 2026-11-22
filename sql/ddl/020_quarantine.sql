@@ -1,5 +1,8 @@
 -- Quarantine, with a reason.
--- Covers: EC22   Lot: L2   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-L2, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EC22.
 --
 -- reason_class makes the separation between the two classes of check required by
 -- EC20 and EC21 visible IN THE DATA: 'field' for per-field validation, 'record'

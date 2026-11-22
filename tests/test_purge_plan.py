@@ -1,8 +1,9 @@
 """S5 / Q2: the dry run counts what would go, and nothing goes.
 
-Covers: EC26, EI13, EC16, EC19
-Lot: Q2
-Competency: C5
+Block: B3, B4.
+Lot: B3-Q2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC26, B3-EI13, B3-EC16, B3-EC19.
 
 S5 is the only process of the project that DESTROYS. Everywhere else a mistake
 is repaired by a replay; here it is permanent, and that asymmetry is what these

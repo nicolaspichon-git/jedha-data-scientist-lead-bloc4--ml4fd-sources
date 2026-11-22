@@ -1,5 +1,8 @@
 -- Copy what M5 measured on the test set into the dataset's row (S6/R10).
--- Covers: EE04, EC23   Lot: R10   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R10, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EE04, B3-EC23.
 --
 -- ONE WRITER: registry.record_reference(), called by dag_train.fit_model and
 -- by tools/backfill_reference.py, both from a run.json payload.

@@ -1,5 +1,8 @@
 -- THE SAME definition -- BATCH mode (backfill).
--- Covers: EE07   Lot: L4   Competency: C2, C5
+-- Block: B3, B4.
+-- Lot: B3-L4, B4-L0.
+-- Competency: B3-C2, B3-C5.
+-- Covers: B3-EE07.
 --
 -- Why a second expression rather than calling the function row by row: with 924
 -- cardholders and roughly 601 transactions each, the per-row call costs about

@@ -1,5 +1,8 @@
 -- THE definition of the history features -- REAL-TIME mode (per row).
--- Covers: EE07   Lot: L4   Competency: C2, C5
+-- Block: B3, B4.
+-- Lot: B3-L4, B4-L0.
+-- Competency: B3-C2, B3-C5, B4-C2.
+-- Covers: B3-EE07, B4-EC14.
 --
 -- Its batch counterpart is sql/backfill/features_window.sql. Both must produce
 -- the same values; sql/checks/reconcile_features.sql is what proves it, rather

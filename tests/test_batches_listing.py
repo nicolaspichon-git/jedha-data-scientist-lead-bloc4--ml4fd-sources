@@ -1,8 +1,9 @@
 """The raw-zone listing counts lines, not lines times runs.
 
-Covers: EC12, EC23
-Lot: L7
-Competency: C4
+Block: B3, B4.
+Lot: B3-L7, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC12, B3-EC23.
 
 WHAT HAPPENED. `fd-manager batches` joined fd_raw_events to fd_pipeline_runs on
 batch_id and counted afterwards. batch_id is not a key of fd_pipeline_runs: a

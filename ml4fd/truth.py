@@ -1,8 +1,9 @@
 """Ground truth: the verdict and the date it became known.
 
-Covers: EI01, EI02
-Lot: L5
-Competency: C2
+Block: B3, B4.
+Lot: B3-L5, B4-L0.
+Competency: B3-C2.
+Covers: B3-EI01, B3-EI02.
 
 The verdict does not live on the transaction. That separation is structural --
 fd_transactions has no column for a label -- and not a convention, because a
@@ -63,9 +64,10 @@ def to_bool(value: str) -> bool:
 def label_ts_for(txn_ts: dt.datetime, delay: dt.timedelta) -> dt.datetime:
     """The date the verdict becomes known: the transaction's date plus the delay.
 
-    Covers: EI02
-    Lot: L5
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-L5.
+    Competency: B3-C2.
+    Covers: B3-EI02.
     """
     if txn_ts.tzinfo is None:
         raise ValueError("txn_ts must be timezone-aware; see checks.SOURCE_TZ")
@@ -84,9 +86,10 @@ def to_ground_truth(record: dict[str, str], delay: dt.timedelta,
     parse_ts comes from ml4fd.checks: how a source timestamp is read, time zone
     included, has a single definition.
 
-    Covers: EI01, EI02
-    Lot: L5
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-L5.
+    Competency: B3-C2.
+    Covers: B3-EI01, B3-EI02.
     """
     # Through the profile, and it must agree with to_transaction's: the FK from
     # fd_ground_truth to fd_transactions is on txn_id, so two derivations would
@@ -121,9 +124,10 @@ def load_ground_truth(write_conn: "psycopg.Connection",
     Quarantined lines are skipped: fd_ground_truth references
     fd_transactions(txn_id), and a rejected record never reached that table.
 
-    Covers: EC23
-    Lot: L5
-    Competency: C2, C5
+    Block: B3, B4.
+    Lot: B3-L5.
+    Competency: B3-C2, B3-C5.
+    Covers: B3-EC23.
     """
     columns = ", ".join(OUTPUT_COLUMNS)
     with write_conn.cursor() as cur:

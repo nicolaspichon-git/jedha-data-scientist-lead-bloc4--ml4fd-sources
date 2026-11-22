@@ -1,5 +1,8 @@
 -- Is this batch later than everything already stored?
--- Covers: EE07   Lot: N3   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-N3, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EE07.
 --
 -- The question that decides whether a batch-scoped feature update is sound.
 -- Returns the number of stored transactions that are NOT in the batch and are

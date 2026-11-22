@@ -1,8 +1,9 @@
 """The morning report, as the analyst opens it.
 
-Covers: EE03, EC14
-Lot: R2
-Competency: C4
+Block: B3, B4.
+Lot: B3-R2, B4-L0.
+Competency: B3-C4.
+Covers: B3-EE03, B3-EC14.
 
 ORDER IS THE POINT: the date, then every notice -- absences, the digest, the
 mounts -- then the figures, then the document. ml4fd/dashboard.morning_view()

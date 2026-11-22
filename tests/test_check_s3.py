@@ -1,8 +1,9 @@
 """The acceptance checker of S3: what it enforces and what it only reports.
 
-Covers: EC09, EC17
-Lot: N8
-Competency: C5
+Block: B3, B4.
+Lot: B3-N8, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC09, B3-EC17.
 
 The point of testing an acceptance checker is that a check which cannot fail
 proves nothing. So the alert file is built here in three states -- clean, leaky,
@@ -100,13 +101,13 @@ def _write(root, payloads):
 def test_a_clean_alert_file_passes(tmp_path):
     _write(tmp_path, [CLEAN, dict(CLEAN, txn_id="def:1")])
     rows = _rows(tmp_path)
-    assert rows["N5 aucun champ nominatif dans une alerte"] == ("aucun",
+    assert rows["B3-N5 aucun champ nominatif dans une alerte"] == ("aucun",
                                                                 "aucun")
     # THE VERDICT, and not the pair: this test once asserted
     # ("0 illisible", "0") and passed while the report said ECHEC.
-    for name in ("N5 aucun champ nominatif dans une alerte",
-                 "N5 chaque ligne est du JSON",
-                 "N5 chaque alerte porte sa tracabilite"):
+    for name in ("B3-N5 aucun champ nominatif dans une alerte",
+                 "B3-N5 chaque ligne est du JSON",
+                 "B3-N5 chaque alerte porte sa tracabilite"):
         assert cs3.verdict(*rows[name]) == "OK", (name, rows[name])
 
 
@@ -116,7 +117,7 @@ def test_a_leaked_name_is_caught(tmp_path):
     measurement. This reads the file."""
     _write(tmp_path, [CLEAN, dict(CLEAN, first="Michael", last="Williams")])
     rows = _rows(tmp_path)
-    expected, actual = rows["N5 aucun champ nominatif dans une alerte"]
+    expected, actual = rows["B3-N5 aucun champ nominatif dans une alerte"]
     assert expected == "aucun"
     assert "first" in actual and "last" in actual
 
@@ -125,7 +126,7 @@ def test_the_pseudonym_counts_as_a_leak(tmp_path):
     """client_key is an HMAC: a stable pseudonym over a cardholder's whole
     history. A set of them groups transactions by person without a name."""
     _write(tmp_path, [dict(CLEAN, client_key="deadbeef")])
-    _, actual = _rows(tmp_path)["N5 aucun champ nominatif dans une alerte"]
+    _, actual = _rows(tmp_path)["B3-N5 aucun champ nominatif dans une alerte"]
     assert "client_key" in actual
 
 
@@ -133,7 +134,7 @@ def test_the_label_counts_as_a_leak(tmp_path):
     """An alert carrying is_fraud would hand the verdict to whoever receives
     the notification -- and N6 spent a lot keeping it out."""
     _write(tmp_path, [dict(CLEAN, is_fraud="1")])
-    _, actual = _rows(tmp_path)["N5 aucun champ nominatif dans une alerte"]
+    _, actual = _rows(tmp_path)["B3-N5 aucun champ nominatif dans une alerte"]
     assert "is_fraud" in actual
 
 
@@ -141,7 +142,7 @@ def test_an_unreadable_line_is_counted(tmp_path):
     path = _write(tmp_path, [CLEAN])
     with open(path, "a", encoding="utf-8") as handle:
         handle.write("pas du json\n")
-    row = _rows(tmp_path)["N5 chaque ligne est du JSON"]
+    row = _rows(tmp_path)["B3-N5 chaque ligne est du JSON"]
     assert row == ("0 illisible", "1 illisible")
     assert cs3.verdict(*row) == "<<< ECHEC"
 
@@ -151,7 +152,7 @@ def test_an_alert_without_its_traceability_is_counted(tmp_path):
     and that is the first question of the first incident."""
     partial = {k: v for k, v in CLEAN.items() if k != "model_version"}
     _write(tmp_path, [CLEAN, partial])
-    row = _rows(tmp_path)["N5 chaque alerte porte sa tracabilite"]
+    row = _rows(tmp_path)["B3-N5 chaque alerte porte sa tracabilite"]
     assert row == ("0 incomplete", "1 incomplete")
     assert cs3.verdict(*row) == "<<< ECHEC"
 
@@ -175,48 +176,48 @@ def test_an_empty_file_is_also_unverified(tmp_path):
 
 def test_the_cadence_is_checked_against_the_announced_rate(tmp_path):
     rows = _rows(tmp_path)
-    assert rows["N7 appels/jour contre le debit annonce"] == ("7200", "7200")
+    assert rows["B3-N7 appels/jour contre le debit annonce"] == ("7200", "7200")
 
 
 def test_a_cadence_that_undershoots_the_rate_fails(tmp_path):
     rows = _rows(tmp_path, observed_per_day=lambda: 1440)
-    expected, actual = rows["N7 appels/jour contre le debit annonce"]
+    expected, actual = rows["B3-N7 appels/jour contre le debit annonce"]
     assert expected != actual
 
 
 def test_the_declared_recipe_must_still_be_trainable(tmp_path):
     rows = _rows(tmp_path)
-    assert rows["N4 la recette declaree reste entrainable"][1] == "5 features"
+    assert rows["B3-N4 la recette declaree reste entrainable"][1] == "5 features"
 
 
 def test_a_recipe_still_reading_the_clock_is_named(tmp_path):
     rows = _rows(tmp_path, drop_features=())
-    expected, actual = rows["N4 la recette declaree ne lit plus la pendule"]
+    expected, actual = rows["B3-N4 la recette declaree ne lit plus la pendule"]
     assert "txn_hour" in actual and "txn_weekday" in actual
     assert expected != actual
 
 
 def test_an_unknown_channel_fails(tmp_path):
     rows = _rows(tmp_path, alert_channel="webhoook")
-    assert rows["N5 canal de notification declare"] == ("connu", "INCONNU")
+    assert rows["B3-N5 canal de notification declare"] == ("connu", "INCONNU")
 
 
 def test_a_delivery_semantics_that_can_lose_a_notification_fails(tmp_path):
     rows = _rows(tmp_path, alert_delivery="at-most-once")
-    expected, actual = rows["N5 semantique de livraison declaree"]
+    expected, actual = rows["B3-N5 semantique de livraison declaree"]
     assert expected == "at-least-once"
     assert actual == "at-most-once"
 
 
 def test_a_capacity_nobody_enforces_fails(tmp_path):
     rows = _rows(tmp_path, enforce_capacity=False)
-    assert rows["N5 plafond de capacite applique"] == ("oui", "NON")
+    assert rows["B3-N5 plafond de capacite applique"] == ("oui", "NON")
 
 
 def test_the_verdict_dag_must_not_run_every_minute(tmp_path):
     """EI06, and N6's fourth guarantee: a cadence of its own."""
     rows = _rows(tmp_path)
-    assert rows["N6 cadence de dag_ingest_verdicts distincte de la minute"] \
+    assert rows["B3-N6 cadence de dag_ingest_verdicts distincte de la minute"] \
         == ("oui", "oui")
 
 
@@ -226,11 +227,11 @@ def test_a_clean_operations_file_passes(tmp_path):
     _write(tmp_path, [CLEAN])
     _write_ops(tmp_path, [CLEAN_OPS])
     rows = _rows(tmp_path)
-    assert rows["N9 aucune transaction dans un message d'exploitation"] \
+    assert rows["B3-N9 aucune transaction dans un message d'exploitation"] \
         == ("aucune", "aucune")
-    for name in ("N9 aucune transaction dans un message d'exploitation",
-                 "N9 chaque ligne est du JSON",
-                 "N9 chaque message nomme son controle et son changement"):
+    for name in ("B3-N9 aucune transaction dans un message d'exploitation",
+                 "B3-N9 chaque ligne est du JSON",
+                 "B3-N9 chaque message nomme son controle et son changement"):
         assert cs3.verdict(*rows[name]) == "OK", (name, rows[name])
 
 
@@ -242,7 +243,7 @@ def test_a_transaction_in_an_operations_message_is_caught(tmp_path):
     _write_ops(tmp_path, [dict(CLEAN_OPS, txn_id="abc:1794817599732",
                                amt=371.94, merchant="fraud_Dach-Borer")])
     expected, actual = _rows(tmp_path)[
-        "N9 aucune transaction dans un message d'exploitation"]
+        "B3-N9 aucune transaction dans un message d'exploitation"]
     assert expected == "aucune"
     for name in ("txn_id", "amt", "merchant"):
         assert name in actual
@@ -252,7 +253,7 @@ def test_a_personal_field_in_an_operations_message_is_caught_too(tmp_path):
     _write(tmp_path, [CLEAN])
     _write_ops(tmp_path, [dict(CLEAN_OPS, cc_num="4532...")])
     assert "cc_num" in _rows(tmp_path)[
-        "N9 aucune transaction dans un message d'exploitation"][1]
+        "B3-N9 aucune transaction dans un message d'exploitation"][1]
 
 
 def test_an_absent_operations_file_is_unverified_and_not_passed(tmp_path):
@@ -272,21 +273,21 @@ def test_two_equal_destinations_fail_the_acceptance(tmp_path):
     _write(tmp_path, [CLEAN])
     same = str(tmp_path / "ws" / "alerts.jsonl")
     rows = _rows(tmp_path, ops_file=same)
-    assert rows["N9 destinations distinctes des deux canaux"] \
+    assert rows["B3-N9 destinations distinctes des deux canaux"] \
         == ("distinctes", "IDENTIQUES")
 
 
 def test_an_unknown_operations_channel_fails(tmp_path):
     _write(tmp_path, [CLEAN])
     rows = _rows(tmp_path, ops_channel="pigeon")
-    assert rows["N9 canal d'exploitation declare"] == ("connu", "INCONNU")
+    assert rows["B3-N9 canal d'exploitation declare"] == ("connu", "INCONNU")
 
 
 def test_the_four_controls_are_counted(tmp_path):
     """A control dropped the way the whole stage once was must fail here too,
     and not only in tests/test_health.py."""
     _write(tmp_path, [CLEAN])
-    assert _rows(tmp_path)["N9 les quatre controles de la vue 3.3 sont la"] \
+    assert _rows(tmp_path)["B3-N9 les quatre controles de la vue 3.3 sont la"] \
         == ("4", "4")
 
 
@@ -298,10 +299,10 @@ def test_the_criteria_after_the_alert_file_are_still_reached(tmp_path):
     that used to swallow the rest: no file at all, and a channel that is not a
     file."""
     rows = _rows(tmp_path)                      # no alert file written at all
-    assert "N9 canal d'exploitation declare" in rows
+    assert "B3-N9 canal d'exploitation declare" in rows
 
     rows = _rows(tmp_path, alert_channel="log")
-    assert "N9 canal d'exploitation declare" in rows
+    assert "B3-N9 canal d'exploitation declare" in rows
 
 
 # --- where the DAG files are, which is not where the repo keeps them ----------
@@ -344,12 +345,12 @@ def test_no_directory_at_all_names_where_it_looked(tmp_path):
     are fine. The criterion names the candidates instead."""
     assert config.dags_dir(tmp_path) is None
     rows = _rows(tmp_path, criteria_root=tmp_path)
-    expected, actual = rows["N7 repertoire des DAG"]
+    expected, actual = rows["B3-N7 repertoire des DAG"]
     assert expected == "trouve"
     for candidate in config.DAG_DIRS:
         assert candidate in actual
     # And it does not then blame the DAGs themselves.
-    assert "N7 DAG dag_ingest" not in rows
+    assert "B3-N7 DAG dag_ingest" not in rows
 
 
 def test_the_cadences_are_read_when_the_directory_is_found(tmp_path):
@@ -364,9 +365,9 @@ def test_the_cadences_are_read_when_the_directory_is_found(tmp_path):
     # criteria_root, or this would read the REAL DAGs of the repository and
     # pass for the wrong reason -- which is how the defect survived.
     rows = _rows(tmp_path, criteria_root=tmp_path)
-    assert rows["N7 cadence de dag_ingest"] == ("* * * * *",
+    assert rows["B3-N7 cadence de dag_ingest"] == ("* * * * *",
                                                          "* * * * *")
-    assert rows["N6 cadence de dag_ingest_verdicts distincte de la minute"] \
+    assert rows["B3-N6 cadence de dag_ingest_verdicts distincte de la minute"] \
         == ("oui", "oui")
 
 

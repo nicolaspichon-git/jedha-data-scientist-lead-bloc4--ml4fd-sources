@@ -1,8 +1,9 @@
 """The indexes fd_transactions is read by, held against the queries that read it.
 
-Covers: EC23
-Lot: L5
-Competency: C3, C5
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C3, B4-C5.
+Covers: B4-EC23.
 
 WHY THIS FILE EXISTS. On 21/11/2026 `fd-manager accept` took two minutes, and
 the cause was not a check: fd_transactions carried no index on batch_id, while

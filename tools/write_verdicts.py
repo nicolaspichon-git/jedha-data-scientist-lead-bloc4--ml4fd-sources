@@ -1,8 +1,9 @@
 """Write the withheld verdicts by hand, outside any scoring.
 
-Covers: EE03, EI03, EI12, EC23
-Lot: N6
-Competency: C3, C4
+Block: B3, B4.
+Lot: B3-N6, B4-L0.
+Competency: B3-C3, B3-C4.
+Covers: B3-EE03, B3-EI03, B3-EI12, B3-EC23.
 
 The companion of dag_ingest_verdicts, for the same reason tools/ingest_once.py is
 the companion of the real-time DAG: the acceptance criterion of this lot has to

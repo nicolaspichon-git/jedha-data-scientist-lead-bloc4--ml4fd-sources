@@ -1,8 +1,9 @@
 """Score the same payload twice, with each verdict, and require the same score.
 
-Covers: EE03, EI03, EI12, EC17
-Lot: N6
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-N6, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EE03, B3-EI03, B3-EI12, B3-EC17.
 
 THE ONLY ACCEPTANCE CRITERION OF THIS PLAN THAT MEASURES AN ABSENCE. Every
 other one checks that a function does something; this one checks that a value
@@ -10,7 +11,7 @@ does NOT reach a model. The distinction matters because a leak leaves no trace
 in any metric: a model that reads the label scores beautifully, and the report
 would be the proudest page of the dossier.
 
-The API delivers is_fraud in the SAME payload as the features -- N0 measured it,
+The API delivers is_fraud in the SAME payload as the features -- B3-N0 measured it,
 21 columns, is_fraud present as a str -- so the label sits one line of code away
 from the scoring. tests/test_leak.py reads the code and the schema for the four
 structural guarantees. This runs the chain, with the REGISTERED model, and
@@ -35,7 +36,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
 log = logging.getLogger("check_leak")
 
-# A payload of the measured shape. The values are the ones N0 published as safe
+# A payload of the measured shape. The values are the ones B3-N0 published as safe
 # to record -- no name, no address, no date of birth -- and cc_num is the
 # 19-digit card the measurement found, so the check also crosses the precision
 # boundary that cost S1 a ruling.

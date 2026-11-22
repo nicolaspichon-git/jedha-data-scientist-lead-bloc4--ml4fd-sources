@@ -1,8 +1,9 @@
 """The shape of the daily report DAG, read from its source.
 
-Covers: EE06, EI06, EC09, EC14
-Lot: P4
-Competency: C5
+Block: B3, B4.
+Lot: B3-P4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE06, B3-EI06, B3-EC09, B3-EC14.
 
 Airflow is not installed in the authoring environment, so this reads the file.
 A weaker test than running the DAG, and still the one that catches what matters

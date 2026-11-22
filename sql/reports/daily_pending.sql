@@ -1,5 +1,8 @@
 -- The sentence G2 cannot be answered honestly without.
--- Covers: EE04, EI04, EC14   Lot: P1   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-P1, B4-L0.
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EE04, B3-EI04, B3-EC14.
 --
 -- G2 asks each morning for "yesterday's payments AND FRAUDS". Taken at its
 -- word the request is impossible: yesterday's frauds are not known yesterday,

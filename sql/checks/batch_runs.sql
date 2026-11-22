@@ -1,5 +1,8 @@
 -- The runs that carry one batch. Readable by fd_ingest AND by fd_purge.
--- Covers: EC18, EC23   Lot: Q7   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-Q7, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC18, B3-EC23.
 --
 -- SPLIT FROM batch_stores.sql ALONG A PRIVILEGE BOUNDARY, not for tidiness.
 -- fd_purge holds no grant whatsoever on fd_transactions -- that is the

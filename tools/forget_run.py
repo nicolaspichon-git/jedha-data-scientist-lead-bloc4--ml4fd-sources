@@ -1,8 +1,9 @@
 """Forget one named batch. ROWS LEAVE THE DATABASE HERE.
 
-Covers: EC18, EC19, EC23, EC26
-Lot: Q7
-Competency: C2, C3
+Block: B3, B4.
+Lot: B3-Q7, B4-L0.
+Competency: B3-C2, B3-C3.
+Covers: B3-EC18, B3-EC19, B3-EC23, B3-EC26.
 
 It plans, prints the plan, refuses on any of the plan's grounds, then deletes
 in committed slices and journals each store in fd_purges -- the purge's own

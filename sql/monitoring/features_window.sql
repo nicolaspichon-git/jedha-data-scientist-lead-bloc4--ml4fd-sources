@@ -1,5 +1,8 @@
 -- The transactions of a window, with the features the model reads (EC39).
--- Covers: EC39   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC39.
 --
 -- THE SAME SELECT LIST AS sql/scoring/rows_to_score.sql, deliberately, down to
 -- the derivation of txn_hour and txn_weekday. The drift being measured is the

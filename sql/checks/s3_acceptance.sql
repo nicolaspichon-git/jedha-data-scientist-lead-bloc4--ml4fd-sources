@@ -1,6 +1,8 @@
 -- The acceptance criteria of S3, lots N1 to N9. Every verdict must read OK.
--- Covers: EE01, EE02, EE09, EI01, EI03, EI05, EC09, EC14, EC17, EC23, EC24
--- Lot: N8   Competency: C1, C4, C5
+-- Block: B3, B4.
+-- Lot: B3-N8, B4-L0.
+-- Competency: B3-C1, B3-C4, B3-C5.
+-- Covers: B3-EE01, B3-EE02, B3-EE09, B3-EI01, B3-EI03, B3-EI05, B3-EC09, B3-EC14, B3-EC17, B3-EC23, B3-EC24.
 --
 -- THE DECISIVE ONE IS THE BLIND BAND, criterion 9: every verdict of the stream
 -- must sit exactly one declared delay after its transaction, and none may be

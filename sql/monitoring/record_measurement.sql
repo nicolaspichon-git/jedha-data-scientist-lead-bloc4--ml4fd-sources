@@ -1,5 +1,8 @@
 -- Record one monitoring measurement. Append only (EC45).
--- Covers: EC45   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC45.
 --
 -- One statement, named parameters, as every file under sql/ that db.py runs.
 -- measured_at is left to its DEFAULT now(): the time a measurement was taken

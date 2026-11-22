@@ -1,6 +1,9 @@
 -- The series behind the monitoring page's charts (S6/R11): every judged
 -- measurement of the period, in order.
--- Covers: EC45, EC49   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC45, B4-EC49.
 --
 -- WHY THIS QUERY IS WHAT EC45 IS FOR. "Conserver l'historique des mesures,
 -- afin de pouvoir constater une evolution dans le temps long" -- the keeping

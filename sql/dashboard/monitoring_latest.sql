@@ -1,6 +1,9 @@
 -- Where each monitoring control stands now (S6/R11): the most recent JUDGED
 -- measurement of each one, with the state it carries and since when.
--- Covers: EC45, EC49   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC45, B4-EC49.
 --
 -- JUDGED AND NOT OBSERVED. drift_measurements records two kinds of row: the
 -- share of drifted columns, which carries a verdict, and one row per column,

@@ -1,6 +1,9 @@
 -- Every decision served over a calendar period, grouped by the path it came
 -- from, read through fd_scoring_decisions.
--- Covers: EC16, EC19   Lot: L5   Competency: C3
+-- Block: B4.
+-- Lot: B4-L5.
+-- Competency: B4-C3.
+-- Covers: B4-EC16, B4-EC19.
 --
 -- READ THROUGH THE VIEW AND NOT THE TWO TABLES, which is the whole point of
 -- 195_scoring_decisions.sql: a decision is recorded once, by whoever holds

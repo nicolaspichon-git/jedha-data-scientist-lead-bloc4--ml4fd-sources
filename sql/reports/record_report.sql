@@ -1,5 +1,8 @@
 -- Record a produced report. WRITTEN AFTER THE DOCUMENT, never before.
--- Covers: EC14, EC23   Lot: P3   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-P3, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EC14, B3-EC23.
 --
 -- THE ORDER IS THE SAME AS N5's, AND FOR THE SAME REASON turned around:
 -- recording first would leave the table claiming a document that was never

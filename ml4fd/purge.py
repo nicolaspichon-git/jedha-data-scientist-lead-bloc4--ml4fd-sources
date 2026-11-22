@@ -1,8 +1,9 @@
 """What a purge would delete, measured before anything is deleted.
 
-Covers: EC26, EI13, EC16, EC19
-Lot: Q2
-Competency: C5
+Block: B3, B4.
+Lot: B3-Q2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC26, B3-EI13, B3-EC16, B3-EC19.
 
 NOTHING IN THIS MODULE DELETES. It is the dry run of S5, and S5 is the only
 process of the project that destroys: everywhere else a mistake is repaired by

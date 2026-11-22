@@ -1,9 +1,10 @@
-"""Acceptance criteria of S5 that SQL cannot reach: the declaration, the DAG,
+"""Acceptance criteria of B3-S5 that SQL cannot reach: the declaration, the DAG,
 the files.
 
-Covers: EC16, EC18, EC19, EC23, EC27
-Lot: Q6
-Competency: C1, C4, C5
+Block: B3, B4.
+Lot: B3-Q6, B4-L0.
+Competency: B3-C1, B3-C4, B3-C5.
+Covers: B3-EC16, B3-EC18, B3-EC19, B3-EC23, B3-EC27.
 
 The criteria of S5 that the database holds live in sql/checks/s5_acceptance.sql,
 because they are questions about rows and about privileges. What is here is
@@ -11,13 +12,13 @@ everything else:
 
   THE DECLARED DURATIONS AGAINST THE APPLIED BOUNDARIES. governance.yml says
   ninety days; fd_purges records the cutoff each purge actually used. The two
-  agreeing is the whole of EC18 -- "une duree non appliquee n'est pas une
+  agreeing is the whole of B3-EC18 -- "une duree non appliquee n'est pas une
   politique" -- and it is a question neither side can answer alone: the SQL
   cannot read the governance, and the governance cannot know what ran.
 
   THE DAG AND ITS CADENCE, read from the file: weekly, on a Sunday, no
   catch-up, and NO WAY TO OVERRIDE THE BOUNDARY. That last one is the criterion
-  Q5 exists for -- a parameter of a demonstration left in an orchestrator ends
+  B3-Q5 exists for -- a parameter of a demonstration left in an orchestrator ends
   up being used, and here that means deleting data that had not reached its
   retention.
 
@@ -74,57 +75,57 @@ def criteria(root: Path):
 
 def _declaration(item, settings):
     """Every store of the project carries a decision. Read from governance."""
-    yield item("Q0 duree de la zone brute", "90 jours",
+    yield item("B3-Q0 duree de la zone brute", "90 jours",
                "%d jours" % settings.raw_retention_days)
-    yield item("Q0 duree de la quarantaine, egale a celle de la zone brute",
+    yield item("B3-Q0 duree de la quarantaine, egale a celle de la zone brute",
                "90 jours", "%d jours" % settings.quarantine_retention_days)
-    yield item("Q0 duree des journaux d'Airflow, au plus celle de la zone brute",
+    yield item("B3-Q0 duree des journaux d'Airflow, au plus celle de la zone brute",
                "oui",
                "oui" if settings.airflow_logs_retention_days
                <= settings.raw_retention_days else
                "NON : %d jours" % settings.airflow_logs_retention_days)
-    yield item("Q2 part declaree du garde-fou", "0.5",
+    yield item("B3-Q2 part declaree du garde-fou", "0.5",
                "%s" % settings.purge_max_share)
 
 
 def _dag(item, root: Path, settings):
-    """The orchestration of Q5, read from the file."""
+    """The orchestration of B3-Q5, read from the file."""
     from ml4fd import config
 
     dags = config.dags_dir(root)
     if dags is None:
-        yield item("Q5 repertoire des DAG", "trouve",
+        yield item("B3-Q5 repertoire des DAG", "trouve",
                    "ABSENT : cherche dans %s" % ", ".join(config.DAG_DIRS))
         return
-    yield item("info repertoire des DAG lu", "mesure", str(dags))
+    yield item("B3-Q5 info repertoire des DAG lu", "mesure", str(dags))
 
     path = dags / "dag_purge.py"
     if not path.is_file():
-        yield item("Q5 DAG dag_purge", "present", "ABSENT dans %s" % dags)
+        yield item("B3-Q5 DAG dag_purge", "present", "ABSENT dans %s" % dags)
         return
     body = path.read_text(encoding="utf-8")
 
     found = re.search(r'schedule="([^"]+)"', body)
     schedule = found.group(1) if found else "aucune"
-    yield item("Q5 cadence de dag_purge contre la declaration",
+    yield item("B3-Q5 cadence de dag_purge contre la declaration",
                settings.purge_schedule, schedule)
 
     parts = schedule.split()
-    yield item("Q5 cadence hebdomadaire, le dimanche", "oui",
+    yield item("B3-Q5 cadence hebdomadaire, le dimanche", "oui",
                "oui" if len(parts) == 5 and parts[4] == "0"
                and parts[2] == "*" and parts[3] == "*" else "NON : " + schedule)
 
-    yield item("Q5 dag_purge ne rattrape pas les dimanches manques", "oui",
+    yield item("B3-Q5 dag_purge ne rattrape pas les dimanches manques", "oui",
                "oui" if "catchup=False" in body else "NON")
 
-    # THE CRITERION Q5 EXISTS FOR. The source minus its docstrings, because the
+    # THE CRITERION B3-Q5 EXISTS FOR. The source minus its docstrings, because the
     # module explains at length what it must never do, and a grep over the
     # prose would find the explanation.
     code = _code(body)
-    yield item("Q5 aucune surcharge de la borne exposee par le DAG", "oui",
+    yield item("B3-Q5 aucune surcharge de la borne exposee par le DAG", "oui",
                "oui" if ("before" not in code and "params" not in code)
                else "NON")
-    yield item("Q5 aucune horloge lue par le DAG", "oui",
+    yield item("B3-Q5 aucune horloge lue par le DAG", "oui",
                "oui" if not any(clock in code for clock in
                                 ("now()", "utcnow()", "today()",
                                  "datetime.now")) else "NON")
@@ -151,7 +152,7 @@ def _applied(item, conn, settings):
     """The declared durations against the boundaries the purges used.
 
     NEITHER SIDE CAN ANSWER THIS ALONE: the SQL file cannot read governance.yml,
-    and governance.yml cannot know what ran. This is the whole of EC18.
+    and governance.yml cannot know what ran. This is the whole of B3-EC18.
     """
     with conn.cursor() as cur:
         cur.execute(
@@ -184,11 +185,11 @@ def _applied(item, conn, settings):
     for store, ran_at, as_of, cutoff, deleted, refused in rows:
         days = expected.get(store)
         if days is None:
-            yield item("Q6 magasin journalise mais non declare : %s" % store,
+            yield item("B3-Q6 magasin journalise mais non declare : %s" % store,
                        "declare", "INCONNU")
             continue
         observed = (as_of - cutoff).days
-        yield item("Q6 borne appliquee a %s contre la duree declaree" % store,
+        yield item("B3-Q6 borne appliquee a %s contre la duree declaree" % store,
                    "%d jours" % days, "%d jours" % observed)
         yield item("info %s : derniere purge, lignes supprimees, refus" % store,
                    "mesure", "%s, %d, %d"
@@ -212,7 +213,7 @@ def _datasets(item, conn, settings, root: Path):
             if not path.is_file():
                 missing.append("%s -> %s" % (version, declared))
 
-    yield item("Q6 fichiers de jeux decrits par fd_datasets et absents du disque",
+    yield item("B3-Q6 fichiers de jeux decrits par fd_datasets et absents du disque",
                "0", "%d" % len(missing))
     if missing:
         yield item("info jeux manquants", "mesure", " | ".join(missing[:3]))
@@ -237,7 +238,7 @@ def main(argv) -> int:
     root = Path(args.root)
 
     print("")
-    print("Criteres d'acceptation de S5 que SQL n'atteint pas")
+    print("Criteres d'acceptation de B3-S5 que SQL n'atteint pas")
     print("Projet examine : %s" % root)
     print("")
 

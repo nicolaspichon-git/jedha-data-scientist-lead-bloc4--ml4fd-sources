@@ -1,8 +1,9 @@
 """The database driver is imported where it is used, and not on import.
 
-Covers: EC23
-Lot: L5
-Competency: C3, C4
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C3, B4-C4.
+Covers: B4-EC23.
 
 WHY THIS IS A RULE AND NOT A STYLE. ml4fd/build.py, datasets.py, features.py
 and guard.py already annotate "psycopg.Connection" under TYPE_CHECKING, so

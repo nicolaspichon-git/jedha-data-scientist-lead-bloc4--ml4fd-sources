@@ -1,8 +1,9 @@
-"""L5: the scoring service's own logic, kept out of the HTTP layer.
+"""B4-L5: the scoring service's own logic, kept out of the HTTP layer.
 
-Covers: EC15, EC16, EC19, EC20, EC21
-Lot: L5
-Competency: C2, C3
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C2, B4-C3.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
 
 WHY THIS MODULE EXISTS AND scoring_service/app.py IS THIN. The same arrangement the
 dashboard uses: everything a caller sees is decided here, where pytest can
@@ -19,7 +20,7 @@ a payment received.
 WHAT IT NEVER KEEPS. The caller sends a card number and a home location. The
 number is turned into the same pseudonym ml4fd/transform.py writes
 (client_key), the location into a distance, and fd_scoring_service_calls has no column for
-either -- EC17 enforced by the schema, not promised in a comment.
+either -- B4-EC17 enforced by the schema, not promised in a comment.
 """
 from __future__ import annotations
 
@@ -66,14 +67,15 @@ def problems(payload: dict, max_amount: float) -> list[str]:
     window: a caller who fixes one field and is then told about the next has to
     guess how many rounds are left.
 
-    EXPLICIT, WHICH IS WHAT EC20 ASKS. "requete non conforme" names nothing;
+    EXPLICIT, WHICH IS WHAT B4-EC20 ASKS. "requete non conforme" names nothing;
     these sentences name the field, what was received and what is expected. The
     404 of a wrong route and the 422 of a wrong field are different answers and
     the caller must be able to tell them apart without reading our logs.
 
-    Covers: EC20
-    Lot: L5
-    Competency: C3
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C3.
+    Covers: B4-EC20.
     """
     absent = missing(payload)
     if absent:
@@ -140,9 +142,10 @@ def anonymous(payload: dict, pepper: str) -> dict:
     second definition of the pseudonym, and the first mismatch would be
     invisible.
 
-    Covers: EC17
-    Lot: L5
-    Competency: C3, C4
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C3, B4-C4.
+    Covers: B4-EC17.
     """
     return {"txn_ts": instant(payload["txn_ts"]),
             "client_key": transform.client_key(str(payload["cc_num"]).strip(),
@@ -277,9 +280,10 @@ def batch_answer(scorer: score.Scorer, rows: list) -> dict:
     rounded to the scale it will be stored at BEFORE the comparison, so the
     decision this returns and the CHECK on fd_scores cannot differ.
 
-    Covers: EC16, EC19
-    Lot: L5
-    Competency: C3
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C3.
+    Covers: B4-EC16, B4-EC19.
     """
     if len(rows) > MAX_BATCH_ROWS:
         raise ValueError(
@@ -301,7 +305,7 @@ def batch_answer(scorer: score.Scorer, rows: list) -> dict:
 
 
 def sentence(decision: dict, row: dict) -> str:
-    """The decision as a sentence, which is what EC15 asks for.
+    """The decision as a sentence, which is what B4-EC15 asks for.
 
     A SENTENCE AND NOT A NUMBER, and the requirement is about who reads it:
     "restituer la sortie du modele sous une forme exploitable par une
@@ -312,9 +316,10 @@ def sentence(decision: dict, row: dict) -> str:
     never a replacement: a caller that needs the number must not have to parse
     French to find it.
 
-    Covers: EC15
-    Lot: L5
-    Competency: C3
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C2.
+    Covers: B4-EC15.
     """
     verdict = ("signalee pour verification"
                if decision["flagged"] else "acceptee sans signalement")
@@ -356,7 +361,7 @@ def record(conn: "psycopg.Connection", call: dict, row: dict,
 def health(scorer: score.Scorer | None, problem: str | None = None) -> dict:
     """What the health endpoint announces, including the version served.
 
-    THE VERSION IS THE POINT, which is what EC21 asks for: a service that
+    THE VERSION IS THE POINT, which is what B4-EC21 asks for: a service that
     answers "ok" without saying what it serves cannot be distinguished from
     one that has been serving last month's model since a promotion nobody
     noticed. score.load() resolves the alias before its cache, so the version
@@ -367,9 +372,10 @@ def health(scorer: score.Scorer | None, problem: str | None = None) -> dict:
     ordinary state before the first promotion and a different problem from a
     process that has stopped.
 
-    Covers: EC21
-    Lot: L5
-    Competency: C3
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C3.
+    Covers: B4-EC21.
     """
     if scorer is None:
         return {"state": "degraded", "model_version": None,

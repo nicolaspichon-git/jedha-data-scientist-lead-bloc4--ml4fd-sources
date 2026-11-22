@@ -4,11 +4,12 @@
     python tools/build_traceability.py            # writes TRACEABILITY.md
     python tools/build_traceability.py --check    # writes nothing, non-zero on a break
 
-Covers: EC07, EC28, EC50
-Lot: L8 (repointe et reduit en L4, 20/11/2026)
-Competency: C1, C6
+Block: B4.
+Lot: B3-L8, B4-L0.
+Competency: B4-C1, B4-C6.
+Covers: B3-EC07, B3-EC28, B4-EC50.
 
-EC50 IS THIS FILE'S OWN REQUIREMENT -- "tenir une matrice de tracabilite
+B4-EC50 IS THIS FILE'S OWN REQUIREMENT -- "tenir une matrice de tracabilite
 competence -> exigence -> element de la solution -> emplacement" -- and it went
 unmarked while the generator read a document that did not exist. Marked here
 rather than anywhere else: the requirement asks for the matrix to be KEPT, and
@@ -45,7 +46,7 @@ document this matrix does not read yet, which is a different thing from naming
 nothing. Reporting them as breaks would train the reader to ignore the report.
 
 THE COMPETENCY COMES FROM THE SECTION a requirement sits under, not from the
-Source column. Source says where a requirement comes from ("C2/EC05", "R1§Ex.")
+Source column. Source says where a requirement comes from ("B4-C2/ B4-EC05", "[R1, §Ex.]")
 and happens to carry a competency most of the time; the section heading says
 which competency the requirement belongs to, always. A jury reads competency ->
 requirement -> code, so that is the column the matrix carries.
@@ -72,17 +73,23 @@ MATRIX = ROOT / "TRACEABILITY.md"
 # beside it. A list of places to look is a list that goes stale the moment
 # somebody adds a place.
 SCANNED = ("ml4fd", "sql", "tests", "tools", "airflow", "dashboard",
-           "scoring_service", "producer")
+           "scoring_service", "producer", ".github")
 
 # IN SCOPE and OUT OF SCOPE, declared apart. The first is what the matrix is
 # complete about; the second is what the code may legitimately mark while the
 # cahier des charges is being written.
-IN_SCOPE = re.compile(r"\b(EC[0-9]{2})\b")
-OUT_OF_SCOPE = re.compile(r"\b((?:EE|EI)[0-9]{2})\b")
-SECTION = re.compile(r"^\|\s*\|\s*\*\*(C[0-9])\s*:")
-MARK = re.compile(r"Covers:\s*(.+)")
+#
+# BOTH CARRY THEIR BLOCK PREFIX, since 2026-11-21. BC03 and BC04 each number
+# their requirements from EC01, so a bare EC07 names two different things and
+# this file used to count BC03's marks as BC04's. In scope is B4- only; every
+# B3- requirement, EC included, is out of scope. A bare EC is neither: it is a
+# mark not yet resolved, and counting it would credit the dossier with a guess.
+IN_SCOPE = re.compile(r"(?<![\w-])(B4-EC[0-9]{2})(?![\w])")
+OUT_OF_SCOPE = re.compile(r"(?<![\w-])(B3-(?:EE|EI|EC)[0-9]{2})(?![\w])")
+SECTION = re.compile(r"^\|\s*\|\s*\*\*(B4-C[0-9])\s*:")
+MARK = re.compile(r"^\s*(?:#|--|\*)?\s*Covers:\s*(.+)")
 COMPETENCY = re.compile(r"Competency:\s*([^\n]+)")
-COMP = re.compile(r"\b(C[0-9])\b")
+COMP = re.compile(r"(?<![\w-])(B4-C[0-9])\b")
 
 # The Type column of the requirements document spells a kind as a LETTER, and
 # sometimes two ("D/F"). BC03's spelled it out in prose ("documentaire,
@@ -104,8 +111,8 @@ LEGEND = ("L = livrable, D = documentaire, DM = demonstration, "
 # L LEFT THIS TUPLE ON 2026-11-20, and that is a correction rather than a
 # loosening. A deliverable is a thing that must EXIST -- a presentation, a
 # repository, a report -- and three of this dossier's four carry no line of
-# code by their nature: EC46 is a slide deck, EC48 is five minutes of speech,
-# EC47 is "heberger le code sur GitHub", which was already true when it was
+# code by their nature: B4-EC46 is a slide deck, B4-EC48 is five minutes of speech,
+# B4-EC47 is "heberger le code sur GitHub", which was already true when it was
 # first reported as missing code. Counting them as debt put three items on a
 # to-do list that no amount of code could ever clear, which is the fastest way
 # to teach a reader to skip a section.
@@ -173,7 +180,7 @@ def defined() -> dict[str, dict]:
             if line.startswith("|") and "Exigence" in line and "Type" in line:
                 head = columns(line)
             continue
-        found = re.match(r"^\|\s*\*{0,2}(EC[0-9]{2})\*{0,2}\s*\|", line)
+        found = re.match(r"^\|\s*\*{0,2}(B4-EC[0-9]{2})\*{0,2}\s*\|", line)
         if not found:
             continue
         cells = [cell.strip() for cell in line.split("|")]
@@ -212,7 +219,7 @@ def tagged() -> tuple[dict, dict, dict]:
         if not folder.exists():
             continue
         for path in sorted(folder.rglob("*")):
-            if path.suffix not in (".py", ".sql"):
+            if path.suffix not in (".py", ".sql", ".yml", ".yaml"):
                 continue
             lines = read(path).split("\n")
             for number, line in enumerate(lines):
@@ -234,12 +241,15 @@ def tagged() -> tuple[dict, dict, dict]:
                 # looked for a path the repository spells with slashes.
                 where = "%s:%d%s" % (path.relative_to(ROOT).as_posix(),
                                      number + 1, scope)
-                # THE SECOND DECLARATION OF THE SAME BLOCK. Covers: and
-                # Competency: are written together, three lines apart, and they
-                # say the same thing twice -- which is what makes them
-                # checkable against the document's own grouping. See
-                # disagreements().
-                block = "\n".join(lines[number:number + 4])
+                # THE SECOND DECLARATION OF THE SAME BLOCK. A marking block
+                # reads Block, Lot, Competency, Covers, in that order, so the
+                # Competency: line sits just ABOVE Covers:, and the two say the
+                # same thing twice -- which is what makes them checkable
+                # against the document's own grouping. See disagreements().
+                # The window looked below Covers: until 2026-11-21, when the
+                # blocks were reordered; it then saw no competency at all and
+                # compared nothing, silently.
+                block = "\n".join(lines[max(0, number - 3):number + 1])
                 said = COMPETENCY.search(block)
                 claimed = tuple(COMP.findall(said.group(1))) if said else ()
                 for name in IN_SCOPE.findall(mark.group(1)):
@@ -265,7 +275,7 @@ def disagreements(req: dict[str, dict], declared: dict) -> list[tuple]:
 
     WHAT THIS CATCHES, AND WHY NO SEMANTICS ARE NEEDED. The requirements
     document files every EC under a competency section; a marking block in the
-    code declares a competency of its own, three lines under its Covers:. Two
+    code declares a competency of its own, just above its Covers:. Two
     independent declarations of the same fact -- so they can be compared, and
     when they disagree one of them is wrong.
 
@@ -286,9 +296,10 @@ def disagreements(req: dict[str, dict], declared: dict) -> list[tuple]:
     and inventing a verdict for it would put noise in a report whose whole
     value is that every line in it means something.
 
-    Covers: EC07
-    Lot: L4
-    Competency: C1
+    Block: B3, B4.
+    Lot: B3-?, B4-L0.
+    Competency: B3-C2.
+    Covers: B3-EC07.
     """
     out = []
     for name in sorted(declared):
@@ -357,18 +368,18 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
            "> Fichier **genere** par `tools/build_traceability.py`. "
            "Ne pas editer a la main.",
            "> Les emplacements viennent des marques `Covers:` du code.",
-           "> Perimetre : les exigences de competence (EC) de "
+           "> Perimetre : les exigences de competence (B4-EC) de "
            "`step-0/ml4fd-project--d0-requirements.md`.",
            "",
-           "> **A lire avant de se fier a la colonne Code.** Les marques "
-           "`Covers:` des lots anciens ont ete ecrites contre le referentiel "
-           "dont ce projet est issu, que le document d'exigences a depuis "
-           "renumerote : `ml4fd/stream.py` marque EC01, que le document enonce "
-           "comme *produire un cahier des charges*. Les marques de C5 et C6 "
-           "ont ete ecrites contre le document actuel. Le tableau "
-           "*Marques en desaccord* plus bas est le point de depart du "
-           "repointage ; tant qu'il n'est pas vide, la couverture de C1 a C4 "
-           "est a verifier une marque a la fois.",
+           "> **A lire avant de se fier a la colonne Code.** BC03 et BC04 "
+           "numerotent chacun leurs exigences a partir de EC01 : un `EC07` "
+           "nu designe deux choses. Depuis le 21/11/2026, chaque marque porte "
+           "son prefixe, et seules les marques `B4-` comptent ici. Les "
+           "marques `B3-` -- l'heritage de BC03, dont ce projet est issu -- "
+           "sont listees a part, hors perimetre, et ne couvrent aucune "
+           "exigence de ce document : `ml4fd/stream.py` marque `B3-EC01`, "
+           "qui n'est pas `B4-EC01` (*produire un cahier des charges*). Une "
+           "marque sans prefixe n'est comptee nulle part.",
            "",
            "> Nature : " + LEGEND + ".",
            "",
@@ -413,8 +424,8 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
                 "section sous laquelle le document classe l'exigence. Les deux "
                 "sont des declarations du meme fait, donc l'une des deux est "
                 "fausse. Une frontiere reelle en est un cas particulier et se "
-                "corrige du cote de la marque : EC33 est declenchee par le "
-                "monitoring (C6) et executee par le reentrainement (C5), et "
+                "corrige du cote de la marque : B4-EC33 est declenchee par le "
+                "monitoring (B4-C6) et executee par le reentrainement (B4-C5), et "
                 "`tests/test_monitor.py` a cesse d'y figurer le jour ou sa "
                 "ligne `Competency:` a dit les deux. Ces emplacements portent "
                 "**(!)** dans la colonne Code. Ils ne changent aucun compte : "
@@ -423,11 +434,11 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
                 "| --- | --- | --- | --- |"]
         out += ["| **%s** | %s | %s | `%s` |" % row for row in suspect]
     if outside:
-        out += ["", "### Hors perimetre pour l'instant", "",
-                "Le code porte aussi des marques EE et EI, heritees du "
-                "referentiel d'exigences dont le cahier des charges complet "
-                "est en cours. Elles sont listees ici pour ne pas etre "
-                "perdues, et ne comptent pas comme ruptures.", "",
+        out += ["", "### Hors perimetre : l'heritage de BC03", "",
+                "Le code porte aussi des marques `B3-` -- EE, EI et EC du "
+                "referentiel de BC03, dont ce projet reprend la base de code "
+                "(lot B4-L0). Elles sont listees ici pour ne pas etre perdues, "
+                "et ne comptent ni comme couverture ni comme ruptures.", "",
                 ", ".join("**%s** (%d)" % (name, len(places))
                           for name, places in sorted(outside.items()))]
     return "\n".join(out) + "\n"
@@ -458,7 +469,7 @@ def main(argv=None) -> int:
             for line in by_competency(req, code, no_code):
                 print("    %s" % line)
         if outside:
-            print("  %d marques EE/EI hors perimetre, non comptees"
+            print("  %d identifiants B3- hors perimetre, non comptes"
                   % len(outside))
         # A DISAGREEMENT IS NOT A FAILURE HERE. 304 of them on the first
         # run, and some are legitimate -- see coverage(). A chain that is red

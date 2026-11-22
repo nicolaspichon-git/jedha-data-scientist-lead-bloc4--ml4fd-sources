@@ -1,6 +1,8 @@
 -- The acceptance criteria of S1, as one table. Every verdict must read OK.
--- Covers: EC01, EC12, EC17, EC20, EC23, EE08, EI01, EI04   Lot: L8
--- Competency: C1, C2, C4, C5
+-- Block: B3, B4.
+-- Lot: B3-L8, B4-L0.
+-- Competency: B3-C1, B3-C2, B3-C4, B3-C5.
+-- Covers: B3-EC01, B3-EC12, B3-EC17, B3-EC20, B3-EC23, B3-EE08, B3-EI01, B3-EI04.
 --
 -- THE EXPECTED VALUES ARE DERIVED AND NOT WRITTEN DOWN, and that is the rule
 -- this file now follows. Each one is read from the raw zone, from the run

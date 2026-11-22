@@ -1,8 +1,9 @@
 """Every path governance.yml declares must also be mounted into the container.
 
-Covers: EC23, EC24
-Lot: P2
-Competency: C5
+Block: B3, B4.
+Lot: B3-P2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC23, B3-EC24.
 
 THE FAILURE THIS FILE EXISTS FOR, and it is the third time this project has paid
 for it:

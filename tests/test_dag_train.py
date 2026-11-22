@@ -1,8 +1,9 @@
 """What the training DAG must thread through, without importing Airflow.
 
-Covers: EC05, EC23, EI04
-Lot: N4
-Competency: C1, C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C1, B3-C5.
+Covers: B3-EC05, B3-EC23, B3-EI04.
 
 The DAG cannot be imported here -- Airflow is not installed in the authoring
 environment -- so these read its source. That is a weaker test than running it,

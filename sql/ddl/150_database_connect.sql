@@ -1,5 +1,8 @@
 -- WHO MAY CONNECT TO THE BUSINESS DATABASE. Closed by default, opened by name.
--- Covers: EC18, EC22   Lot: L1   Competency: C3
+-- Block: B4.
+-- Lot: B4-L1.
+-- Competency: B4-C3.
+-- Covers: B4-EC18, B4-EC22.
 --
 -- PostgreSQL grants CONNECT on a new database to PUBLIC, that is to every
 -- role the cluster will ever hold. fd_dashboard relied on that default: its
@@ -61,7 +64,7 @@ BEGIN
 
     -- The two service roles are refused here, and their own databases refuse
     -- everyone but them (sql/initdb/010_databases.sh). Restated on every
-    -- replay: this is the separation L1 exists for, and it should not depend
+    -- replay: this is the separation B4-L1 exists for, and it should not depend
     -- on a file that runs once at first boot.
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fd_airflow') THEN
         EXECUTE format('REVOKE CONNECT ON DATABASE %I FROM fd_airflow',

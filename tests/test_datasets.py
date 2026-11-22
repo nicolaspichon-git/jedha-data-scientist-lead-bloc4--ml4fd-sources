@@ -1,4 +1,10 @@
-"""Recipe identity, and the labelling horizon that bounds every cut-off."""
+"""Recipe identity, and the labelling horizon that bounds every cut-off.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 import datetime as dt
 import re
 from pathlib import Path

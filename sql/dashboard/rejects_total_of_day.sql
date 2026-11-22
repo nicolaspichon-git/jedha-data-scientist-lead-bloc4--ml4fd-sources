@@ -1,5 +1,8 @@
 -- The quarantine of a calendar period, in total. Read by the dashboard (R7).
--- Covers: EC15   Lot: R7, R8   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R7, B3-R8, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC15.
 --
 -- Read here rather than summed from rejects_of_day.sql: a line rejected for
 -- two reasons is ONE line, and only a count over the whole day says so.

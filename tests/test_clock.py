@@ -1,8 +1,9 @@
 """The one permutation that simulates the stream's clock.
 
-Covers: EI04, EC24
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EI04, B3-EC24.
 
 It lives in one module because two tools need it -- the N4 measurement and the
 re-choice of the threshold -- and two copies of a permutation are two chances to

@@ -1,5 +1,8 @@
 -- The batches of the raw zone that are beyond retention, with their fingerprint.
--- Covers: EC19, EC26   Lot: Q2   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-Q2, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EC19, B3-EC26.
 --
 -- READ ONLY. This file decides WHAT IS PURGEABLE, and the delete of Q3 takes
 -- its batch_id from here rather than carrying a date predicate of its own: one

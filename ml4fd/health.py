@@ -1,8 +1,9 @@
 """The health of the ingestion pipeline, and telling the operator about it.
 
-Covers: EC14, EC17
-Lot: N9
-Competency: C1, C2, C4
+Block: B3, B4.
+Lot: B3-N9, B4-L0.
+Competency: B3-C1, B3-C2, B3-C4.
+Covers: B3-EC14, B3-EC17.
 
 THE STAGE THE DESIGN HAD AND THE CODE DID NOT. Diagram 3.3 of the project
 specifies a third stage of the ingestion DAG -- "(3c) dag_ingest : check" --
@@ -456,9 +457,10 @@ def check(conn, settings, dag_id: str, run_id: str | None = None) -> dict:
     A red control is this function's normal output, not an error: failing the
     run on one would stop the ingestion the control exists to watch.
 
-    Covers: EC14
-    Lot: N9
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-N9, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EC14.
     """
     start, end = rolling_window(conn, settings.ops_window_minutes)
     facts = facts_of(conn, dag_id, start, end)
@@ -480,9 +482,10 @@ def notify_ops(conn, settings, report: dict) -> dict:
     later run would announce it -- there would no longer be a transition to
     see. That failure is silent and permanent; a duplicate is neither.
 
-    Covers: EC14, EC17
-    Lot: N9
-    Competency: C3, C4
+    Block: B3, B4.
+    Lot: B3-N9, B4-L0.
+    Competency: B3-C3, B3-C4.
+    Covers: B3-EC14, B3-EC17.
     """
     channel_name = settings.ops_channel
     send = channel_of(channel_name)

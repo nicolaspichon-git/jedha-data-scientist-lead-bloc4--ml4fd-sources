@@ -1,5 +1,8 @@
 -- The journal of the promotions: one row per decision, promoted or refused.
--- Covers: EC34, EC35, EC37   Lot: L3   Competency: C5
+-- Block: B4.
+-- Lot: B4-L3.
+-- Competency: B4-C5.
+-- Covers: B4-EC34, B4-EC35, B4-EC37.
 --
 -- WHY A TABLE AND NOT A LOG LINE. A promotion changes what the system serves,
 -- and a refusal explains why it did not. Both have to be answerable months

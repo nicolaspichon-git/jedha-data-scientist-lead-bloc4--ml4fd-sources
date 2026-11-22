@@ -1,5 +1,8 @@
 -- Give fd_dashboard its password, from .env. Run by `fd-manager init`.
--- Covers: EC19   Lot: R0   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-R0, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EC19.
 --
 -- Kept out of sql/ddl on purpose: everything there is replayed by anything that
 -- builds a schema, and this file needs a secret it must not find in the

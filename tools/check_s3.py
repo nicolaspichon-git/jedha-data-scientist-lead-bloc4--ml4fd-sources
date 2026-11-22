@@ -1,10 +1,11 @@
-"""Acceptance criteria of S3 that SQL cannot reach: the files and the declarations.
+"""Acceptance criteria of B3-S3 that SQL cannot reach: the files and the declarations.
 
-Covers: EE09, EI06, EC09, EC17, EC24
-Lot: N8
-Competency: C1, C4, C5
+Block: B3, B4.
+Lot: B3-N8, B4-L0.
+Competency: B3-C1, B3-C4, B3-C5.
+Covers: B3-EE09, B3-EI06, B3-EC09, B3-EC17, B3-EC24.
 
-The criteria of N1 to N7 that the database holds live in
+The criteria of B3-N1 to B3-N7 that the database holds live in
 sql/checks/s3_acceptance.sql, because they are questions about rows. What is
 here is everything else: the alert file and what it must NOT contain, the two
 DAGs and their cadences, and the agreement between governance.yml and the model
@@ -85,19 +86,19 @@ def criteria(root: Path):
 
     settings = config.load()
 
-    # --- the cadence against the calibration (N7)
+    # --- the cadence against the calibration (B3-N7)
     observed = settings.observed_per_day()
-    yield item("N7 appels/jour contre le debit annonce",
+    yield item("B3-N7 appels/jour contre le debit annonce",
                "%d" % int(API_TXN_PER_DAY), "%d" % observed)
-    yield item("N7 appels par minute sous le limiteur mesure (13)",
+    yield item("B3-N7 appels par minute sous le limiteur mesure (13)",
                "oui", "oui" if settings.calls_per_run <= 13 else "NON")
 
-    # --- the two DAGs and their cadences (EI06)
+    # --- the two DAGs and their cadences (B3-EI06)
     dags = config.dags_dir(root)
     if dags is None:
         # NAMED, like config.governance_path() does: "absent" without saying
         # where one looked sends the reader to check the DAGs, which are fine.
-        yield item("N7 repertoire des DAG", "trouve",
+        yield item("B3-N7 repertoire des DAG", "trouve",
                    "ABSENT : cherche dans %s"
                    % ", ".join(config.DAG_DIRS))
     else:
@@ -107,7 +108,7 @@ def criteria(root: Path):
         # the left, so without them the % applies to the Path.
         path = dags / ("%s.py" % name)
         if not path.is_file():
-            yield item("N7 DAG %s" % name, "present", "ABSENT")
+            yield item("B3-N7 DAG %s" % name, "present", "ABSENT")
             continue
         body = path.read_text(encoding="utf-8")
         found = ""
@@ -125,61 +126,61 @@ def criteria(root: Path):
                          else line.split("=", 1)[1].strip().rstrip(","))
                 break
         if expected_schedule is None:
-            yield item("N6 cadence de %s distincte de la minute" % name,
+            yield item("B3-N6 cadence de %s distincte de la minute" % name,
                        "oui", "oui" if found != "* * * * *" else "A LA MINUTE")
         else:
-            yield item("N7 cadence de %s" % name, expected_schedule, found)
+            yield item("B3-N7 cadence de %s" % name, expected_schedule, found)
 
-    # --- the recipe in service against what governance declares (N4)
-    yield item("N4 colonnes retirees declarees",
+    # --- the recipe in service against what governance declares (B3-N4)
+    yield item("B3-N4 colonnes retirees declarees",
                ",".join(settings.drop_features) or "aucune",
                ",".join(settings.drop_features) or "aucune")
     kept = datasets.without(settings.drop_features)
-    yield item("N4 la recette declaree reste entrainable",
+    yield item("B3-N4 la recette declaree reste entrainable",
                "au moins 1 feature",
                "%d features" % len(kept) if kept else "AUCUNE")
-    yield item("N4 la recette declaree ne lit plus la pendule",
+    yield item("B3-N4 la recette declaree ne lit plus la pendule",
                "aucune colonne de calendrier",
                ", ".join(clock.present(kept)) or "aucune colonne de calendrier")
 
-    # --- the notification channel (N5)
+    # --- the notification channel (B3-N5)
     channel = settings.alert_channel
     try:
         notify.channel_of(channel)
         known = "connu"
     except ValueError:
         known = "INCONNU"
-    yield item("N5 canal de notification declare", "connu", known)
-    yield item("N5 semantique de livraison declaree", "at-least-once",
+    yield item("B3-N5 canal de notification declare", "connu", known)
+    yield item("B3-N5 semantique de livraison declaree", "at-least-once",
                settings.alert_delivery)
-    yield item("N5 plafond de capacite applique", "oui",
+    yield item("B3-N5 plafond de capacite applique", "oui",
                "oui" if settings.enforce_capacity else "NON")
 
     # --- THE ALERT FILE, then the operations file. Both in generators of their
     # own, because each ends in an early `return` and those used to return from
     # criteria() ITSELF: every criterion added after them would have been
-    # silently skipped, which is exactly what happened when N9 tried to add
+    # silently skipped, which is exactly what happened when B3-N9 tried to add
     # three.
     yield from _alert_file(item, settings, channel)
 
-    # --- N9: the operations channel, stage (3c) of diagram 3.3
+    # --- B3-N9: the operations channel, stage (3c) of diagram 3.3
     try:
         health.channel_of(settings.ops_channel)
         ops_known = "connu"
     except ValueError:
         ops_known = "INCONNU"
-    yield item("N9 canal d'exploitation declare", "connu", ops_known)
-    yield item("N9 destinations distinctes des deux canaux", "distinctes",
+    yield item("B3-N9 canal d'exploitation declare", "connu", ops_known)
+    yield item("B3-N9 destinations distinctes des deux canaux", "distinctes",
                "distinctes"
                if Path(settings.alert_file) != Path(settings.ops_file)
                else "IDENTIQUES")
-    yield item("N9 les quatre controles de la vue 3.3 sont la", "4",
+    yield item("B3-N9 les quatre controles de la vue 3.3 sont la", "4",
                "%d" % len(health.CONTROLS))
     yield from _ops_file(item, settings)
 
 
 def _alert_file(item, settings, channel):
-    """N5's criteria on the alert file: the one thing that leaves this system."""
+    """B3-N5's criteria on the alert file: the one thing that leaves this system."""
     path = Path(settings.alert_file)
     if channel != "file":
         yield item("info canal declare, pas de fichier a lire", "mesure",
@@ -209,17 +210,17 @@ def _alert_file(item, settings, channel):
     # THE ACTUAL CARRIES THE UNIT OF THE EXPECTED, or the two never compare
     # equal: "0" against "0 illisible" failed on a clean file. check_s4.py
     # writes "%d absent" for the same reason.
-    yield item("N5 chaque ligne est du JSON", "0 illisible",
+    yield item("B3-N5 chaque ligne est du JSON", "0 illisible",
                "%d illisible" % bad_json)
     # THE criterion of this file.
-    yield item("N5 aucun champ nominatif dans une alerte", "aucun",
+    yield item("B3-N5 aucun champ nominatif dans une alerte", "aucun",
                ", ".join(sorted(leaked)) or "aucun")
-    yield item("N5 chaque alerte porte sa tracabilite",
+    yield item("B3-N5 chaque alerte porte sa tracabilite",
                "0 incomplete", "%d incomplete" % missing)
 
 
 def _ops_file(item, settings):
-    """N9's criteria on the operations file.
+    """B3-N9's criteria on the operations file.
 
     THE SAME QUESTION AS THE ALERT FILE, ASKED OF THE OTHER DESTINATION, plus
     one the alert file cannot be asked: that no transaction travelled here. An
@@ -251,12 +252,12 @@ def _ops_file(item, settings):
                    "mesure", "NON VERIFIE : fichier vide")
         return
 
-    yield item("N9 chaque ligne est du JSON", "0 illisible",
+    yield item("B3-N9 chaque ligne est du JSON", "0 illisible",
                "%d illisible" % bad_json)
     # THE criterion of this file.
-    yield item("N9 aucune transaction dans un message d'exploitation", "aucune",
+    yield item("B3-N9 aucune transaction dans un message d'exploitation", "aucune",
                ", ".join(sorted(leaked)) or "aucune")
-    yield item("N9 chaque message nomme son controle et son changement",
+    yield item("B3-N9 chaque message nomme son controle et son changement",
                "0 incomplet", "%d incomplet" % missing)
 
 

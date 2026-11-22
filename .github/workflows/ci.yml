@@ -1,10 +1,13 @@
-# The integration half of C4: every change is built, linted and tested before
+# The integration half of B4-C4: every change is built, linted and tested before
 # it can reach the main branch.
-# Covers: EC24, EC25, EC26   Lot: L2   Competency: C4
+# Block: B4.
+# Lot: B4-L2.
+# Competency: B4-C4.
+# Covers: B4-EC24, B4-EC25, B4-EC26.
 #
 # WHAT MAKES THIS BLOCKING is not this file. A workflow only produces a check;
 # refusing a merge on a red check is a branch protection rule, set on the
-# repository. Both are needed for EC26.
+# repository. Both are needed for B4-EC26.
 name: CI
 
 on:

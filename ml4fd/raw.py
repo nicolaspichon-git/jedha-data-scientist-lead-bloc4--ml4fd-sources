@@ -1,8 +1,9 @@
 """Writing into and reading back from the raw zone.
 
-Covers: EC23, EC24
-Lot: L1
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-L1, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EC23, B3-EC24.
 
 The raw zone is the seam of the whole system: everything downstream can be
 rebuilt from it without querying the source again (EC24), and it is append-only
@@ -46,7 +47,10 @@ def history_in_raw(conn: "psycopg.Connection", dag_id: str) -> list[tuple]:
     Reads sql/checks/history_already_loaded.sql -- THE definition. Returns
     (state, run_id, batch_id, n_rows, ended_at), successes first.
 
-    Covers: EC23, EC24
+    Block: B3, B4.
+    Lot: B4-L0.
+    Competency: ?.
+    Covers: B3-EC23, B3-EC24.
     """
     from ml4fd import db
     return db.query_file(conn, HISTORY_LOADED_SQL, dag_id=dag_id)
@@ -63,7 +67,10 @@ def refuse_second_load(conn: "psycopg.Connection", dag_id: str,
     the run level, which is where an operator relaunching after a failure
     actually stands.
 
-    Covers: EC23, EC24
+    Block: B3, B4.
+    Lot: ?, B4-L0.
+    Competency: ?.
+    Covers: B3-EC23, B3-EC24.
     """
     if replay:                         # a replay reads the raw zone, never writes it
         return

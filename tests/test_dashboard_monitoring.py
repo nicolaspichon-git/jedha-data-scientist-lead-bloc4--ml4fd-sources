@@ -1,8 +1,9 @@
 """R11: the monitoring page -- the one reader fd_monitoring did not have.
 
-Covers: EC45, EC49
-Lot: L4
-Competency: C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C6.
+Covers: B4-EC45, B4-EC49.
 
 WHAT THESE TESTS ARE FOR. On 2026-11-20 a search for fd_monitoring returned
 its DDL, its insert, the task that calls it, and no reader at all: the history

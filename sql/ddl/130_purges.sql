@@ -1,5 +1,8 @@
 -- The journal of the purges: one row per store and per execution.
--- Covers: EC14, EC18, EC27   Lot: Q6   Competency: C4, C5
+-- Block: B3, B4.
+-- Lot: B3-Q6, B4-L0.
+-- Competency: B3-C4, B3-C5.
+-- Covers: B3-EC14, B3-EC18, B3-EC27.
 --
 -- WHY A TABLE AND NOT A LOG LINE. "Une durée non appliquée n'est pas une
 -- politique" (D1, annexe B): the declaration in governance.yml claims that

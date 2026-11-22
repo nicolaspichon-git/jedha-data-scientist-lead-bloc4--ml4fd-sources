@@ -1,8 +1,9 @@
 """The four controls, and the one property that makes the channel usable.
 
-Covers: EC14, EC17
-Lot: N9
-Competency: C5
+Block: B3, B4.
+Lot: B3-N9, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC14, B3-EC17.
 
 The controls are pure functions of a Facts record, so every verdict here is
 exercised without a database: that split is the point of ml4fd/health.py and it

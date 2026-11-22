@@ -1,13 +1,14 @@
 """Recompute every stored feature, then prove the reconciliation passes.
 
-Covers: EE07
-Lot: N3
-Competency: C5
+Block: B3, B4.
+Lot: B3-N3, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE07.
 
 WHY THIS EXISTS. features.backfill() lived inside dag_load_history, which also
 reloads 555,719 CSV rows. A stream batch that escaped features.apply_batch --
-the four transactions ingested before N3 existed, plus the three of the
--Corrupt run -- needs the backfill and nothing else. Running S1's DAG to repair
+the four transactions ingested before B3-N3 existed, plus the three of the
+-Corrupt run -- needs the backfill and nothing else. Running B3-S1's DAG to repair
 seven rows would reload the history to fix the symptom.
 
 WHY IT IS NOT A DAG TASK. It repairs; it is not part of the normal course. If

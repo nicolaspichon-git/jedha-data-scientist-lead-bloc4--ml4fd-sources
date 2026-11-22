@@ -1,8 +1,9 @@
 """The traceability matrix abbreviates the kind of a requirement.
 
-Covers: EC07
-Lot: L8
-Competency: C1
+Block: B3, B4.
+Lot: B3-L8, B4-L0.
+Competency: B3-C1.
+Covers: B3-EC07.
 
 The matrix is read column by column against D0, and the Nature column held the
 requirements document's own prose -- "architecturale", "documentaire,
@@ -34,7 +35,7 @@ needs_matrix = pytest.mark.skipif(
     not MATRIX.exists(),
     reason="TRACEABILITY.md has not been generated for this dossier yet "
            "(tools/build_traceability.py still points at the BC03 "
-           "documents; L7 repoints it).")
+           "documents; B4-L7 repoints it).")
 
 _spec = importlib.util.spec_from_file_location(
     "build_traceability", ROOT / "tools" / "build_traceability.py")
@@ -145,9 +146,9 @@ def test_the_columns_are_located_by_name():
 def test_every_requirement_of_the_document_is_read():
     req = bt.defined()
     assert len(req) == 51, len(req)
-    assert req["EC01"]["competency"] == "C1"
-    assert req["EC45"]["competency"] == "C6"
-    assert req["EC45"]["statement"].startswith("Conserver l'historique")
+    assert req["B4-EC01"]["competency"] == "B4-C1"
+    assert req["B4-EC45"]["competency"] == "B4-C6"
+    assert req["B4-EC45"]["statement"].startswith("Conserver l'historique")
 
 
 def test_the_competency_comes_from_the_section_and_not_the_source_column():
@@ -155,8 +156,8 @@ def test_the_competency_comes_from_the_section_and_not_the_source_column():
     carries a competency only most of the time; the section heading says which
     competency it belongs to, always."""
     req = bt.defined()
-    assert req["EC02"]["source"] != req["EC02"]["competency"]
-    assert req["EC02"]["competency"] == "C1"
+    assert req["B4-EC02"]["source"] != req["B4-EC02"]["competency"]
+    assert req["B4-EC02"]["competency"] == "B4-C1"
 
 
 # --- L4: only the EC are in scope, and the rest is not a break ---------------
@@ -167,8 +168,8 @@ def test_the_ee_and_ei_marks_are_counted_and_never_reported_as_breaks():
     read yet is not the same as naming nothing, and reporting them as breaks
     would train the reader to ignore the report."""
     code, outside, _declared = bt.tagged()
-    assert outside, "no EE/EI mark found: the tolerance has stopped being used"
-    assert not any(name.startswith(("EE", "EI")) for name in code)
+    assert outside, "no B3- mark found: the tolerance has stopped being used"
+    assert not any(name.startswith("B3-") for name in code)
     req = bt.defined()
     assert bt.breaks(req, code) == []
 
@@ -176,9 +177,9 @@ def test_the_ee_and_ei_marks_are_counted_and_never_reported_as_breaks():
 def test_a_mark_naming_an_unknown_ec_is_a_break():
     """The one direction that can still be wrong: a typo in a Covers: mark
     would otherwise look exactly like coverage."""
-    found = bt.breaks({"EC01": {}}, {"EC99": ["ml4fd/nowhere.py:1"]})
+    found = bt.breaks({"B4-EC01": {}}, {"B4-EC99": ["ml4fd/nowhere.py:1"]})
     assert len(found) == 1
-    assert "EC99" in found[0] and "do not define" in found[0]
+    assert "B4-EC99" in found[0] and "do not define" in found[0]
 
 
 # --- L4: the counts stay factual --------------------------------------------
@@ -189,9 +190,9 @@ def test_the_count_says_marked_or_not_and_nothing_cleverer():
     agreeing mark was enough or all of them had to agree. Both readings are
     arguable, which is why neither belongs in a figure quoted at an
     examination."""
-    req = {"EC01": {}, "EC02": {}}
-    carried, no_code = bt.coverage(req, {"EC01": ["a.py:1"]})
-    assert carried == ["EC01"] and no_code == ["EC02"]
+    req = {"B4-EC01": {}, "B4-EC02": {}}
+    carried, no_code = bt.coverage(req, {"B4-EC01": ["a.py:1"]})
+    assert carried == ["B4-EC01"] and no_code == ["B4-EC02"]
 
 
 def test_a_disagreement_does_not_fail_the_check():
@@ -207,9 +208,9 @@ def test_a_disagreement_does_not_fail_the_check():
 
 
 def test_the_cross_check_compares_two_declarations_of_the_same_fact():
-    req = {"EC01": {"competency": "C1"}}
-    declared = {"EC01": {"ml4fd/stream.py:3": ("C2",),
-                         "step-0/elsewhere.py:9": ("C1",)}}
+    req = {"B4-EC01": {"competency": "B4-C1"}}
+    declared = {"B4-EC01": {"ml4fd/stream.py:3": ("B4-C2",),
+                         "step-0/elsewhere.py:9": ("B4-C1",)}}
     found = bt.disagreements(req, declared)
     assert [row[3] for row in found] == ["ml4fd/stream.py:3"]
 
@@ -217,21 +218,24 @@ def test_the_cross_check_compares_two_declarations_of_the_same_fact():
 def test_a_mark_without_a_competency_line_is_not_judged():
     """Absence is not disagreement, and inventing a verdict for it would put
     noise in a report whose whole value is that every line means something."""
-    req = {"EC01": {"competency": "C1"}}
-    assert bt.disagreements(req, {"EC01": {"sql/x.sql:1": ()}}) == []
+    req = {"B4-EC01": {"competency": "B4-C1"}}
+    assert bt.disagreements(req, {"B4-EC01": {"sql/x.sql:1": ()}}) == []
 
 
 # --- L4: the document warns about what it cannot yet prove -------------------
 
 @needs_matrix
-def test_the_matrix_says_the_old_marks_cannot_be_trusted_yet():
+def test_the_matrix_says_the_bc03_marks_are_counted_apart():
     """A traceability matrix exists to make one error impossible: showing an
-    uncovered requirement as covered. While the early-lot marks name another
-    referential, the document has to say so itself -- a warning I give in chat
-    is a warning the jury never reads."""
+    uncovered requirement as covered. BC03 and BC04 both number from EC01, so
+    an inherited mark looks like a BC04 one to anybody who does not read its
+    prefix -- the document has to say so itself, with the example that made
+    the error real. A warning I give in chat is a warning the jury never reads.
+    Until 2026-11-21 the warning said the marks could not be trusted yet; the
+    prefixes made them trustworthy, and the warning now says how."""
     text = MATRIX.read_text(encoding="utf-8")
-    assert "renumerote" in text
-    assert "EC01" in text and "stream.py" in text
+    assert "hors perimetre" in text
+    assert "B3-EC01" in text and "B4-EC01" in text and "stream.py" in text
 
 
 # --- L4: a deliverable is not functional debt --------------------------------
@@ -256,43 +260,43 @@ def test_the_deliverables_are_named_apart_from_the_functional_gaps():
     deliverables = text.index("### Livrables, hors code")
     assert functional < deliverables
     gaps = text[functional:deliverables]
-    for name in ("EC46", "EC47", "EC48"):
+    for name in ("B4-EC46", "B4-EC47", "B4-EC48"):
         assert name not in gaps, "%s counted as functional debt" % name
 
 
 # --- L4: the three marks of this lot ----------------------------------------
 
 def test_the_unattended_retraining_is_marked():
-    """EC31 asks for a retraining that runs without a hand on it. dag_train is
+    """B4-EC31 asks for a retraining that runs without a hand on it. dag_train is
     that -- guard, dataset, fit, registration, gate, alias -- and the mark was
     missing rather than the implementation."""
     req = bt.defined()
     code, _outside, _declared = bt.tagged()
-    assert req["EC31"]["competency"] == "C5"
-    assert any("dag_train.py" in place for place in code.get("EC31", []))
+    assert req["B4-EC31"]["competency"] == "B4-C5"
+    assert any("dag_train.py" in place for place in code.get("B4-EC31", []))
 
 
 def test_the_matrix_is_marked_by_its_own_generator():
-    """EC50 asks for the matrix to be KEPT, and what keeps it is the generator,
+    """B4-EC50 asks for the matrix to be KEPT, and what keeps it is the generator,
     not the file it writes."""
     code, _outside, _declared = bt.tagged()
     assert any("build_traceability.py" in place
-               for place in code.get("EC50", []))
+               for place in code.get("B4-EC50", []))
 
 
 def test_competence_five_is_complete_and_undoubted():
-    """The result of this lot, pinned: every EC of C5 carries a mark, and none
+    """The result of this lot, pinned: every B4-EC of B4-C5 carries a mark, and none
     of those marks disagrees with the document. If this breaks, either a
     requirement lost its code or a Competency line drifted."""
     req = bt.defined()
     code, _outside, declared = bt.tagged()
     suspect = bt.disagreements(req, declared)
-    five = [name for name in req if req[name]["competency"] == "C5"]
+    five = [name for name in req if req[name]["competency"] == "B4-C5"]
     assert five
     for name in five:
         assert code.get(name), "%s carries no code" % name
     assert not [row for row in suspect
-                if req[row[0]]["competency"] == "C5"], suspect
+                if req[row[0]]["competency"] == "B4-C5"], suspect
 
 
 def test_every_directory_that_carries_marks_is_scanned():
@@ -323,7 +327,7 @@ def test_every_directory_that_carries_marks_is_scanned():
 def test_the_whole_of_l5_is_visible_to_the_matrix():
     """The consequence, pinned on the lot that paid for the defect."""
     code, _outside, _declared = bt.tagged()
-    for name in ("EC15", "EC16", "EC17", "EC19", "EC20", "EC21", "EC23"):
+    for name in ("B4-EC15", "B4-EC16", "B4-EC17", "B4-EC19", "B4-EC20", "B4-EC21", "B4-EC23"):
         # NORMALISED, because this ran green on Linux and red on Windows: the
         # generator built its locations with str(relative_to(ROOT)), which
         # yields a backslash there. The generator now uses as_posix(), and this

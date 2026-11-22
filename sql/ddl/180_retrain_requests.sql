@@ -1,5 +1,8 @@
--- The retraining requests the monitoring made. Covers: EC33, EC37
--- Lot: L4 (ajoute le 20/11/2026)   Competency: C4, C5
+-- The retraining requests the monitoring made.
+-- Block: B4.
+-- Lot: B4-L4 (ajoute le 20/11/2026).
+-- Competency: B4-C4, B4-C5.
+-- Covers: B4-EC33, B4-EC37.
 --
 -- WHY THIS TABLE EXISTS, measured rather than foreseen. On 2026-11-20 at 09:34
 -- UTC the monitoring saw an injected drift, raised input_drift into alert, and
@@ -25,7 +28,7 @@
 -- IT ALSO ANSWERS A QUESTION THE DOSSIER ASKS. airflow/dags/dag_monitor.py
 -- wants "did the monitoring ask for a retraining on the 12th" to be answerable
 -- from one screen. Airflow's own dag_run table would answer it, but it has
--- lived in a database of its own since L1 and cannot be read from here.
+-- lived in a database of its own since B4-L1 and cannot be read from here.
 
 CREATE TABLE IF NOT EXISTS fd_retrain_requests (
     request_id   bigserial   PRIMARY KEY,

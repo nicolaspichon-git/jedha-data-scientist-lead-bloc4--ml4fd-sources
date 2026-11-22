@@ -1,5 +1,8 @@
 -- Roles and append-only.
--- Covers: EC19   Lot: L0   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-L0, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC19.
 --
 -- The append-only property of fd_raw_events comes FROM A REVOCATION, not from a
 -- convention: the role that ingests has no right to rewrite what it wrote.

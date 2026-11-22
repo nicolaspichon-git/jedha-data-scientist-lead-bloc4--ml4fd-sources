@@ -1,5 +1,10 @@
 """What a training run is allowed to claim.
 
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+
 sklearn is absent from the authoring environment, so the fit is not exercised
 here -- only the reporting rules, which is where the plan's acceptance criteria
 actually live."""

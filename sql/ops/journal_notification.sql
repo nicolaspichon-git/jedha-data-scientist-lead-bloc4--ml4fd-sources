@@ -1,5 +1,8 @@
 -- Journal one message of the operations channel, AFTER it was sent.
--- Covers: EC14, EC17   Lot: R9 (S6)   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R9, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14, B3-EC17.
 --
 -- Run in the transaction that records fd_ops_state (ml4fd/health.py,
 -- notify_ops): the state and its journal commit together or not at all.

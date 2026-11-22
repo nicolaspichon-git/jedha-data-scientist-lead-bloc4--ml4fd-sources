@@ -1,5 +1,8 @@
 -- Exploited layer: typed, pseudonymised transactions with their features.
--- Covers: EE08, EI03, EC17   Lot: L3, L4   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-L3, B3-L4, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EE08, B3-EI03, B3-EC17.
 --
 -- No label column: dissociating the verdict is structural, not a convention
 -- (F02.3). No identifying column either: identity data is not copied here

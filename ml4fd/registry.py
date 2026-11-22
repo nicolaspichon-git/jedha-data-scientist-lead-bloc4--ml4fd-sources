@@ -1,8 +1,9 @@
 """Registering a model with everything needed to find its data again.
 
-Covers: EE09, EI06, EC23
-Lot: M7, M8
-Competency: C1, C3, C4
+Block: B3, B4.
+Lot: B3-M7, B3-M8, B4-L0.
+Competency: B3-C1, B3-C3, B3-C4.
+Covers: B3-EE09, B3-EI06, B3-EC23.
 
 WHAT MAKES A MODEL AUDITABLE is not the model file. It is the chain from the
 model back to the exact rows it was fitted on: the recipe digest, the cut-off,
@@ -39,9 +40,10 @@ FREEZE_FILE = "requirements.lock"
 def resolved_packages() -> str:
     """What pip actually resolved, as a lock file's worth of text.
 
-    Covers: EC23
-    Lot: M8
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-M8, B4-L0.
+    Competency: B3-C4, B4-C2.
+    Covers: B3-EC23, B4-EC12.
     """
     try:
         done = subprocess.run([sys.executable, "-m", "pip", "freeze"],
@@ -61,9 +63,10 @@ def manifest(recipe, evaluation, choice, model_path: Path) -> dict:
     Written beside the dataset as well as logged, so the chain survives a
     tracking server that is down, moved or wiped.
 
-    Covers: EC23
-    Lot: M8
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-M8, B4-L0.
+    Competency: B3-C4, B4-C2.
+    Covers: B3-EC23, B4-EC12.
     """
     payload = {
         "written_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -152,14 +155,15 @@ def reference_of(payload: dict) -> dict:
 
 
 def record_reference(conn, payload: dict) -> dict:
-    """Copy what M5 measured into the dataset's row of fd_datasets (S6/R10).
+    """Copy what B3-M5 measured into the dataset's row of fd_datasets (B3-S6/B3-R10).
 
     RAISES if no row was updated: a manifest whose recipe is not registered is
-    a broken chain (M8), not a reference to skip quietly.
+    a broken chain (B3-M8), not a reference to skip quietly.
 
-    Covers: EE04, EC23
-    Lot: R10
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-R10, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EE04, B3-EC23.
     """
     from ml4fd import db
 
@@ -167,7 +171,7 @@ def record_reference(conn, payload: dict) -> dict:
     updated = db.execute_file(conn, REFERENCE_SQL, **figures)
     if updated != 1:
         raise LookupError(
-            "recette %s absente de fd_datasets : la reference de M5 n'a pas "
+            "recette %s absente de fd_datasets : la reference de B3-M5 n'a pas "
             "ete enregistree (%d ligne mise a jour)"
             % (figures["recipe_digest"][:12], updated))
     return figures
@@ -235,11 +239,12 @@ def load_kwargs(load_model) -> dict:
     presence vary by version.
 
     Introspected rather than guessed, because a parameter I cannot verify from
-    here is exactly the bet that cost this project three rounds on M7.
+    here is exactly the bet that cost this project three rounds on B3-M7.
 
-    Covers: EE09
-    Lot: N4
-    Competency: C3
+    Block: B3, B4.
+    Lot: B3-N4, B4-L0.
+    Competency: B3-C3.
+    Covers: B3-EE09.
     """
     parameters = inspect.signature(load_model).parameters
     if "skops_trusted_types" in parameters:
@@ -302,9 +307,10 @@ def experiment_id(mlflow, name: str = EXPERIMENT) -> str:
     pointing at a local path is REFUSED rather than used: writing would fail a
     few lines later with an error that names a directory instead of a cause.
 
-    Covers: EE09, EC23
-    Lot: M7
-    Competency: C1, C4
+    Block: B3, B4.
+    Lot: B3-M7, B4-L0.
+    Competency: B3-C1, B3-C4.
+    Covers: B3-EE09, B3-EC23.
     """
     existing = mlflow.get_experiment_by_name(name)
     if existing is None:
@@ -334,9 +340,10 @@ def log_run(model, payload: dict, report: str, lock: str,
     disagree about what ran. Reconstructing an Evaluation here would create a
     second source of truth, and two sources of truth are one too many.
 
-    Covers: EE09, EI06
-    Lot: M7
-    Competency: C1, C3
+    Block: B3, B4.
+    Lot: B3-M7, B4-L0.
+    Competency: B3-C1, B3-C3, B4-C2.
+    Covers: B3-EE09, B3-EI06, B4-EC13.
     """
     import mlflow
     import mlflow.sklearn
@@ -348,9 +355,9 @@ def log_run(model, payload: dict, report: str, lock: str,
         mlflow.log_params(params_from(payload))
         mlflow.log_metrics(metrics_from(payload))
         mlflow.set_tags({
-            "process": "S2",
+            "process": "B3-S2",
             "dataset_version": payload["dataset"]["version"],
-            "lots": "M1-M8",
+            "lots": "B3-M1..B3-M8",
         })
         # EVERY artifact write under one guard, not just the model. The first
         # version wrapped log_model alone and the failure came from log_text,
@@ -400,9 +407,10 @@ def version_of_run(client, run_id: str, name: str = REGISTERED_NAME):
     The run_id is the only thing that ties a registered version to the task
     that registered it, so it is what the loop carries.
 
-    Covers: EC34
-    Lot: L4
-    Competency: C5
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C5.
+    Covers: B4-EC34.
     """
     found = [version for version in
              client.search_model_versions("name='%s'" % name)

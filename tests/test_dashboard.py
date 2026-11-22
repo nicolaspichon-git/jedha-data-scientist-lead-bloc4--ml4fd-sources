@@ -1,8 +1,9 @@
 """R1: the reads behind the dashboard -- delegations, not second answers.
 
-Covers: EE03, EC14, EC17
-Lot: R1
-Competency: C4
+Block: B3, B4.
+Lot: B3-R1, B4-L0.
+Competency: B3-C4.
+Covers: B3-EE03, B3-EC14, B3-EC17.
 
 The dashboard decides nothing. What is tested here is mostly that it ASKS the
 definitions other processes already use, rather than answering on its own, and

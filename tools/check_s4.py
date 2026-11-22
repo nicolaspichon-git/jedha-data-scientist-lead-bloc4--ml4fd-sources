@@ -1,8 +1,9 @@
 """Acceptance criteria of S4 that SQL cannot reach: the documents and the counts.
 
-Covers: EE04, EI02, EI03, EI04, EC14, EC23, EC27
-Lot: P5
-Competency: C1, C4, C5
+Block: B3, B4.
+Lot: B3-P5, B4-L0.
+Competency: B3-C1, B3-C4, B3-C5.
+Covers: B3-EE04, B3-EI02, B3-EI03, B3-EI04, B3-EC14, B3-EC23, B3-EC27.
 
 The criteria of S4 that the database holds live in sql/checks/s4_acceptance.sql,
 because they are questions about rows. What is here is everything else:
@@ -10,15 +11,15 @@ because they are questions about rows. What is here is everything else:
   THE DOCUMENT ON THE DISK. fd_reports describes a file; this reads the file and
   compares its sha256 with content_digest. A registry that describes what is not
   there, or what has changed since, is a registry nobody can trust -- the
-  reasoning of run.json beside a dataset in M8, and the defect M8 paid for.
+  reasoning of run.json beside a dataset in B3-M8, and the defect B3-M8 paid for.
 
   THE COUNTS, RECOMPUTED. The four counts of a row are compared with what the
   four queries return over THE WINDOW THE ROW ITSELF NAMES. That is the only
   check that catches a report built on the wrong window: the figures would be
   internally consistent and describe another day. It is also what makes the
-  replay criterion of P4 measurable -- recompute and the counts must not move.
+  replay criterion of B3-P4 measurable -- recompute and the counts must not move.
 
-  THE COMPARISON WITH M5, informative, from the recipe's run.json on disk.
+  THE COMPARISON WITH B3-M5, informative, from the recipe's run.json on disk.
 
 Usage, from the scheduler container:
     python3 /opt/project/tools/check_s4.py [--days 30]
@@ -48,8 +49,8 @@ def criteria(root: Path, days: int):
     settings = config.load()
     zone = zoneinfo.ZoneInfo(settings.report_timezone)
 
-    # --- the declarations (P2, P4)
-    yield item("P4 cadence du rapport declaree", settings.report_schedule,
+    # --- the declarations (B3-P2, B3-P4)
+    yield item("B3-P4 cadence du rapport declaree", settings.report_schedule,
                settings.report_schedule)
     # The directory comes from config.dags_dir(): inside the scheduler the DAGs
     # are NOT under the project root, and deriving the path here read
@@ -57,10 +58,10 @@ def criteria(root: Path, days: int):
     dags = config.dags_dir(root)
     dag = dags / "dag_daily.py" if dags else None
     if dags is None:
-        yield item("P4 repertoire des DAG", "trouve",
+        yield item("B3-P4 repertoire des DAG", "trouve",
                    "ABSENT : cherche dans %s" % ", ".join(config.DAG_DIRS))
     elif not dag.is_file():
-        yield item("P4 DAG dag_daily", "present", "ABSENT dans %s" % dags)
+        yield item("B3-P4 DAG dag_daily", "present", "ABSENT dans %s" % dags)
     else:
         body = dag.read_text(encoding="utf-8")
         found = ""
@@ -68,23 +69,23 @@ def criteria(root: Path, days: int):
             if line.strip().startswith("schedule="):
                 found = line.split('"')[1] if '"' in line else ""
                 break
-        yield item("P4 cadence de dag_daily", settings.report_schedule, found)
-        yield item("P4 dag_daily rattrape les matins manques", "oui",
+        yield item("B3-P4 cadence de dag_daily", settings.report_schedule, found)
+        yield item("B3-P4 dag_daily rattrape les matins manques", "oui",
                    "oui" if "catchup=True" in body else "NON")
 
-    yield item("P2 racine des rapports declaree", "sous le projet",
+    yield item("B3-P2 racine des rapports declaree", "sous le projet",
                "sous le projet"
                if str(settings.report_root).startswith(str(root))
                or settings.report_root.startswith(str(PROJECT))
                else "AILLEURS : %s" % settings.report_root)
 
-    # --- the documents and the counts (P2, P3), then the reference of M5.
+    # --- the documents and the counts (B3-P2, B3-P3), then the reference of B3-M5.
     #
     # EACH BLOCK IS A GENERATOR OF ITS OWN, and that is not a style choice. The
     # document block ends in an early `return` when the journal is empty, and
     # in check_s3.py that very `return` returned from criteria() ITSELF --
     # silently swallowing every criterion declared after it. It was found there
-    # in N9 and reproduced here three hours later, in a file written by the same
+    # in B3-N9 and reproduced here three hours later, in a file written by the same
     # hand that had just fixed it. Knowing the lesson is not the same as
     # applying it; a `yield from` is.
     with db.connect("fd_report") as conn:
@@ -162,22 +163,22 @@ def _documents(item, conn, settings, zone, root, days):
                 drifted.append("%s %s : %s puis %s"
                                % (day, name, value, again[name]))
 
-    yield item("P3 chaque ligne a son document sur le disque", "0 absent",
+    yield item("B3-P3 chaque ligne a son document sur le disque", "0 absent",
                "%d absent%s" % (len(absent),
                                 " (%s)" % ", ".join(absent[:3])
                                 if absent else ""))
     # THE criterion of this file.
-    yield item("P3 empreinte du document egale content_digest", "0 ecart",
+    yield item("B3-P3 empreinte du document egale content_digest", "0 ecart",
                "%d ecart%s" % (len(mismatched),
                                " (%s)" % ", ".join(mismatched[:3])
                                if mismatched else ""))
-    yield item("P3 fenetre coherente avec la journee couverte", "0 impossible",
+    yield item("B3-P3 fenetre coherente avec la journee couverte", "0 impossible",
                "%d impossible%s" % (len(impossible),
                                     " (%s)" % "; ".join(impossible[:2])
                                     if impossible else ""))
     yield item("info decomptes recalcules", "mesure",
                "%d rapport(s)" % recomputed)
-    yield item("P2 les decomptes egalent ce que les requetes rendent",
+    yield item("B3-P2 les decomptes egalent ce que les requetes rendent",
                "0 divergence",
                "%d divergence%s" % (len(drifted),
                                     " (%s)" % "; ".join(drifted[:2])
@@ -185,7 +186,7 @@ def _documents(item, conn, settings, zone, root, days):
 
 
 def _reference(item, conn, settings, report):
-    """What M5 measured, for the reader to compare against. Informative.
+    """What B3-M5 measured, for the reader to compare against. Informative.
 
     Yielded whatever the journal holds: the comparison does not depend on a
     report having been produced, and in check_s3 a block like this one sat
@@ -193,17 +194,17 @@ def _reference(item, conn, settings, report):
     """
     reference = report.reference(conn, settings)
     if reference is None:
-        yield item("info reference de M5", "mesure",
+        yield item("info reference de B3-M5", "mesure",
                    "INDISPONIBLE : aucune mesure en base")
         return
     yield item("info recette de reference", "mesure", reference["version"])
-    yield item("info rappel mesure par M5 sur le jeu de test", "mesure",
+    yield item("info rappel mesure par B3-M5 sur le jeu de test", "mesure",
                "%.4f" % reference["recall"]
                if reference["recall"] is not None else "n/a")
-    yield item("info precision mesuree par M5", "mesure",
+    yield item("info precision mesuree par B3-M5", "mesure",
                "%.4f" % reference["precision"]
                if reference["precision"] is not None else "n/a")
-    yield item("info alertes/jour prevues par M6", "mesure",
+    yield item("info alertes/jour prevues par B3-M6", "mesure",
                "%.1f" % reference["alerts_per_day"]
                if reference["alerts_per_day"] is not None else "n/a")
 

@@ -1,8 +1,9 @@
 """Static guards on the PowerShell entry point.
 
-Covers: EC06
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC06.
 
 WHY A TEST FILE FOR A SHELL SCRIPT. fd-manager.ps1 is the only way any of this is
 run, and it has broken three times in ways no Python test could see:

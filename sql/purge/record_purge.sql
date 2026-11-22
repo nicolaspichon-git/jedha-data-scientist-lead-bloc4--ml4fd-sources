@@ -1,4 +1,8 @@
--- Record what a purge did to one store. Covers: EC14, EC18   Lot: Q6   C4
+-- Record what a purge did to one store.
+-- Block: B3, B4.
+-- Lot: B3-Q6, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14, B3-EC18.
 --
 -- AFTER THE DELETION, like every other journal of this project and for the
 -- same reason turned around: recording first would claim a purge that may not

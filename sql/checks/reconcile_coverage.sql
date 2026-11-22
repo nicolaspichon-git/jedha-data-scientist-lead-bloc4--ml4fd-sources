@@ -1,5 +1,8 @@
 -- Composition of the reconciliation sample. Guards against a vacuous test.
--- Covers: EE07   Lot: L4   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-L4, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EE07.
 --
 -- A reconciliation whose tie stratum holds zero rows proves nothing about
 -- ruling 2. This query is what lets the DAG refuse such a run rather than

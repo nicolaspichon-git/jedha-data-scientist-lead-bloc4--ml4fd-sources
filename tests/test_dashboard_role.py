@@ -1,8 +1,9 @@
 """R0: the role the dashboard logs in as reads three tables and nothing else.
 
-Covers: EC19
-Lot: R0
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-R0, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EC19.
 
 THE ONLY COMPONENT OPEN TO A BROWSER. It must be UNABLE to write, to see the
 raw zone or to learn the stack's secrets, not merely refrain from it.

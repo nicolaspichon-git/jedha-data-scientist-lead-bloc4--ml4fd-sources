@@ -1,8 +1,9 @@
 """S5 / Q1: the fingerprint of a batch is taken, stored, and demanded.
 
-Covers: EC23, EI12
-Lot: Q1
-Competency: C4
+Block: B3, B4.
+Lot: B3-Q1, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC23, B3-EI12.
 
 WHY THIS LOT COMES BEFORE ANY PURGE. runs.digest() fingerprinted whole tables,
 once, at the end of the historical load, and only wrote them to the Airflow log.

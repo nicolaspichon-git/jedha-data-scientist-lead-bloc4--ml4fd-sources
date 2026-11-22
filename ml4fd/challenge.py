@@ -1,7 +1,9 @@
 """The challenging of a candidate against the champion, and its outcome.
 
-Covers: EC34, EC36, EC37   Lot: L3 (deplace et ferme en L4, 20/11/2026)
-Competency: C5
+Block: B4.
+Lot: B4-L3.
+Competency: B4-C5.
+Covers: B4-EC34, B4-EC36, B4-EC37.
 
 WHY THIS MODULE EXISTS, AND WHY IT IS NOT ml4fd/promote.py. promote.py holds
 the DECISION as a pure function, tested branch by branch without mlflow, and
@@ -206,9 +208,10 @@ def judge(client, settings, candidate_mv, apply: bool, say=log.info) -> dict:
     leaves a promotion that happened and was not journalled, which a reader can
     detect; the reverse leaves a journal claiming something that did not.
 
-    Covers: EC34, EC36, EC37
-    Lot: L4
-    Competency: C5
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C5.
+    Covers: B4-EC34, B4-EC36, B4-EC37.
     """
     from ml4fd import db, paired, promote, registry
 

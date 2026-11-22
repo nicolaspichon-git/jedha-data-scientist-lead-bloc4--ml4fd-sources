@@ -1,5 +1,8 @@
 -- The transactions of a batch, with every column a recipe may ask for.
--- Covers: EE07, EI04   Lot: N4   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-N4, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EE07, B3-EI04.
 --
 -- A SUPERSET, deliberately. This query offers the columns; the recipe of the
 -- loaded model version chooses which of them to use and in which ORDER, and

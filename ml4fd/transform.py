@@ -1,8 +1,9 @@
 """Typing and pseudonymisation.
 
-Covers: EC17, EE08, EI03
-Lot: L3
-Competency: C2, C4
+Block: B3, B4.
+Lot: B3-L3, B4-L0.
+Competency: B3-C2, B3-C4.
+Covers: B3-EC17, B3-EE08, B3-EI03.
 
 Typing means converting, constraining and deciding: amt as numeric(12,2) rather
 than a float, txn_ts as timestamptz, cc_num read as text and never stored.
@@ -81,9 +82,10 @@ def client_key(cc_num: str, pepper: str) -> str:
     digest is inverted by trying all of them. The pepper lives in the
     environment, never in governance.yml and never in the repository.
 
-    Covers: EC17
-    Lot: L3
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-L3.
+    Competency: B3-C4.
+    Covers: B3-EC17.
     """
     if not cc_num:
         raise ValueError("empty cc_num: nothing to pseudonymise")
@@ -104,9 +106,10 @@ def home_distance_km(home_lat: str | None, home_long: str | None,
     Returns None if any coordinate is missing: absence is not a distance of
     zero, which would read as "the merchant is at the cardholder's door".
 
-    Covers: EC17
-    Lot: L3
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-L3.
+    Competency: B3-C4.
+    Covers: B3-EC17.
     """
     try:
         lat1, lon1 = math.radians(float(home_lat)), math.radians(float(home_long))
@@ -141,9 +144,10 @@ def to_transaction(record: dict[str, str], pepper: str,
     parse_ts comes from ml4fd.checks rather than being written again here: how a
     source timestamp is read, time zone included, must have a single definition.
 
-    Covers: EE08, EI03, EC17
-    Lot: L3
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-L3.
+    Competency: B3-C2.
+    Covers: B3-EE08, B3-EI03, B3-EC17.
     """
     # Through the profile: the CSV writes a wall clock in
     # trans_date_trans_time, the stream epoch milliseconds in current_time.
@@ -198,9 +202,10 @@ def load_transactions(write_conn: "psycopg.Connection", batch_id,
     connection deadlocks -- with no exception and no timeout. Give the reader its
     own connection. The parameter is named write_conn to say so.
 
-    Covers: EC23
-    Lot: L3
-    Competency: C2, C5
+    Block: B3, B4.
+    Lot: B3-L3.
+    Competency: B3-C2, B3-C5.
+    Covers: B3-EC23.
     """
     assert len(COPY_COLUMNS) == len(COPY_TYPES), "column and type lists diverged"
     columns = ", ".join(COPY_COLUMNS)

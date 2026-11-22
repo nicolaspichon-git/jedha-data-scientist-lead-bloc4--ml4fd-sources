@@ -1,4 +1,10 @@
-"""Typing and pseudonymisation: the properties the exploited layer relies on."""
+"""Typing and pseudonymisation: the properties the exploited layer relies on.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 from decimal import Decimal
 
 import pytest

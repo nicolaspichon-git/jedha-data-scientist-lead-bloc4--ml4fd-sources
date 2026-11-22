@@ -1,5 +1,8 @@
 -- Delete ONE SLICE of ONE batch of the raw zone.
--- Covers: EE05, EI11, EC19   Lot: Q3   Competency: C2, C3
+-- Block: B3, B4.
+-- Lot: B3-Q3, B4-L0.
+-- Competency: B3-C2, B3-C3.
+-- Covers: B3-EE05, B3-EI11, B3-EC19.
 --
 -- NO DATE PREDICATE HERE, and that absence is the design. What is beyond
 -- retention is decided once, in sql/purge/candidates_raw.sql, and this file

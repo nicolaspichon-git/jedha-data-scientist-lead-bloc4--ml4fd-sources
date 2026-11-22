@@ -1,8 +1,9 @@
 """R6: the operations page -- N9's four controls, not a second set.
 
-Covers: EC14
-Lot: R6
-Competency: C4
+Block: B3, B4.
+Lot: B3-R6, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC14.
 
 health.check() is what raise_and_notify_ops runs every minute. The page calls
 it, so it shows what the control task would say at that instant -- same facts,

@@ -1,8 +1,9 @@
 """The injected drift: the writer, and its agreement with the reader.
 
-Covers: EC39, EC51
-Lot: L4
-Competency: C5, C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C5, B4-C6.
+Covers: B4-EC39, B4-EC51.
 
 ONE FILE, TWO PROGRAMS, AND THAT IS THE WHOLE RISK. tools/drift.py writes
 runtime/drift.json and producer/app.py reads it, in different languages of the
@@ -213,7 +214,7 @@ def test_the_tool_names_the_managers_spelling_of_its_options():
     assert "-Factor" in usage and "-Off" in usage
     assert "fd-manager drift" in usage
 
-# --- the history of the flips (L4, 20/11/2026) -----------------------------
+# --- the history of the flips (B4-L4, 20/11/2026) -----------------------------
 #
 # WHY A HISTORY AT ALL. The switch is overwritten at every flip, which was
 # enough while the stream fed nothing: a drifted transaction was served,

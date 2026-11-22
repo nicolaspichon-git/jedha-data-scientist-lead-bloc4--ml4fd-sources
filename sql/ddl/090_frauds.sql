@@ -1,5 +1,8 @@
 -- The alert raised on a scored transaction, and whether it reached anyone.
--- Covers: EE09, EI05, EC14, EC17   Lot: N5   Competency: C2, C3, C4
+-- Block: B3, B4.
+-- Lot: B3-N5, B4-L0.
+-- Competency: B3-C2, B3-C3, B3-C4.
+-- Covers: B3-EE09, B3-EI05, B3-EC14, B3-EC17.
 --
 -- THE PRIMARY KEY ON txn_id IS THE IDEMPOTENCE, and it is the whole point: a
 -- transaction cannot raise two alerts, whatever the task replays. A retrain

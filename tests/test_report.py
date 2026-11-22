@@ -1,8 +1,9 @@
 """Assembling and rendering the morning report.
 
-Covers: EE04, EI04, EC14, EC17
-Lot: P2
-Competency: C5
+Block: B3, B4.
+Lot: B3-P2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE04, B3-EI04, B3-EC14, B3-EC17.
 
 THE PROPERTY WORTH TESTING IS THAT THE DOCUMENT IS A FUNCTION OF ITS DATA.
 Two runs on the same window must produce the same bytes, or comparing two

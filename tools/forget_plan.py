@@ -1,8 +1,9 @@
 """Can this batch be forgotten? READS ONLY -- it has no way to delete.
 
-Covers: EC18, EC23
-Lot: Q7
-Competency: C2, C4
+Block: B3, B4.
+Lot: B3-Q7, B4-L0.
+Competency: B3-C2, B3-C4.
+Covers: B3-EC18, B3-EC23.
 
 WHY A BATCH AND NOT A DATE. The retention purge cuts on an instant, and an
 instant cannot separate the interrupted loads of a CSV from the load that

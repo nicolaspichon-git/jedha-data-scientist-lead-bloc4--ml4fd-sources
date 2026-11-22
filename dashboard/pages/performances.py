@@ -1,8 +1,9 @@
 """The performance of the model, as the verdicts reveal it (R10).
 
-Covers: EE04, EI02, EI03
-Lot: R10
-Competency: C2, C4
+Block: B3, B4.
+Lot: B3-R10, B4-L0.
+Competency: B3-C2, B3-C4.
+Covers: B3-EE04, B3-EI02, B3-EI03.
 
 Section 3 of the morning report over a period: the verdicts that became known,
 the decisions they judge, and what M5 measured on the test set -- read from

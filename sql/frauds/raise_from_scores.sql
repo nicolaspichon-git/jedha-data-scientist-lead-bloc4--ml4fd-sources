@@ -1,5 +1,8 @@
 -- Raise an alert for every flagged score that has none yet.
--- Covers: EI05, EC23   Lot: N5   Competency: C3
+-- Block: B3, B4.
+-- Lot: B3-N5, B4-L0.
+-- Competency: B3-C3.
+-- Covers: B3-EI05, B3-EC23.
 --
 -- NOT SCOPED TO A BATCH, and that is deliberate. Scoping to the batch just
 -- scored would be marginally cheaper and would lose an alert for good if this

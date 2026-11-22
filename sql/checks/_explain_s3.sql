@@ -88,7 +88,7 @@ criteria AS (
     -- readings of one rule must not disagree. Before Q6 this criterion rested
     -- on an age of five minutes while the tool that closes these runs asked
     -- Airflow, so `abandoned` could report nothing to do while this failed and
-    -- an operator had no way out. Q6 aligned both on dag_run. L1 then gave
+    -- an operator had no way out. Q6 aligned both on dag_run. B4-L1 then gave
     -- Airflow a database of its own, which put dag_run out of reach from here
     -- and broke the two of them at once -- consistently, at least. Both now
     -- rest on the age alone, and abandoned_runs.sql carries the reasoning.

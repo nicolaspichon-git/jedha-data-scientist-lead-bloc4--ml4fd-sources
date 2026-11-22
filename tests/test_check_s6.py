@@ -1,8 +1,9 @@
 """R5: the acceptance of S6 -- the catalogue, and the container as it runs.
 
-Covers: EC19, EC27
-Lot: R5
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-R5, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EC19, B3-EC27.
 
 s6_acceptance.sql was run on PostgreSQL 16 three ways: sound (10 OK, exit 0);
 damaged by making fd_dashboard a member of fd_report and granting it the
@@ -131,7 +132,7 @@ def inspect(**changes):
         "HostConfig": {"CapDrop": ["ALL"],
                        "SecurityOpt": ["no-new-privileges:true"],
                        "PortBindings": {"8501/tcp": [{"HostIp": "127.0.0.1",
-                                                      "HostPort": "8501"}]}},
+                                                      "HostPort": "8502"}]}},
         "Mounts": [{"Destination": d, "RW": False}
                    for d in sorted(check_s6.EXPECTED_MOUNTS)],
         "State": {"Health": {"Status": "healthy"}},
@@ -187,26 +188,26 @@ def test_the_container_built_on_the_airflow_anchor_is_caught(tmp_path):
                                "POSTGRES_PASSWORD=%s" % OWNER,
                                "ML4FD_PEPPER=pepper"],
                   HostConfig__PortBindings={"8501/tcp": [{"HostIp": "",
-                                                          "HostPort": "8501"}]})
+                                                          "HostPort": "8502"}]})
     bad["Mounts"][0]["RW"] = True
     seen = {"uid": 0, "reports_write": "ACCEPTEE", "ml4fd_write": "ACCEPTEE",
             "session_error": "WrongIdentity: SUPER-UTILISATEUR", "health": "ok"}
     failed = failures(verdicts(answers(bad, seen), tmp_path))
-    for expected in ("R4 poivre absent de l'environnement",
-                     "R4 mot de passe du proprietaire absent de l'environnement",
-                     "R4 POSTGRES_USER du service",
-                     "R4 port publie sur cette machine seulement",
-                     "R4 montages en lecture seule",
-                     "R5 processus non root (uid vu de l'interieur)",
-                     "R5 ecriture dans reports/ refusee par le noyau",
-                     "R5 identite de la session PostgreSQL"):
+    for expected in ("B3-R4 poivre absent de l'environnement",
+                     "B3-R4 mot de passe du proprietaire absent de l'environnement",
+                     "B3-R4 POSTGRES_USER du service",
+                     "B3-R4 port publie sur cette machine seulement",
+                     "B3-R4 montages en lecture seule",
+                     "B3-R5 processus non root (uid vu de l'interieur)",
+                     "B3-R5 ecriture dans reports/ refusee par le noyau",
+                     "B3-R5 identite de la session PostgreSQL"):
         assert expected in failed, expected
 
 
 def test_a_stopped_service_says_how_to_start_it(tmp_path):
     rows = verdicts(answers(inspect(), running=False), tmp_path)
-    assert list(rows) == ["R4 service dashboard en marche"]
-    assert "fd-manager.ps1 dashboard" in rows["R4 service dashboard en marche"][1]
+    assert list(rows) == ["B3-R4 service dashboard en marche"]
+    assert "fd-manager.ps1 dashboard" in rows["B3-R4 service dashboard en marche"][1]
 
 
 def test_an_altered_or_relocated_report_fails(tmp_path):
@@ -216,15 +217,15 @@ def test_an_altered_or_relocated_report_fails(tmp_path):
                                               "verdict": "differente",
                                               "relocated": True}}
     failed = failures(verdicts(answers(inspect(), seen), tmp_path))
-    assert "R5 dernier rapport conforme a son empreinte" in failed
-    assert "R5 dernier rapport lu au chemin ou Airflow l'a ecrit" in failed
+    assert "B3-R5 dernier rapport conforme a son empreinte" in failed
+    assert "B3-R5 dernier rapport lu au chemin ou Airflow l'a ecrit" in failed
 
 
 def test_a_page_unreachable_from_this_machine_fails(tmp_path):
     def down(url):
         raise OSError("refused")
     failed = failures(verdicts(answers(inspect()), tmp_path, get=down))
-    assert failed == ["R5 page servie, vue de cette machine"]
+    assert failed == ["B3-R5 page servie, vue de cette machine"]
 
 
 def test_no_secret_is_ever_printed(tmp_path, capsys, monkeypatch):

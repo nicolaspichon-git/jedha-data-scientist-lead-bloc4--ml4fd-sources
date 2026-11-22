@@ -1,5 +1,8 @@
 -- The fingerprint RECORDED for one batch, if any.
--- Covers: EC23, EI12   Lot: Q1   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-Q1, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC23, B3-EI12.
 --
 -- Parameter: batch_id. The earliest run that carries one wins, which is the run
 -- that wrote the batch: a replay attaches later runs to the same batch.

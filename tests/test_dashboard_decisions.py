@@ -1,12 +1,13 @@
-"""L5: the decisions page -- the reader fd_scoring_decisions did not have.
+"""B4-L5: the decisions page -- the reader fd_scoring_decisions did not have.
 
-Covers: EC16, EC19
-Lot: L5
-Competency: C3
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C3.
+Covers: B4-EC16, B4-EC19.
 
 WHAT THESE TESTS ARE FOR. On 2026-11-21 a search for fd_scoring_decisions
 returned its DDL, two grants and no reader: the view existed so the two
-journals could be read as one, and nothing read it. EC19 asks that each call
+journals could be read as one, and nothing read it. B4-EC19 asks that each call
 and its answer be persisted; a journal nobody can read is a claim nobody can
 check.
 

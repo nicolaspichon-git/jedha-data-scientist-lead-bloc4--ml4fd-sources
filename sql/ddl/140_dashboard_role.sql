@@ -1,5 +1,8 @@
 -- The role the dashboard logs in as. READS WHAT ITS PAGES SHOW, NOTHING ELSE.
--- Covers: EC19   Lot: R0   Competency: C2, C5
+-- Block: B3, B4.
+-- Lot: B3-R0, B4-L0.
+-- Competency: B3-C2, B3-C5.
+-- Covers: B3-EC19.
 --
 -- THE ONLY COMPONENT OF THE PROJECT OPEN TO A BROWSER, and the design follows
 -- from that: it must be UNABLE to write, to see the raw zone, or to learn the

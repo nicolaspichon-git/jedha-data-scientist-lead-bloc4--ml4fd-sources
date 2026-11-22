@@ -1,8 +1,9 @@
 """S3 / N7: the real-time ingestion, one run a minute.
 
-Covers: EE01, EE02, EE09, EI01, EI05, EI06, EC09, EC14, EC23, EC24
-Lot: N7
-Competency: C1, C2, C3, C4
+Block: B3, B4.
+Lot: B3-N7, B4-L0.
+Competency: B3-C1, B3-C2, B3-C3, B3-C4.
+Covers: B3-EE01, B3-EE02, B3-EE09, B3-EI01, B3-EI05, B3-EI06, B3-EC09, B3-EC14, B3-EC23, B3-EC24.
 
 THE RAW ZONE IS THE HAND-OFF, and that is the design rather than a convenience.
 Airflow passes JSON between tasks, not Python objects, so the readings cannot
@@ -93,9 +94,10 @@ def _mark_failed(context) -> None:
     M1's guard would then read as a reason to refuse training. abandon() closes
     only what is still RUNNING, i.e. what nobody closed.
 
-    Covers: EC14
-    Lot: N9
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-N9, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EC14.
     """
     run_id = str(context.get("run_id", "?"))
     try:
@@ -136,9 +138,10 @@ def ingest_realtime():
         a reading not written is a transaction nobody will see again. Better to
         fail the minute and let the next run collect.
 
-        Covers: EE01, EI01, EC23
-        Lot: N7
-        Competency: C2
+        Block: B3, B4.
+        Lot: B3-N7.
+        Competency: B3-C2.
+        Covers: B3-EE01, B3-EI01, B3-EC23.
         """
         from airflow.operators.python import get_current_context
 
@@ -192,9 +195,10 @@ def ingest_realtime():
     def validate(polled: dict) -> dict:
         """Validate the batch and write the quarantine.
 
-        Covers: EE02, EC14, EC25
-        Lot: N7
-        Competency: C2, C5
+        Block: B3, B4.
+        Lot: B3-N7, B4-L0.
+        Competency: B3-C2, B3-C5.
+        Covers: B3-EE02, B3-EC14, B3-EC25.
         """
         import uuid as _uuid
 
@@ -232,9 +236,10 @@ def ingest_realtime():
     def type_and_feature(polled: dict, counts: dict) -> int:
         """Type, pseudonymise, and compute the features of the batch.
 
-        Covers: EI03, EE07, EC17
-        Lot: N7
-        Competency: C2
+        Block: B3, B4.
+        Lot: B3-N7, B4-L0.
+        Competency: B3-C2.
+        Covers: B3-EI03, B3-EE07, B3-EC17.
         """
         import uuid as _uuid
 
@@ -289,9 +294,10 @@ def ingest_realtime():
         holds what makes it re-derivable. sql/ddl/195_scoring_decisions.sql is
         the view that reads the two journals as one.
 
-        Covers: EE09, EI04, EC16, EC24
-        Lot: N7 (decouple en L5, 20/11/2026)
-        Competency: C3
+        Block: B3, B4.
+        Lot: B3-N7, B4-L0.
+        Competency: B3-C3.
+        Covers: B3-EE09, B3-EI04, B3-EC16, B3-EC24.
         """
         import uuid as _uuid
 
@@ -334,9 +340,10 @@ def ingest_realtime():
         state of the CHAIN. The queue this one feeds is the one the capacity of
         60 a day exists to protect.
 
-        Covers: EI05, EC09, EC14
-        Lot: N7
-        Competency: C3, C4
+        Block: B3, B4.
+        Lot: B3-N7, B4-L0.
+        Competency: B3-C3, B3-C4.
+        Covers: B3-EI05, B3-EC09, B3-EC14.
         """
         from ml4fd import config, db, notify
 
@@ -357,9 +364,10 @@ def ingest_realtime():
         Fed to fd_pipeline_runs exactly as S1 does, so M1's guard watches this
         process too -- a window whose runs all failed must refuse to train.
 
-        Covers: EC14, EC23
-        Lot: N7
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-N7, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC14, B3-EC23.
         """
         from ml4fd import db, runs
 
@@ -386,9 +394,10 @@ def ingest_realtime():
         infrastructure -- an unreachable database -- because that is a red task
         and not a verdict.
 
-        Covers: EC14
-        Lot: N9
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-N9, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC14.
         """
         from ml4fd import config, db, health
 
@@ -414,9 +423,10 @@ def ingest_realtime():
         telling anybody is broken. The journal keeps its success either way:
         the ingestion did succeed, and runs.abandon() will not take that back.
 
-        Covers: EC14, EC17
-        Lot: N9
-        Competency: C3, C4
+        Block: B3, B4.
+        Lot: B3-N9, B4-L0.
+        Competency: B3-C3, B3-C4.
+        Covers: B3-EC14, B3-EC17.
         """
         from ml4fd import config, db, health
 

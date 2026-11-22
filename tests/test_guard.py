@@ -1,5 +1,11 @@
 """The gate S2 passes through. The decision is a pure function, so it is tested
-without a database -- which is the point of separating inspect from verdict."""
+without a database -- which is the point of separating inspect from verdict.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 import datetime as dt
 
 

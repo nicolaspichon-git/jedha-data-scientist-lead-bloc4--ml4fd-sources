@@ -1,10 +1,11 @@
-"""Acceptance criteria of L5 that SQL cannot reach: the SERVICE, over HTTP.
+"""Acceptance criteria of B4-L5 that SQL cannot reach: the SERVICE, over HTTP.
 
-Covers: EC15, EC16, EC19, EC20, EC21
-Lot: L5
-Competency: C2, C3, C5
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C2, B4-C3, B4-C5.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
 
-The criterion of L5 has three clauses. sql/checks/l5_acceptance.sql holds the
+The criterion of B4-L5 has three clauses. sql/checks/l5_acceptance.sql holds the
 second one, because it is a question about rows and privileges. The other two
 are here, and so is what the container was given:
 
@@ -37,7 +38,7 @@ are here, and so is what the container was given:
 
 RUNS ON THE HOST, with the project's .venv, from step-2 -- like check_s6.py and
 unlike check_s1..s5: there is no Docker inside a container, and the service is
-published on 127.0.0.1:5001 here while it answers to scoring-service:5000 on
+published on 127.0.0.1:8012 here while it answers to scoring-service:5000 on
 the compose network.
 
 NO SECRET IS PRINTED. The owner's password is read from .env only to be
@@ -60,8 +61,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE = "scoring-service"
-BASE = "http://127.0.0.1:5001"
-MLFLOW = "http://127.0.0.1:5000"
+BASE = "http://127.0.0.1:8012"
+MLFLOW = "http://127.0.0.1:8002"
 REGISTERED_NAME = "fraud_scoring"
 ALIAS = "champion"
 
@@ -162,7 +163,7 @@ def fields_named(body) -> set:
     serve.problems refuses VALUES pydantic accepted -- every field of Payment
     is declared str, so "quarante" is a valid amt as far as the schema goes --
     and it returns detail as a LIST OF SENTENCES, each opening with the field
-    it is about, because EC20 asks for an error a caller can read.
+    it is about, because B4-EC20 asks for an error a caller can read.
 
     This file read the first shape only. Against the real service it therefore
     found no field at all and the criterion read 0 of 3 on 21/11. Worse, the
@@ -197,7 +198,7 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
     """Yield (criterion, expected, actual). `run` and `get` are injectable so
     the logic is testable without Docker and without the service."""
     container = run(["docker", "compose", "ps", "-q", SERVICE]).strip()
-    yield ("L5 service de scoring en marche", "oui",
+    yield ("B4-L5 service de scoring en marche", "oui",
            "oui" if container else
            "NON : .\\fd-manager.ps1 up -Service scoring-service")
     if not container:
@@ -208,54 +209,54 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
     env = dict(item.partition("=")[::2] for item in config.get("Env") or [])
     state = info.get("State") or {}
 
-    yield ("L5 etat de sante Docker", "healthy",
+    yield ("B4-L5 etat de sante Docker", "healthy",
            (state.get("Health") or {}).get("Status", "aucun"))
-    yield ("L5 utilisateur declare de l'image", "non root",
+    yield ("B4-L5 utilisateur declare de l'image", "non root",
            "non root" if config.get("User") not in ("", "root", "0", None)
            else "ROOT")
-    yield ("L5 capacites Linux retirees", "ALL",
+    yield ("B4-L5 capacites Linux retirees", "ALL",
            ",".join(host.get("CapDrop") or []) or "aucune")
-    yield ("L5 elevation de privileges interdite", "oui",
+    yield ("B4-L5 elevation de privileges interdite", "oui",
            "oui" if "no-new-privileges:true" in (host.get("SecurityOpt") or [])
            else "non")
 
     bindings = [b for spec in (host.get("PortBindings") or {}).values()
                 for b in (spec or [])]
-    yield ("L5 port publie sur cette machine seulement", "127.0.0.1:5001",
+    yield ("B4-L5 port publie sur cette machine seulement", "127.0.0.1:8012",
            ", ".join("%s:%s" % (b.get("HostIp") or "0.0.0.0", b.get("HostPort"))
                      for b in bindings) or "aucun")
 
     mounts = info.get("Mounts") or []
-    yield ("L5 montages en lecture seule",
+    yield ("B4-L5 montages en lecture seule",
            "%d sur %d" % (len(mounts), len(mounts)),
            "%d sur %d" % (sum(1 for m in mounts if not m.get("RW")), len(mounts)))
-    yield ("L5 montages attendus, et seulement eux", "oui",
+    yield ("B4-L5 montages attendus, et seulement eux", "oui",
            "oui" if {m.get("Destination") for m in mounts} == EXPECTED_MOUNTS
            else "non : %s" % sorted({m.get("Destination") for m in mounts}
                                     ^ EXPECTED_MOUNTS))
 
     owner = dotenv(env_file)
-    yield ("L5 POSTGRES_USER du service", "fd_scoring_service",
+    yield ("B4-L5 POSTGRES_USER du service", "fd_scoring_service",
            env.get("POSTGRES_USER", "absent"))
-    yield ("L5 mot de passe du proprietaire absent de l'environnement", "absent",
+    yield ("B4-L5 mot de passe du proprietaire absent de l'environnement", "absent",
            "PRESENT" if owner.get("POSTGRES_PASSWORD")
            and owner["POSTGRES_PASSWORD"] in env.values() else "absent")
     # The one place this service differs from the dashboard, and it is argued
     # in docker-compose.yml: without the pepper, a call and a transaction of
     # the same cardholder would stop joining and nothing would say so.
-    yield ("L5 poivre present, car le pseudonyme doit etre le meme", "present",
+    yield ("B4-L5 poivre present, car le pseudonyme doit etre le meme", "present",
            "present" if env.get("ML4FD_PEPPER") else "ABSENT")
 
     # ---- clause 1 : a third party, over HTTP
     status, root_body = get("%s/" % BASE)
-    yield ("L5 racine annonce le contrat", "200 /openapi.json",
+    yield ("B4-L5 racine annonce le contrat", "200 /openapi.json",
            "%s %s" % (status, (root_body or {}).get("contrat", "rien")
                       if isinstance(root_body, dict) else "rien"))
 
     status, spec = get("%s/openapi.json" % BASE)
     paths = set((spec or {}).get("paths", {})) if isinstance(spec, dict) else set()
-    yield ("L5 contrat publie et interrogeable", "200", str(status))
-    yield ("L5 routes declarees dans le contrat", "oui",
+    yield ("B4-L5 contrat publie et interrogeable", "200", str(status))
+    yield ("B4-L5 routes declarees dans le contrat", "oui",
            "oui" if EXPECTED_ROUTES <= paths
            else "manque %s" % sorted(EXPECTED_ROUTES - paths))
 
@@ -263,42 +264,42 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
     if not isinstance(sante, dict):
         sante = {}
     served = str(sante.get("model_version", "aucune"))
-    yield ("L5 etat de sante lu de cette machine", "ok",
+    yield ("B4-L5 etat de sante lu de cette machine", "ok",
            sante.get("state", "injoignable"))
-    yield ("L5 le point de sante annonce la version servie", "oui",
+    yield ("B4-L5 le point de sante annonce la version servie", "oui",
            "oui" if served not in ("aucune", "None") else "NON")
 
     status, refused = get("%s/score" % BASE, MALFORMED)
     named = fields_named(refused)
-    yield ("L5 requete non conforme refusee", "422", str(status))
-    yield ("L5 les trois champs en cause nommes d'un coup", "3",
+    yield ("B4-L5 requete non conforme refusee", "422", str(status))
+    yield ("B4-L5 les trois champs en cause nommes d'un coup", "3",
            str(len(named & {"amt", "merch_lat", "txn_ts"})))
 
     status, decision = get("%s/score" % BASE, PAYMENT)
-    yield ("L5 un tiers obtient un score", "200", str(status))
+    yield ("B4-L5 un tiers obtient un score", "200", str(status))
     if isinstance(decision, dict):
         expected_keys = {"score", "threshold", "flagged", "model_version",
                          "recipe_digest", "call_id"}
         missing = expected_keys - set(decision)
-        yield ("L5 la reponse porte les chiffres et l'identite du modele", "oui",
+        yield ("B4-L5 la reponse porte les chiffres et l'identite du modele", "oui",
                "oui" if not missing else "manque %s" % sorted(missing))
-        # EC15: the figures stay beside the sentence, the sentence never
+        # B4-EC15: the figures stay beside the sentence, the sentence never
         # replaces them. A caller using assistive technology must not have to
         # read a number out of a float.
         sentence = str(decision.get("texte") or decision.get("phrase") or "")
-        yield ("L5 sortie textuelle presente a cote des chiffres", "oui",
+        yield ("B4-L5 sortie textuelle presente a cote des chiffres", "oui",
                "oui" if len(sentence) > 20 else "NON")
-        yield ("L5 la phrase ne reproduit pas le numero de carte", "oui",
+        yield ("B4-L5 la phrase ne reproduit pas le numero de carte", "oui",
                "NON" if OUTSIDE_THE_CORPUS in sentence
                or OUTSIDE_THE_CORPUS[-4:] in sentence else "oui")
         # The decision and its threshold cannot disagree in the answer either.
         score_, seuil = decision.get("score"), decision.get("threshold")
         if isinstance(score_, (int, float)) and isinstance(seuil, (int, float)):
-            yield ("L5 flagged est bien score >= threshold", "oui",
+            yield ("B4-L5 flagged est bien score >= threshold", "oui",
                    "oui" if bool(decision.get("flagged")) == (score_ >= seuil)
                    else "NON")
         call_id = decision.get("call_id")
-        yield ("L5 l'appel est retrouvable en base par son identifiant", "oui",
+        yield ("B4-L5 l'appel est retrouvable en base par son identifiant", "oui",
                "oui" if call_id else "NON")
         if call_id:
             try:
@@ -308,7 +309,7 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
                              % int(call_id))
             except Exception as problem:
                 found = "indecidable (%s)" % type(problem).__name__
-            yield ("L5 et retrouvable dans la vue fd_scoring_decisions", "1",
+            yield ("B4-L5 et retrouvable dans la vue fd_scoring_decisions", "1",
                    found)
 
     # ---- /score/batch : the path dag_ingest takes
@@ -323,24 +324,24 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
             if "category" in row["features"]:
                 row["features"]["category"] = "misc_net"
         status, batch = get("%s/score/batch" % BASE, {"rows": rows})
-        yield ("L5 le chemin par lot repond", "200", str(status))
+        yield ("B4-L5 le chemin par lot repond", "200", str(status))
         if isinstance(batch, dict):
             got = [d.get("txn_id") for d in batch.get("decisions") or []]
-            yield ("L5 les decisions reviennent dans l'ordre envoye",
+            yield ("B4-L5 les decisions reviennent dans l'ordre envoye",
                    "check-l5-a, check-l5-b", ", ".join(str(g) for g in got))
-            yield ("L5 le lot nomme le modele une fois pour toutes", served,
+            yield ("B4-L5 le lot nomme le modele une fois pour toutes", served,
                    str(batch.get("model_version", "aucune")))
         # A batch over the ceiling must be refused WHOLE. Scoring half of it
         # and failing would leave fd_scores with a partial batch nobody asked
         # for -- the message says so rather than letting it happen.
         status, _ = get("%s/score/batch" % BASE,
                         {"rows": [{"txn_id": "x", "features": {}}] * 1001})
-        yield ("L5 un lot au-dela du plafond refuse en entier", "422",
+        yield ("B4-L5 un lot au-dela du plafond refuse en entier", "422",
                str(status))
 
     # ---- clause 3 : a promotion lands without a restart
     designated = alias_version(get)
-    yield ("L5 version servie = version designee par l'alias", designated,
+    yield ("B4-L5 version servie = version designee par l'alias", designated,
            served)
     # Docker reports StartedAt in UTC. to_char on a timestamptz renders it in
     # the session's TimeZone, so the comparison below is only honest if both
@@ -356,13 +357,13 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
     except Exception:
         last = ""
     if not last:
-        yield ("L5 promotion sans redemarrage", "mesure",
+        yield ("B4-L5 promotion sans redemarrage", "mesure",
                "aucune promotion enregistree : clause non demontrable")
     elif started and started < last:
-        yield ("L5 promotion sans redemarrage, le conteneur est anterieur",
+        yield ("B4-L5 promotion sans redemarrage, le conteneur est anterieur",
                "oui", "oui" if designated == served else "NON")
     else:
-        yield ("L5 promotion sans redemarrage", "mesure",
+        yield ("B4-L5 promotion sans redemarrage", "mesure",
                "conteneur demarre le %s, apres la promotion du %s : "
                "l'egalite des versions ne prouve rien ici" % (started, last))
 
@@ -373,7 +374,7 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
 
 def main() -> int:
     print("")
-    print("Criteres d'acceptation de L5 que SQL n'atteint pas : le service reel")
+    print("Criteres d'acceptation de B4-L5 que SQL n'atteint pas : le service reel")
     print("")
     try:
         rows = list(criteria())

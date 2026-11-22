@@ -1,5 +1,8 @@
 -- One notification attempt that failed.
--- Covers: EI05, EC14   Lot: N5   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-N5, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EI05, B3-EC14.
 --
 -- The alert stays raised with notified_at null, so the next run picks it up.
 -- last_error is overwritten rather than accumulated: the current reason is what

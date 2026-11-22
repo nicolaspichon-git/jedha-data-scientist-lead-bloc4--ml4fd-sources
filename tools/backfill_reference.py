@@ -1,8 +1,9 @@
-"""Copy what M5 measured into fd_datasets, for recipes fitted before R10.
+"""Copy what B3-M5 measured into fd_datasets, for recipes fitted before B3-R10.
 
-Covers: EE04, EC23
-Lot: R10
-Competency: C4
+Block: B3, B4.
+Lot: B3-R10, B4-L0.
+Competency: B3-C4.
+Covers: B3-EE04, B3-EC23.
 
 WHY THIS EXISTS. Since S6/R10, dag_train.fit_model writes the five figures of
 the test set into the dataset's row of fd_datasets right after run.json. The
@@ -35,7 +36,7 @@ EVERY = "SELECT recipe_digest, version FROM fd_datasets ORDER BY created_at"
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
-        description="Copy the M5 figures of each run.json into fd_datasets.")
+        description="Copy the figures of each run.json into fd_datasets.")
     parser.add_argument("--dry-run", action="store_true",
                         help="read the manifests, write nothing")
     parser.add_argument("--all", action="store_true",

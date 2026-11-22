@@ -1,5 +1,9 @@
 # Governance policy and parameterised durations.
-# Covers: EI12, EC16, EC18
+
+# Block: B3, B4
+# Lot: B3-?, B4-L0, ...
+# Competency: ...
+# Covers: B3-EI12, B3-EC16, B3-EC18, ...
 #
 # Durations that outlast the demonstration itself live here, and nowhere else in
 # the code. No secret belongs in this file: those live in .env.
@@ -16,7 +20,7 @@ verdicts:
   # Delay between a transaction and the moment its verdict becomes known.
   # Sets the width of the blind band before the cut-off.
   delay_days: 30
-  demo_delay_seconds: 300        # demonstration value (F13.1, EI12)
+  demo_delay_seconds: 300        # demonstration value (B3-F13-1, B3-EI12)
 
   # HOW OFTEN THE DUE VERDICTS ARE WRITTEN, and it has to follow the switch
   # above or the demonstration stalls on arithmetic nobody notices: in demo a
@@ -88,7 +92,7 @@ retention:
       from, which is what M8's lineage rests on.
     datasets_directory: >-
       The parquet training sets under runtime/datasets/. MEASURED RATHER THAN ASSUMED
-      (S5/Q6): they carry no identifying field -- features and the
+      (B3-S5/B3-Q6): they carry no identifying field -- features and the
       pseudonymised client_key -- so limiting their retention is not what this
       policy is for, and they are the other half of M8's lineage: a registered
       model must stay tied to the set that produced it. About 830 MB a year at
@@ -99,13 +103,13 @@ retention:
       comes to be a duration nobody applies. Trimming the directory, if it
       ever matters, is a manual act outside S5.
     fd_purges: >-
-      The journal of the purges (S5/Q6): counts, instants and store names, one
+      The journal of the purges (B3-S5/B3-Q6): counts, instants and store names, one
       row per store and per execution. No personal field -- and it is the proof
-      that the declared durations are APPLIED, which EC18 asks for. Deleting it
+      that the declared durations are APPLIED, which B3-EC18 asks for. Deleting it
       would destroy the evidence that the policy exists in fact; the role that
       purges may insert into it and nothing else.
     fd_promotions: >-
-      The journal of the promotion decisions (L3): a model version, the figures
+      The journal of the promotion decisions (B3-L3): a model version, the figures
       that decided, and the policy in force at the time. No personal field,
       and nothing to empty. Its rows must not go either: it is the only record
       of why one version is served and another was refused -- a question asked
@@ -114,9 +118,9 @@ retention:
       promotes may insert into it and nothing else.
     fd_reports: >-
       The journal of the morning reports: counts and a digest, one row per
-      day. The counts are what the audit of S4 re-reads.
+      day. The counts are what the audit of B3-S4 re-reads.
     mlflow_registry: >-
-      Not purged by S5. Models and their metrics hold no personal data; their
+      Not purged by B3-S5. Models and their metrics hold no personal data; their
       retention is a registry decision, and a model in service must be
       reproducible, which a purge would break.
     reports_directory: >-
@@ -169,7 +173,7 @@ purge:
   # fell. At the same instant the purge would take batches out from under it.
   schedule: "0 4 * * 0"
 
-  # THE GUARD AGAINST A TOO-WIDE PURGE (S5/Q2, Q5). A purge that would delete
+  # THE GUARD AGAINST A TOO-WIDE PURGE (B3-S5/B3-Q2, B3-Q5). A purge that would delete
   # more than this share of a store stops and demands an explicit confirmation:
   # a purge of 90 % of a table may be legitimate, but it is never a routine.
   # Strictly between 0 and 1: at 1 the guard never fires.
@@ -194,7 +198,7 @@ scoring:
   # it travels with the model, in run.json.
   decision_threshold: 0.5
 
-  # HOW THE OPERATING THRESHOLD IS CHOSEN (M6). 0.5 is the default of a
+  # HOW THE OPERATING THRESHOLD IS CHOSEN (B3-M6). 0.5 is the default of a
   # library, never a business decision.
   #
   # cost     : minimise the money lost. The cost of a missed fraud is ITS OWN
@@ -217,7 +221,7 @@ scoring:
   #
   # THE CONTAINER PORT AND NOT THE PUBLISHED ONE, the same rule as
   # realtime.endpoint: inside the compose network a service is reached on the
-  # port it listens on, and the 5001 of docker-compose.yml only publishes it to
+  # port it listens on, and the 8012 of docker-compose.yml only publishes it to
   # the host's loopback for a browser.
   #
   # Changing this line needs the scheduler recreated, since config.load() runs
@@ -311,7 +315,7 @@ scoring:
     min_amount: 300
     night_hours: [22, 23, 0, 1, 2, 3]
 
-# WHETHER A NEWLY TRAINED MODEL EVER REACHES PRODUCTION. Lot L3.
+# WHETHER A NEWLY TRAINED MODEL EVER REACHES PRODUCTION. Lot B4-L3.
 promotion:
   # REGISTERING AND PROMOTING ARE TWO DIFFERENT ACTS, and before L3 only the
   # first existed. Every run of S2 registers a version; the scoring path
@@ -397,7 +401,7 @@ monitoring:
   # reachable at all: a drift injected at T is measured by T+2, the retraining
   # is asked for in the same run, and the gate decides when the candidate is
   # fitted. An hourly monitor would make the loop correct and unshowable.
-  schedule: "17 * * * *"
+  schedule: "10 * * * *"
   demo_schedule: "*/2 * * * *"
 
   # THE TOOL, named because EC38 requires a named one. The figure it computes
@@ -540,7 +544,7 @@ monitoring:
     # right. Silencing them would turn this control into a drift detector that
     # can only ever see what we inject ourselves.
     #
-    # EC45 READS A SERIES, so the count is published with every verdict:
+    # B4-EC45 READS A SERIES, so the count is published with every verdict:
     # drifted_columns_share carries "n of m columns drifted" in its detail, and
     # m changes the day this list changes. A share of 0.60 over five columns
     # and one over three do not mean the same thing, and the row says which.
@@ -910,7 +914,7 @@ realtime:
   # Changing this line needs the scheduler recreated, since config.load() runs
   # per task but the compose environment does not.
   # The CONTAINER port and not the published one: inside the compose network
-  # a service is reached on the port it listens on, and the 8801 in
+  # a service is reached on the port it listens on, and the 8802 in
   # docker-compose.yml only publishes it to the host's loopback for a browser.
   endpoint: http://producer:4000/current-transactions
 

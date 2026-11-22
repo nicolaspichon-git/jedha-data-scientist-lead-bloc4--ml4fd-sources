@@ -1,5 +1,8 @@
 -- The per-column drift figures of the most recent monitoring run (S6/R11).
--- Covers: EC39, EC49   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC39, B4-EC49.
 --
 -- WHY THESE ROWS DESERVE A TABLE OF THEIR OWN. On 2026-11-20 input_drift had
 -- been in alert since 09:34 and the verdict said "3 of 5 columns drifted" --

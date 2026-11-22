@@ -1,5 +1,8 @@
 -- Apply the history features to ONE batch, in real-time mode.
--- Covers: EE07, EI03   Lot: N3   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-N3, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EE07, B3-EI03.
 --
 -- WHY A BATCH AND NOT THE WHOLE TABLE. features_window.sql recomputes
 -- everything, and its docstring says why: a history feature depends on every

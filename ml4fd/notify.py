@@ -1,8 +1,9 @@
 """Telling somebody a transaction was flagged, and recording that it happened.
 
-Covers: EE09, EI05, EC09, EC14, EC17
-Lot: N5
-Competency: C3, C4
+Block: B3, B4.
+Lot: B3-N5, B4-L0.
+Competency: B3-C3, B3-C4.
+Covers: B3-EE09, B3-EI05, B3-EC09, B3-EC14, B3-EC17.
 
 WHAT A NOTIFICATION MAY CARRY, and this is the part worth getting right. An
 alert is exactly the message where one wants to put the cardholder's name. It
@@ -206,9 +207,10 @@ def channel_of(name: str):
 def raise_alerts(conn) -> int:
     """Raise an alert for every flagged score that has none. Returns the count.
 
-    Covers: EI05, EC23
-    Lot: N5
-    Competency: C3
+    Block: B3, B4.
+    Lot: B3-N5.
+    Competency: B3-C3.
+    Covers: B3-EI05, B3-EC23.
     """
     raised = db.execute_file(conn, RAISE_SQL)
     if raised:
@@ -240,9 +242,10 @@ def notify(conn, settings, now_budget: int | None = None) -> dict:
     bounds a crash to at most ONE duplicated notification instead of re-sending
     everything the run had already delivered.
 
-    Covers: EI05, EC09, EC14
-    Lot: N5
-    Competency: C3, C4
+    Block: B3, B4.
+    Lot: B3-N5, B4-L0.
+    Competency: B3-C3, B3-C4.
+    Covers: B3-EI05, B3-EC09, B3-EC14.
     """
     channel_name = settings.alert_channel
     send = channel_of(channel_name)

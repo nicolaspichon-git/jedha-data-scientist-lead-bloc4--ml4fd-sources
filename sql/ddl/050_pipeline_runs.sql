@@ -1,5 +1,8 @@
 -- Run journal, queryable.
--- Covers: EC12   Lot: L7   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-L7, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC12.
 --
 -- The counter-closure constraint puts the L2 acceptance criterion in the
 -- database: n_read = n_valid + n_rejected stops being a test to remember and

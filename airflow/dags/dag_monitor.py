@@ -1,18 +1,19 @@
-"""L4 -- monitoring the model in service, and asking for a retraining.
+"""B4-L4 -- monitoring the model in service, and asking for a retraining.
 
-Covers: EC38, EC39, EC40, EC42, EC44, EC45, EC33
-Lot: L4
-Competency: C6, C5
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C6, B4-C5.
+Covers: B4-EC38, B4-EC39, B4-EC40, B4-EC42, B4-EC44, B4-EC45, B4-EC33.
 
 THE DAG THAT CLOSES THE LOOP, and the only one here that triggers another. S2
-trains on a cadence; L3 decides what gets served; this is what notices that
+trains on a cadence; B4-L3 decides what gets served; this is what notices that
 what is served no longer matches the world, and asks for a new one. Without it
 the two loops of the project never meet: the code loop runs on commits, the
 model loop would run on nothing but the calendar.
 
 ALL THE LOGIC SITS IN ml4fd/monitor.py, as S1's does in the package: the
 decision layer is a set of pure functions over dictionaries, so the whole of
-C6's policy is exercisable by the test suite without Evidently, without Airflow
+B4-C6's policy is exercisable by the test suite without Evidently, without Airflow
 and without a database. This file orders the steps and owns none of them.
 
 IT RAISES ON NOTHING IT MEASURES. A drifted input and a crossed floor are this
@@ -23,7 +24,7 @@ took for S3, and for the same reason.
 
 WHAT IT DOES NOT DO. It does not retrain, it does not promote, and it does not
 decide whether the candidate is any good. It asks dag_train for a candidate;
-the gate of L3 judges it. That separation is what lets the trigger be tuned to
+the gate of B4-L3 judges it. That separation is what lets the trigger be tuned to
 miss little: the expensive mistake -- serving a bad model -- is downstream and
 already guarded.
 """
@@ -61,7 +62,7 @@ RECORD_REQUEST = "record_request"
 
 @dag(
     dag_id=DAG_ID,
-    description="L4: drift, performance, and the retraining they ask for",
+    description="B4-L4: drift, performance, and the retraining they ask for",
     # THE CADENCE IS NEITHER WINDOW. The windows say what is measured; this
     # says how often it is looked at. Hourly in nominal -- short enough that a
     # drift is seen the same morning, long enough that the series does not fill
@@ -81,7 +82,7 @@ RECORD_REQUEST = "record_request"
     start_date=pendulum.datetime(2026, 11, 16, tz="Europe/Paris"),
     catchup=False,                      # a past window cannot be re-measured
     max_active_runs=1,
-    tags=["L4", "BC04", "C5", "C6"],
+    tags=["B4-L4", "BC04", "B4-C5", "B4-C6"],
     default_args={"retries": 0},
 )
 def monitor_model():
@@ -90,7 +91,7 @@ def monitor_model():
     def champion() -> dict:
         """The version in service, and the figures it was published with.
 
-        FROM THE ALIAS AND NEVER FROM THE NEWEST VERSION, which is L3's whole
+        FROM THE ALIAS AND NEVER FROM THE NEWEST VERSION, which is B4-L3's whole
         point: the drift of the inputs is a property of the stream, but the
         performance and the flag rate are properties of the model that is
         actually serving. Measuring the newest registered version would report
@@ -272,7 +273,7 @@ def monitor_model():
         log.info("rien a demander : les controles qui declenchent sont au vert")
 
     # THE TRIGGER ITSELF. conf carries why, so the training run can be read
-    # back to the measurement that asked for it -- the C5/C6 junction, made
+    # back to the measurement that asked for it -- the B4-C5/C6 junction, made
     # auditable rather than inferred from two timestamps.
     #
     # wait_for_completion is FALSE on purpose: a monitoring run must not hold

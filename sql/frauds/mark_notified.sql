@@ -1,5 +1,8 @@
 -- One alert notified. Written AFTER the channel accepted it.
--- Covers: EI05, EC23   Lot: N5   Competency: C3
+-- Block: B3, B4.
+-- Lot: B3-N5, B4-L0.
+-- Competency: B3-C3.
+-- Covers: B3-EI05, B3-EC23.
 --
 -- THE ORDER IS THE DECISION. Send, then record. With an external channel the
 -- two cannot be made atomic, so the choice is which failure to prefer: a crash

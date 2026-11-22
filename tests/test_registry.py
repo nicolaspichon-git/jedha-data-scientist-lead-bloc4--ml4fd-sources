@@ -1,5 +1,10 @@
 """The chain from a model back to its rows, and the manifest that carries it.
 
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+
 mlflow is absent from the authoring environment, so log_run is not exercised
 here. What IS exercised is everything it reads: the manifest, and the two
 translations into parameters and metrics. That is where the chain can break

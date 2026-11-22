@@ -1,8 +1,9 @@
 """Collecting the real-time stream, and putting it in the raw zone untouched.
 
-Covers: EE01, EE02, EI01, EC01
-Lot: N1
-Competency: C2
+Block: B3, B4.
+Lot: B3-N1, B4-L0.
+Competency: B3-C2.
+Covers: B3-EE01, B3-EE02, B3-EI01, B3-EC01.
 
 EVERY VALUE IS TEXT, and that is not a style choice. Measured in N0: 7 of the
 924 cards carry 19 digits and exceed 2**53, so a single float anywhere on the
@@ -168,9 +169,10 @@ def decode(body: str) -> tuple[list[str], list[Any]]:
         because a misalignment would silently put an amount in the category
         column and nothing would raise.
 
-    Covers: EC25
-    Lot: N1
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-N1, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC25.
     """
     try:
         outer = json.loads(body)
@@ -246,9 +248,10 @@ def fetch_one(endpoint: str, session=None,
     collector that raised on those would stop five times a day for a stream that
     is simply flaky.
 
-    Covers: EE01, EC01
-    Lot: N1
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-N1, B4-L0.
+    Competency: B3-C2, B4-C2.
+    Covers: B3-EE01, B3-EC01, B4-EE02.
     """
     getter = session.get if session is not None else requests.get
     our_ms = int(time.time() * 1000)
@@ -286,9 +289,10 @@ def poll(endpoint: str, calls: int, spacing_s: float = 0.0,
     thing that can happen. A 502 is not retried in the same run -- measured at
     25 s, retrying it would eat the whole minute.
 
-    Covers: EE02, EI01, EC14
-    Lot: N1
-    Competency: C2, C4
+    Block: B3, B4.
+    Lot: B3-N1, B4-L0.
+    Competency: B3-C2, B3-C4.
+    Covers: B3-EE02, B3-EI01, B3-EC14.
     """
     readings: list[Reading] = []
     failures: list[Attempt] = []
@@ -359,9 +363,10 @@ def validate_raw(records, max_amount: float, tolerance_s: float
     latency comes back rounded to the millisecond, which the tolerance of 120 s
     does not notice.
 
-    Covers: EC25, EC26, EI13
-    Lot: N7
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-N7, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC25, B3-EC26, B3-EI13.
     """
     numbered = []
     envelopes = {}
@@ -403,9 +408,10 @@ def validate(readings: list[Reading], max_amount: float,
     The line numbers are the ranks the raw zone gave, so a reason written to
     fd_quarantine points at the record that caused it.
 
-    Covers: EC25, EC26, EI13
-    Lot: N2
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-N2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC25, B3-EC26, B3-EI13.
     """
     accepted: list[Reading] = []
     items: list[tuple[int, dict, list]] = []
@@ -451,9 +457,10 @@ def write_batch(conn: "psycopg.Connection", batch_id, readings: list[Reading]
     There is no line number in a stream, and the rank keeps
     UNIQUE (batch_id, line_no) doing its job.
 
-    Covers: EE02, EI01
-    Lot: N1
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-N1, B4-L0.
+    Competency: B3-C2.
+    Covers: B3-EE02, B3-EI01.
     """
     from ml4fd import raw
 

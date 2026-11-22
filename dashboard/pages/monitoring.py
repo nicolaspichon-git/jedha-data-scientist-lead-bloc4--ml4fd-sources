@@ -1,8 +1,9 @@
-"""The surveillance of the model in service, as a jury reads it (R11).
+"""The surveillance of the model in service, as a jury reads it.
 
-Covers: EC45, EC49
-Lot: L4
-Competency: C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C6.
+Covers: B4-EC45, B4-EC49.
 
 WHAT THIS PAGE ANSWERS and nothing else did: fd_monitoring was written every
 cadence and read by nothing. The history EC45 asks to keep was kept and never

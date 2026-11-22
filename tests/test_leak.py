@@ -1,8 +1,9 @@
 """The four guarantees of N6, checked by analysis rather than by re-reading.
 
-Covers: EE03, EI03, EI12, EC17
-Lot: N6
-Competency: C5
+Block: B3, B4.
+Lot: B3-N6, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE03, B3-EI03, B3-EI12, B3-EC17.
 
 WHY THIS FILE IS DIFFERENT FROM EVERY OTHER TEST HERE. It measures an ABSENCE.
 The API delivers is_fraud in the SAME payload as the features -- N0 measured it:

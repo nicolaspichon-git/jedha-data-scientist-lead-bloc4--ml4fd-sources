@@ -1,5 +1,8 @@
 -- How many verdicts are written but not yet due, and how many have fallen due.
--- Covers: EI03, EI12, EC14   Lot: N6   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-N6, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EI03, B3-EI12, B3-EC14.
 --
 -- THE MEASUREMENT THAT MAKES THE WITHHOLDING VISIBLE. A guarantee nobody can
 -- count is a promise; this query is how N8 will check that the blind band
