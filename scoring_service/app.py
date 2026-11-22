@@ -139,10 +139,11 @@ def _scorer():
 
 @app.get("/health", summary="Etat du service et version du modele servi")
 def health() -> dict:
-    """
+    """Announce whether a model is in service, which version, and which code serves it.
+    \f
     Block: B4.
     Lot: B4-L5.
-    Competency: ?.
+    Competency: B4-C2, B4-C3.
     Covers: B4-EC21.
     """
     scorer, problem = _scorer()
@@ -164,7 +165,8 @@ def root() -> dict:
                                           "nomme chaque champ en cause."},
                      503: {"description": "Aucun modele en service."}})
 def post_score(payment: Payment) -> JSONResponse:
-    """
+    """The free entry point.
+    \f
     Block: B4.
     Lot: B4-L5.
     Competency: B4-C2, B4-C3.
@@ -210,12 +212,9 @@ def post_score(payment: Payment) -> JSONResponse:
                                           "ne portant pas les features de la "
                                           "recette en service."},
                      503: {"description": "Aucun modele en service."}})
+
 def post_score_batch(batch: Batch) -> JSONResponse:
     """The pipeline's entry point.
-    Block: B4.
-    Lot: B4-L5.
-    Competency: ?.
-    Covers: B4-EC16, B4-EC19.
 
     WHY IT EXISTS BESIDE /score. fd_transactions holds no cc_num and no home
     location -- transform.py consumes them at the raw boundary and never writes
@@ -228,6 +227,11 @@ def post_score_batch(batch: Batch) -> JSONResponse:
     exists. See ml4fd/serve.batch_answer for the argument, and
     sql/ddl/195_scoring_decisions.sql for the view that reads both journals as
     one.
+    \f
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C2, B4-C3.
+    Covers: B4-EC16, B4-EC19.
     """
     scorer, problem = _scorer()
     if scorer is None:

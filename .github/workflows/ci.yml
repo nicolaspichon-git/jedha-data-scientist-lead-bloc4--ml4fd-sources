@@ -23,13 +23,13 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # 3.11, like the images -- apache/airflow:2.10.4-python3.11 and
       # python:3.11 -- and like requires-python in pyproject.toml. A suite run
       # on a newer interpreter than production tests something else: the local
       # run under 3.14 is what sent us looking for a missing psycopg.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: pip
@@ -84,13 +84,13 @@ jobs:
     env:
       PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
         if: env.PUBLISH == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -105,7 +105,7 @@ jobs:
           echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Build, and publish from main
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: scoring_service/Dockerfile
@@ -116,3 +116,135 @@ jobs:
             ${{ steps.name.outputs.image }}:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # THE DEPLOYMENT (B4-L6), on THIS MACHINE and nowhere else: GitHub cannot
+  # reach a desktop, so a runner installed here takes the job (label
+  # ml4fd-host, started by hand with run.cmd). It runs after the image is
+  # published, from main only -- a pull request never runs code on this
+  # machine.
+  #
+  # WHAT IT REPLACES: the scoring service's container, and only it
+  # (--no-deps). The rest of the stack -- the database, MLflow, Airflow --
+  # is state or is built here, and is not this job's to touch.
+  #
+  # WHERE: the stack's own folder, named by the repository variable
+  # ML4FD_HOST_DIRPATH. The runner works in a folder of its own, from which
+  # compose would find neither .env nor ./runtime/datasets.
+  #
+  # A DEPLOYMENT THAT IS NOT CHECKED IS ONLY A COMMAND THAT RAN: the job fails
+  # unless /health announces the very commit it was asked to deploy.
+  deploy:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, ml4fd-host]
+    # One deployment at a time on this machine; a second waits its turn.
+    concurrency:
+      group: deploy-ml4fd-host
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    env:
+      HOST_DIR: ${{ vars.ML4FD_HOST_DIRPATH }}
+      IMAGE: ghcr.io/${{ github.repository }}/scoring-service
+      REVISION: ${{ github.sha }}
+      HEALTH_URL: http://127.0.0.1:8012/health
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: The stack folder is declared and holds the stack
+        run: |
+          if (-not $env:HOST_DIR) {
+            Write-Host "::error::repository variable ML4FD_HOST_DIRPATH is not set"
+            exit 1
+          }
+          foreach ($name in @('docker-compose.yml', '.env')) {
+            if (-not (Test-Path (Join-Path $env:HOST_DIR $name))) {
+              Write-Host "::error::$name not found in $env:HOST_DIR"
+              exit 1
+            }
+          }
+          $tag = 'sha-' + $env:REVISION.Substring(0, 7)
+          # ASCII and not utf8: Windows PowerShell writes a BOM with utf8, and a
+          # BOM at the head of GITHUB_ENV would become part of the variable name.
+          Add-Content -Path $env:GITHUB_ENV -Value "SCORING_SERVICE_TAG=$tag" -Encoding ascii
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $env:GHCR_TOKEN | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Pull the image
+        run: |
+          docker compose --project-directory $env:HOST_DIR -f (Join-Path $env:HOST_DIR 'docker-compose.yml') pull scoring-service
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # THE TAG IS WRITTEN INTO .env, and not only into this process: compose
+      # reads .env on every command, so a "docker compose up -d" typed by hand
+      # later keeps the deployed image instead of building a "local" one from
+      # the working folder in its place. The line is not a secret; no other
+      # line of .env is touched.
+      - name: Record the deployed tag in .env
+        run: |
+          $file = Join-Path $env:HOST_DIR '.env'
+          $lines = @(Get-Content $file)
+          if ($lines -match '^SCORING_SERVICE_TAG=') {
+            $lines = $lines | ForEach-Object {
+              if ($_ -match '^SCORING_SERVICE_TAG=') { "SCORING_SERVICE_TAG=$env:SCORING_SERVICE_TAG" } else { $_ }
+            }
+          } else {
+            $lines += "SCORING_SERVICE_TAG=$env:SCORING_SERVICE_TAG"
+          }
+          [System.IO.File]::WriteAllLines($file, $lines, (New-Object System.Text.UTF8Encoding($false)))
+
+      - name: Replace the scoring service, and only it
+        run: |
+          docker compose --project-directory $env:HOST_DIR -f (Join-Path $env:HOST_DIR 'docker-compose.yml') up -d --no-build --no-deps scoring-service
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Wait until it is healthy
+        run: |
+          $compose = @('--project-directory', $env:HOST_DIR, '-f', (Join-Path $env:HOST_DIR 'docker-compose.yml'))
+          $id = docker compose @compose ps -q scoring-service
+          $deadline = (Get-Date).AddSeconds(180)
+          do {
+            $state = docker inspect --format '{{.State.Health.Status}}' $id
+            if ($state -eq 'healthy') { break }
+            Start-Sleep -Seconds 5
+          } while ((Get-Date) -lt $deadline)
+          if ($state -ne 'healthy') {
+            Write-Host "::error::the scoring service is '$state' after 180 s"
+            docker compose @compose logs --tail 40 scoring-service
+            exit 1
+          }
+
+      - name: The service announces the deployed commit
+        run: |
+          $health = Invoke-RestMethod -Uri $env:HEALTH_URL -TimeoutSec 10
+          if ($health.revision -ne $env:REVISION) {
+            Write-Host "::error::/health announces revision '$($health.revision)', expected '$env:REVISION'"
+            exit 1
+          }
+          Write-Host ("deployed {0} -- model version {1}, state {2}" -f $env:SCORING_SERVICE_TAG, $health.model_version, $health.state)
+
+      # THE JOURNAL OF DEPLOYMENTS, one line each, on this machine: what was
+      # deployed, when, from which run, and which model it found in service.
+      # The rollback reads it to know what "the previous version" is.
+      - name: Record the deployment
+        run: |
+          $journal = Join-Path $env:HOST_DIR 'runtime\deployments.csv'
+          if (-not (Test-Path $journal)) {
+            'deployed_at,tag,revision,image_digest,model_version,run_url' | Set-Content -Path $journal -Encoding ascii
+          }
+          $health = Invoke-RestMethod -Uri $env:HEALTH_URL -TimeoutSec 10
+          $digest = docker inspect --format '{{index .RepoDigests 0}}' ("{0}:{1}" -f $env:IMAGE, $env:SCORING_SERVICE_TAG)
+          $run = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          $line = "{0},{1},{2},{3},{4},{5}" -f (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'), $env:SCORING_SERVICE_TAG, $env:REVISION, $digest, $health.model_version, $run
+          Add-Content -Path $journal -Value $line -Encoding ascii
+
+      - name: Log out of GHCR
+        if: always()
+        run: docker logout ghcr.io

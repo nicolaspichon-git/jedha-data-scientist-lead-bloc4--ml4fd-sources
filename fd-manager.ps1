@@ -1649,9 +1649,15 @@ LIMIT  14;
             exit 1
         }
         $env:BUILDKIT_PROGRESS = 'plain'
-        # --force-recreate, for the reason the dashboard's block states at
-        # length: the code is mounted, but a running container keeps the
-        # ml4fd modules it imported at start-up.
+        # A BUILD FROM THIS FOLDER, NOT A DEPLOYMENT (L6). The image carries its
+        # code since L6, so --build is what makes an edit of ml4fd/ reach the
+        # service. The tag is forced to "local" for this one command, over the
+        # SCORING_SERVICE_TAG the last deployment wrote into .env: the image
+        # built here is the working folder, and must not wear a commit's name.
+        # The next deployment puts the published image back.
+        $env:SCORING_SERVICE_TAG = 'local'
+        Write-Host "  image construite depuis ce dossier (etiquette local) : elle remplace" -ForegroundColor Yellow
+        Write-Host "  l'image deployee jusqu'au prochain deploiement." -ForegroundColor Yellow
         Invoke-Step 'docker compose up --build --force-recreate scoring-service' {
             & docker compose up -d --build --force-recreate scoring-service
         }
