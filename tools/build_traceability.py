@@ -304,7 +304,7 @@ def disagreements(req: dict[str, dict], declared: dict) -> list[tuple]:
     value is that every line in it means something.
 
     Block: B3, B4.
-    Lot: B3-?, B4-L0.
+    Lot: B4-L0 (B3: U/D).
     Competency: B3-C2.
     Covers: B3-EC07.
     """

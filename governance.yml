@@ -362,15 +362,6 @@ promotion:
   # Then this goes back to true. fd_promotions writes alert_capacity into
   # every row, so a promotion decided with the check off stays visible for
   # good -- which is what makes this defensible instead of merely convenient.
-  #
-  # OFF AGAIN, 2026-11-22, for one promotion by hand: the third clause of
-  # B4-L5, "a promotion changes the version /health announces, without a
-  # restart". Every retraining is refused here for the reason above, the
-  # test split's base rate, and that clause tests the service, not the
-  # gate. The paired test still applies. Back to true right after the
-  # promotion: tests/test_promote.py fails while this reads false, so the
-  # CI keeps it off main. dag_train (Monday 03:00) reads this file as it
-  # stands on disk, and no test protects that.
   respect_alert_capacity: true
 
   # WITH NO CHAMPION YET there is nothing to compare against, and refusing

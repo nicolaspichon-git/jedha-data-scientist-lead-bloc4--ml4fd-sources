@@ -81,7 +81,7 @@ def test_the_expected_tables_are_the_ones_r0_grants():
                 ddl, re.I):
             granted.discard(revoked)
             by_column.discard(revoked)
-    expected = re.search(r"'R0 tables lisibles, colonnes comprises',\s*'([^']+)'",
+    expected = re.search(r"'B3-R0 tables lisibles, colonnes comprises',\s*'([^']+)'",
                          SQL).group(1)
     assert sorted(granted | by_column) == \
         [name.strip() for name in expected.split(",")]
@@ -92,7 +92,7 @@ def test_the_quarantine_columns_expected_are_the_ones_granted():
         encoding="utf-8"))
     granted = re.search(r"GRANT\s+SELECT\s*\(([^)]*)\)\s*ON\s+fd_quarantine", ddl,
                         re.I).group(1)
-    expected = re.search(r"'R6 colonnes lisibles de la quarantaine',\s*'([^']+)'",
+    expected = re.search(r"'B3-R6 colonnes lisibles de la quarantaine',\s*'([^']+)'",
                          SQL).group(1)
     assert sorted(c.strip() for c in granted.split(",")) == \
         [c.strip() for c in expected.split(",")]
@@ -117,7 +117,7 @@ def test_a_missing_role_is_named_before_anything_else_fails():
 
 
 def test_psql_exits_non_zero_on_any_failure():
-    assert "RAISE EXCEPTION 'S6 : % critere(s) en echec" in SQL
+    assert "RAISE EXCEPTION 'B3-S6 : % critere(s) en echec" in SQL
 
 
 # --- the running container ----------------------------------------------------

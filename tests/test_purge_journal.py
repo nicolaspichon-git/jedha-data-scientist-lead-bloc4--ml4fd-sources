@@ -304,8 +304,8 @@ def test_both_halves_of_s5_are_in_the_check():
     assert "s5_acceptance.sql" in block
     assert "check_s5.py" in block
     # and each behind its own Invoke-Step, so a failure names which half
-    assert block.count("Invoke-Step 'criteres d''acceptation de S5'") == 1
-    assert block.count("Invoke-Step 'declaration, DAG et fichiers de S5'") == 1
+    assert block.count("Invoke-Step 'criteres d''acceptation de B3-S5'") == 1
+    assert block.count("Invoke-Step 'declaration, DAG et fichiers de B3-S5'") == 1
 
 
 def test_the_acceptance_task_covers_s5_too():
