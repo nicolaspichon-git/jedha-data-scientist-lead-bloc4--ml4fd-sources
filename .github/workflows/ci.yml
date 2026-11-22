@@ -170,12 +170,18 @@ jobs:
           # BOM at the head of GITHUB_ENV would become part of the variable name.
           Add-Content -Path $env:GITHUB_ENV -Value "SCORING_SERVICE_TAG=$tag" -Encoding ascii
 
+      # THE OFFICIAL ACTION, as in the image job, and not a pipe into
+      # docker login: the first deployment (2026-11-22) failed there with
+      # "denied: denied". Windows PowerShell 5.1 hands a piped string to a
+      # native program with an encoding and line endings of its own, and the
+      # registry refused what reached it. The action passes the token itself,
+      # and logs out on its own when the job ends.
       - name: Log in to GHCR
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $env:GHCR_TOKEN | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull the image
         run: |
@@ -244,7 +250,3 @@ jobs:
           $run = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           $line = "{0},{1},{2},{3},{4},{5}" -f (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'), $env:SCORING_SERVICE_TAG, $env:REVISION, $digest, $health.model_version, $run
           Add-Content -Path $journal -Value $line -Encoding ascii
-
-      - name: Log out of GHCR
-        if: always()
-        run: docker logout ghcr.io
