@@ -185,12 +185,23 @@ criteria AS (
     -- again -- it would sit in the table as a state nobody computes, and the
     -- channel would go quiet about whatever that control used to watch.
     UNION ALL
-    SELECT 21, 'N9 controles enregistres hors des quatre declares',
+    --
+    -- EIGHT AND NOT FOUR since B4-L4, 2026-11-22. dag_monitor records its four
+    -- families in the same table, deliberately: fd_ops_state is the one place
+    -- where a control's last state lives, so the channel and the dashboard
+    -- read both kinds alike. The four pipeline controls are health.py's, the
+    -- four monitoring ones ml4fd/monitor.py's (and the CHECK of
+    -- sql/ddl/170_monitoring.sql). Counting the second as unknown failed this
+    -- criterion as soon as one of them changed state, and differently each
+    -- time another did.
+    SELECT 21, 'N9 controles enregistres hors des huit declares',
            '0 inconnu',
            (SELECT count(*)::text || ' inconnu'
               FROM fd_ops_state
              WHERE control NOT IN ('freshness', 'empty_run',
-                                   'rejection_rate', 'volume_invariant'))
+                                   'rejection_rate', 'volume_invariant',
+                                   'input_drift', 'prediction_drift',
+                                   'performance', 'data_quality'))
     -- Informative and NOT a criterion, for the same reason as 13: a pipeline
     -- legitimately in alert would otherwise fail its own acceptance, and an
     -- acceptance check that fails on reality teaches people to ignore it.

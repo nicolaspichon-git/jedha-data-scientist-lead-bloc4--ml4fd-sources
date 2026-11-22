@@ -128,12 +128,12 @@ known AS (
     FROM   latest l, labelled r
 ),
 criteria AS (
-    SELECT 1 AS ord, 'M0 jeux enregistres (>= 1)' AS criterion,
+    SELECT 1 AS ord, 'B3-M0 jeux enregistres (>= 1)' AS criterion,
            'ok' AS expected,
            CASE WHEN count(*) >= 1 THEN 'ok' ELSE 'aucun' END AS actual
     FROM   fd_datasets
     UNION ALL
-    SELECT 2, 'M2 empreinte de recette sur 64 hexa', '64',
+    SELECT 2, 'B3-M2 empreinte de recette sur 64 hexa', '64',
            length(recipe_digest)::text FROM latest
     UNION ALL
     -- ASKED OF THE DATA AND NOT OF THE SETTING. The rule
@@ -143,7 +143,7 @@ criteria AS (
     -- itself, so it also catches the failure of 20/11 that no setting showed: a
     -- present-day cut-off on a dataset holding not one stream row -- the
     -- retraining that refitted the very same Parquet files.
-    SELECT 3, 'M2 coupure au-dela de l''horizon admise par le flux', 'oui',
+    SELECT 3, 'B3-M2 coupure au-dela de l''horizon admise par le flux', 'oui',
            CASE WHEN l.cut_off <= '2020-06-21 03:59:46+00'::timestamptz
                   THEN 'oui'
                 WHEN (SELECT stream_train FROM known) > 0
@@ -158,7 +158,7 @@ criteria AS (
     -- FROM latest, so the three bounds VANISH when no dataset is registered
     -- rather than reading ECHEC on nulls: criterion 1 already names that cause,
     -- and three more lines saying it differently help nobody.
-    SELECT 4, 'M3 cote test = corpus etiquete du cote test',
+    SELECT 4, 'B3-M3 cote test = corpus etiquete du cote test',
            (SELECT corpus_test::text FROM known), n_test::text
     FROM   latest
     UNION ALL
@@ -175,7 +175,7 @@ criteria AS (
     -- THE UPPER BOUND, AND THE DECISIVE CRITERION. Exceeding corpus + stream
     -- attributable to the cut-off means the build used rows whose verdict was
     -- not knowable then -- the optimistic recall this whole file exists for.
-    SELECT 6, 'M3 cote train n''excede pas corpus + flux attribuable', 'oui',
+    SELECT 6, 'B3-M3 cote train n''excede pas corpus + flux attribuable', 'oui',
            CASE WHEN l.n_train <= (SELECT corpus_train + stream_train FROM known)
                 THEN 'oui'
                 ELSE 'NON : ' || l.n_train::text || ' > '
@@ -183,22 +183,22 @@ criteria AS (
            END
     FROM   latest l
     UNION ALL
-    SELECT 7, 'M4 regle de decoupage temporelle', 'oui',
+    SELECT 7, 'B3-M4 regle de decoupage temporelle', 'oui',
            CASE WHEN split_rule LIKE 'temporal:%' THEN 'oui'
                 ELSE 'NON : ' || split_rule END
     FROM   latest
     UNION ALL
-    SELECT 8, 'M4 positifs du cote entrainement (> 0)', 'ok',
+    SELECT 8, 'B3-M4 positifs du cote entrainement (> 0)', 'ok',
            CASE WHEN n_train_pos > 0 THEN 'ok' ELSE 'AUCUN' END FROM latest
     UNION ALL
     SELECT 9, 'M4 positifs du cote test (> 0)', 'ok',
            CASE WHEN n_test_pos > 0 THEN 'ok' ELSE 'AUCUN' END FROM latest
     UNION ALL
-    SELECT 10, 'M4 taux de base enregistres', 'ok',
+    SELECT 10, 'B3-M4 taux de base enregistres', 'ok',
            CASE WHEN base_rate_train > 0 AND base_rate_test > 0 THEN 'ok'
                 ELSE 'MANQUANT' END FROM latest
     UNION ALL
-    SELECT 11, 'M4 aucune transaction des deux cotes', '0',
+    SELECT 11, 'B3-M4 aucune transaction des deux cotes', '0',
            CASE WHEN train_end <= test_end THEN '0' ELSE 'CHEVAUCHEMENT' END
     FROM   latest
     -- Informative, and the figures that must accompany any metric later.

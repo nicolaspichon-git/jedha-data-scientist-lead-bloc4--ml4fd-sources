@@ -69,11 +69,11 @@ sequences AS (
                 ELSE false END
 ),
 criteria AS (
-    SELECT 1 AS ord, 'R0 fd_dashboard peut se connecter (LOGIN)' AS criterion,
+    SELECT 1 AS ord, 'B3-R0 fd_dashboard peut se connecter (LOGIN)' AS criterion,
            'oui' AS expected,
            (SELECT CASE WHEN rolcanlogin THEN 'oui' ELSE 'non' END FROM role) AS actual
     UNION ALL
-    SELECT 2, 'R0 aucun attribut d''administration', 'aucun',
+    SELECT 2, 'B3-R0 aucun attribut d''administration', 'aucun',
            (SELECT coalesce(nullif(concat_ws(', ',
                     CASE WHEN rolsuper       THEN 'SUPERUSER'   END,
                     CASE WHEN rolcreatedb    THEN 'CREATEDB'    END,
@@ -82,11 +82,11 @@ criteria AS (
                     CASE WHEN rolbypassrls   THEN 'BYPASSRLS'   END), ''),
                     'aucun') FROM role)
     UNION ALL
-    SELECT 3, 'R0 membre d''aucun role', '0',
+    SELECT 3, 'B3-R0 membre d''aucun role', '0',
            (SELECT count(*)::text FROM pg_auth_members m
               JOIN role ON m.member = role.oid)
     UNION ALL
-    SELECT 4, 'R0 mot de passe SCRAM applique (sinon il ne peut pas se connecter)',
+    SELECT 4, 'B3-R0 mot de passe SCRAM applique (sinon il ne peut pas se connecter)',
            'oui',
            (SELECT CASE WHEN a.rolpassword LIKE 'SCRAM-SHA-256$%' THEN 'oui'
                         WHEN a.rolpassword IS NULL THEN 'AUCUN : .\fd-manager.ps1 init'
@@ -103,7 +103,7 @@ criteria AS (
     -- 190_scoring_service_calls.sql rather than admitted here.
     --
     -- This list is a duplication, and this is the day it earned its keep.
-    SELECT 5, 'R0 tables lisibles, colonnes comprises',
+    SELECT 5, 'B3-R0 tables lisibles, colonnes comprises',
            'fd_datasets, fd_frauds, fd_ground_truth, fd_monitoring, fd_ops_notifications, fd_ops_state, fd_pipeline_runs, fd_quarantine, fd_reports, fd_retrain_requests, fd_scores, fd_scoring_decisions, fd_transactions',
            (SELECT coalesce(string_agg(relname, ', ' ORDER BY relname), 'aucune')
               FROM readable)
@@ -112,7 +112,7 @@ criteria AS (
            (SELECT coalesce(string_agg(relname, ', ' ORDER BY relname), 'aucune')
               FROM writable)
     UNION ALL
-    SELECT 7, 'R0 acces a la zone brute', 'aucun',
+    SELECT 7, 'B3-R0 acces a la zone brute', 'aucun',
            (SELECT coalesce(string_agg(relname, ', ' ORDER BY relname), 'aucun')
               FROM readable
              WHERE relname = 'fd_raw_events')
@@ -122,7 +122,7 @@ criteria AS (
     -- `payload` (the raw rejected record) and `reason_detail` (which may quote a
     -- raw value) must never be among them. Listed by name, so a column added
     -- by hand shows up as a difference rather than passing unseen.
-    SELECT 8, 'R6 colonnes lisibles de la quarantaine',
+    SELECT 8, 'B3-R6 colonnes lisibles de la quarantaine',
            'batch_id, line_no, reason_class, reason_code, rejected_at',
            (SELECT coalesce(string_agg(a.attname, ', ' ORDER BY a.attname), 'aucune')
               FROM pg_attribute a
@@ -133,7 +133,7 @@ criteria AS (
     UNION ALL
     -- R10: the catalogue BY COLUMN. Not the paths of the Parquet files nor the
     -- feature list; listed by name for the same reason as the quarantine.
-    SELECT 8.5, 'R10 colonnes lisibles du catalogue des jeux',
+    SELECT 8.5, 'B3-R10 colonnes lisibles du catalogue des jeux',
            'base_rate_test, created_at, measured_at, recipe_digest, test_alerts_per_day, test_precision, test_recall, test_threshold, version',
            (SELECT coalesce(string_agg(a.attname, ', ' ORDER BY a.attname), 'aucune')
               FROM pg_attribute a
@@ -142,15 +142,15 @@ criteria AS (
                AND has_column_privilege('fd_dashboard', a.attrelid, a.attnum,
                                         'SELECT'))
     UNION ALL
-    SELECT 9, 'R0 roles qu''il peut endosser (SET ROLE)', 'aucun',
+    SELECT 9, 'B3-R0 roles qu''il peut endosser (SET ROLE)', 'aucun',
            (SELECT coalesce(string_agg(rolname, ', ' ORDER BY rolname), 'aucun')
               FROM assumable)
     UNION ALL
-    SELECT 10, 'R0 creation dans le schema public', 'non',
+    SELECT 10, 'B3-R0 creation dans le schema public', 'non',
            CASE WHEN has_schema_privilege('fd_dashboard', 'public', 'CREATE')
                 THEN 'oui' ELSE 'non' END
     UNION ALL
-    SELECT 11, 'R0 sequences utilisables', 'aucune',
+    SELECT 11, 'B3-R0 sequences utilisables', 'aucune',
            (SELECT coalesce(string_agg(relname, ', ' ORDER BY relname), 'aucune')
               FROM sequences)
     UNION ALL
@@ -188,7 +188,7 @@ BEGIN
       FROM acceptance
      WHERE verdict LIKE '%ECHEC%';
     IF failed > 0 THEN
-        RAISE EXCEPTION 'S6 : % critere(s) en echec : %', failed, names
+        RAISE EXCEPTION 'B3-S6 : % critere(s) en echec : %', failed, names
             USING HINT = 'Le tableau ci-dessus donne attendu et constate pour chacun.';
     END IF;
 END $$;

@@ -128,7 +128,7 @@ historical_runs AS (
 ),
 criteria AS (
 
-    -- L1 -- raw zone
+    -- B3-L1 -- raw zone
     --
     -- PER BATCH and not in total: fd_raw_events is append-only, so every load
     -- adds a batch and the table legitimately grows. Comparing the total with
@@ -144,39 +144,39 @@ criteria AS (
     -- criterion failed on a raw zone that was perfectly healthy. A count added
     -- for the reader's benefit is a count that breaks the comparison. The
     -- counts are on the lines that judge them; this one judges the equality.
-    SELECT 1 AS ord, 'L1 lots de taille identique en zone brute' AS criterion,
+    SELECT 1 AS ord, 'B3-L1 lots de taille identique en zone brute' AS criterion,
            'tous egaux' AS expected,
            CASE WHEN min(n) = max(n) THEN 'tous egaux'
                 ELSE min(n)::text || '..' || max(n)::text END AS actual
     FROM  (SELECT count(*) AS n FROM historical_raw GROUP BY batch_id) b
     UNION ALL
-    SELECT 2, 'L1 lots historiques en zone brute (informatif)',
+    SELECT 2, 'B3-L1 lots historiques en zone brute (informatif)',
            (SELECT count(*)::text FROM historical_batch),
            (SELECT count(*)::text FROM historical_batch)
 
-    -- L2 -- validation
+    -- B3-L2 -- validation
     UNION ALL
-    SELECT 3, 'L2 lignes en quarantaine (informatif)',
+    SELECT 3, 'B3-L2 lignes en quarantaine (informatif)',
            (SELECT count(*)::text FROM historical_quarantine),
            (SELECT count(*)::text FROM historical_quarantine)
     UNION ALL
-    SELECT 4, 'L2 fermeture des compteurs',
+    SELECT 4, 'B3-L2 fermeture des compteurs',
            '0 ecart', (SELECT count(*)::text || ' ecart'
                        FROM historical_runs r
                        WHERE r.n_read IS NOT NULL
                          AND r.n_read <> coalesce(r.n_valid, 0)
                                        + coalesce(r.n_rejected, 0))
 
-    -- L3 -- typing and pseudonymisation
+    -- B3-L3 -- typing and pseudonymisation
     UNION ALL
     -- AGAINST THE JOURNAL, which is a stronger statement than against a
-    -- number: n_valid is what validation declared it had passed, and L2 above
+    -- number: n_valid is what validation declared it had passed, and B3-L2 above
     -- has already proved the counters close (n_read = n_valid + n_rejected).
     -- So this line now says "the exploited layer holds exactly what the
     -- pipeline said it accepted" -- and it ties two stores together instead of
     -- tying one store to a memory. max() because the raw zone keeps every
     -- load: the runs are N, the transactions one set.
-    SELECT 5, 'L3 transactions typees = n_valid du journal',
+    SELECT 5, 'B3-L3 transactions typees = n_valid du journal',
            (SELECT max(n_valid)::text FROM historical_runs
              WHERE state = 'success'),
            count(*)::text
@@ -184,7 +184,7 @@ criteria AS (
     UNION ALL
     -- INFORMATIVE: a property of the corpus, which no other table can
     -- recompute. Judging it would couple this file to one source again.
-    SELECT 6, 'L3 porteurs distincts (informatif)',
+    SELECT 6, 'B3-L3 porteurs distincts (informatif)',
            count(DISTINCT client_key)::text, count(DISTINCT client_key)::text
     FROM   historical_txn
     UNION ALL
@@ -194,7 +194,7 @@ criteria AS (
     --
     -- ONE BATCH, because the raw zone is append-only: N loads of the same file
     -- hold N copies while the exploited layer holds one set. Any batch serves,
-    -- since L1 above has just proved them equal in size; the ORDER BY only
+    -- since B3-L1 above has just proved them equal in size; the ORDER BY only
     -- makes the choice deterministic.
     --
     -- ORDER BY ... LIMIT 1 AND NOT min(batch_id): PostgreSQL 16 has no min()
@@ -212,7 +212,7 @@ criteria AS (
     -- trans_num IS the txn_id for this source: checks.CSV_PROFILE sets
     -- event_id_includes_time=False, so event_id() returns the trimmed
     -- trans_num and nothing else. S1 stores the row itself as the payload.
-    SELECT 7, 'L3 somme des montants = zone brute',
+    SELECT 7, 'B3-L3 somme des montants = zone brute',
            -- first_batch_raw, which carries the payloads of that one batch
            -- and nothing else. Verified identical to the former reading over
            -- every payload of the raw zone: 584,060,225 either way on the test
@@ -224,7 +224,7 @@ criteria AS (
            coalesce(sum(amt), 0)::text
     FROM   historical_txn
     UNION ALL
-    SELECT 8, 'L3 colonnes nominatives dans la couche exploitee',
+    SELECT 8, 'B3-L3 colonnes nominatives dans la couche exploitee',
            '0', count(*)::text
     FROM   information_schema.columns
     WHERE  table_name = 'fd_transactions'
@@ -234,13 +234,13 @@ criteria AS (
     UNION ALL
     -- The property is "every transaction has one", so the expected value is
     -- the count of transactions.
-    SELECT 9, 'L3 distance domicile renseignee',
+    SELECT 9, 'B3-L3 distance domicile renseignee',
            (SELECT count(*)::text FROM historical_txn), count(*)::text
     FROM   historical_txn WHERE f_home_distance_km IS NOT NULL
 
     -- L4 -- features
     UNION ALL
-    SELECT 10, 'L4 lignes sans features', '0', count(*)::text
+    SELECT 10, 'B3-L4 lignes sans features', '0', count(*)::text
     FROM   historical_txn WHERE f_tx_count IS NULL
     UNION ALL
     -- EXACTLY ONE FIRST TRANSACTION PER CARDHOLDER, which is ruling 6 stated
@@ -248,7 +248,7 @@ criteria AS (
     -- holds whatever the corpus is -- and it still catches the defect it was
     -- written for: a feature window that leaked a client's own row would give
     -- fewer firsts than clients.
-    SELECT 11, 'L4 une premiere transaction par porteur',
+    SELECT 11, 'B3-L4 une premiere transaction par porteur',
            (SELECT count(DISTINCT client_key)::text FROM historical_txn),
            count(*)::text
     FROM   historical_txn WHERE f_tx_count = 0 AND f_avg_amount IS NULL
@@ -257,22 +257,22 @@ criteria AS (
     UNION ALL
     -- One verdict per transaction, which is the property. A verdict missing
     -- or a verdict too many both show, and neither needs a constant.
-    SELECT 12, 'L5 un verdict par transaction',
+    SELECT 12, 'B3-L5 un verdict par transaction',
            (SELECT count(*)::text FROM historical_txn), count(*)::text
     FROM   historical_truth
     UNION ALL
     -- INFORMATIVE, like the cardholders above: the number of frauds is the
     -- corpus's, and the base rate it implies is what fd_datasets stores beside
     -- every dataset so that a precision can be read at all.
-    SELECT 13, 'L5 fraudes (informatif)', count(*)::text, count(*)::text
+    SELECT 13, 'B3-L5 fraudes (informatif)', count(*)::text, count(*)::text
     FROM   historical_truth WHERE label
     UNION ALL
-    SELECT 14, 'L5 delai de verdict uniforme',
+    SELECT 14, 'B3-L5 delai de verdict uniforme',
            'oui', CASE WHEN min(label_ts - txn_ts) = max(label_ts - txn_ts)
                        THEN 'oui' ELSE 'non' END
     FROM   historical_truth
     UNION ALL
-    SELECT 15, 'L5 dissociation du verdict',
+    SELECT 15, 'B3-L5 dissociation du verdict',
            '0', count(*)::text
     FROM   information_schema.columns
     WHERE  table_name = 'fd_transactions'
@@ -288,7 +288,7 @@ criteria AS (
     -- STATED AS THE RATIO ITS OWN COMMENT DESCRIBES. The 555,719 added
     -- nothing to the property and coupled the most telling line of the table
     -- to one corpus: it read "non" on a pipeline that was working perfectly.
-    SELECT 16, 'L6 idempotence : N lots ingeres, un seul jeu de transactions',
+    SELECT 16, 'B3-L6 idempotence : N lots ingeres, un seul jeu de transactions',
            'ok',
            CASE WHEN (SELECT count(*) FROM historical_txn) > 0
                  AND (SELECT count(*) FROM historical_raw)
@@ -297,7 +297,7 @@ criteria AS (
 
     -- L7 -- journal
     UNION ALL
-    SELECT 17, 'L7 executions reussies (>= 1)',
+    SELECT 17, 'B3-L7 executions reussies (>= 1)',
            'ok', CASE WHEN count(*) >= 1 THEN 'ok' ELSE 'aucune' END
     FROM   historical_runs WHERE state = 'success'
 )
