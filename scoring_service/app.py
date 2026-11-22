@@ -46,7 +46,7 @@ app = FastAPI(
     version=VERSION,
     description=("Score une transaction de paiement et dit si elle doit etre "
                  "signalee. Le modele servi est celui qui porte l'alias "
-                 "champion dans le registre MLflow ; /health dit lequel."),
+                 "*champion* dans le registre *MLflow* ; /health dit lequel."),
 )
 
 
