@@ -8,14 +8,13 @@ __pycache__/
 .local_cache/
 # Parquet datasets: data, not code. The registry in fd_datasets is what makes
 # them findable again, and the recipe digest is what makes them rebuildable.
+_to_delete/
+ws/
+runtime/reports/202*.*
 runtime/datasets/*
+runtime/producer/*
 runtime/channels/ops/*
 runtime/channels/frauds/*
-runtime/reports/202*.*
-ws/
-_to_delete/
-/runtime/observations/
-/runtime/channels/monitoring/
-/runtime/producer/
-# The journal of deployments (B4-L6): written on this machine by the deploy job.
-/runtime/deployments/
+runtime/channels/monitoring/*
+runtime/observations/*
+runtime/deployments/*
