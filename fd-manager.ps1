@@ -246,6 +246,21 @@ function Assert-Env {
             exit 1
         }
     }
+    <#  L6: the two Airflow secrets that docker-compose.yml used to carry in
+        clear. compose refuses to start without them (${...:?}); refusing here
+        says why in this script's words, before any container is touched.  #>
+    foreach ($name in @('AIRFLOW_SECRET_KEY', 'AIRFLOW_ADMIN_PASSWORD')) {
+        $filled = @(Get-Content '.env' |
+                    Where-Object { $_ -match ('^' + $name + '=.+') }).Count -gt 0
+        if (-not $filled) {
+            Write-Host ""
+            Write-Host "$name est vide dans .env." -ForegroundColor Red
+            Write-Host "Ce secret n'est plus ecrit dans docker-compose.yml ; il vit dans .env." -ForegroundColor Red
+            Write-Host "Lancez :  .\fd-manager.ps1 setup" -ForegroundColor Yellow
+            Write-Host ""
+            exit 1
+        }
+    }
 }
 
 function Assert-Docker {
@@ -325,7 +340,7 @@ switch ($Task) {
             @{ n = 'status';       d = 'state of the services and of the DAGs, with the logs of what exited' }
             @{ n = 'logs';         d = 'logs: .\fd-manager.ps1 logs -Service airflow-scheduler [-Follow]' }
             @{ n = 'psql';         d = 'interactive psql session on the database' }
-            @{ n = 'airflow-user'; d = 'list the Airflow accounts and reset admin / admin' }
+            @{ n = 'airflow-user'; d = 'list the Airflow accounts and recreate admin (password from .env)' }
             @{ n = 'init';         d = 'apply the DDL and the function (replayable)' }
             @{ n = 'load';         d = 'trigger the loading of the labelled history' }
             @{ n = 'train';        d = 'trigger a training, challenging and promotion: .\fd-manager.ps1 train [-CutOff 2020-11-30] [-Drop none]' }
@@ -442,6 +457,8 @@ switch ($Task) {
             @{ n = 'AIRFLOW_DB_PASSWORD'; c = 'Password of the owner of a service database (L1).' }
             @{ n = 'MLFLOW_DB_PASSWORD';  c = 'Password of the owner of a service database (L1).' }
             @{ n = 'FD_SCORING_SERVICE_PASSWORD';     c = 'Password of fd_scoring_service, the role the scoring service logs in as (L5).' }
+            @{ n = 'AIRFLOW_SECRET_KEY';     c = 'Key that signs the sessions of the Airflow webserver (L6). Never versioned.' }
+            @{ n = 'AIRFLOW_ADMIN_PASSWORD'; c = 'Password of the admin account of the Airflow web interface (L6). Never versioned.' }
         )
         foreach ($secret in $secrets) {
             $name = $secret.n
@@ -502,7 +519,7 @@ switch ($Task) {
         Write-Host ""
         & docker compose ps
         Write-Host ""
-        Write-Host "Airflow    : http://localhost:8082   (admin / admin)" -ForegroundColor Cyan
+        Write-Host "Airflow    : http://localhost:8082   (admin ; mot de passe : AIRFLOW_ADMIN_PASSWORD dans .env)" -ForegroundColor Cyan
         Write-Host "MLflow     : http://localhost:8002" -ForegroundColor Cyan
         Write-Host "Streamlit  : http://localhost:8502   (fd_dashboard, lecture seule)" -ForegroundColor Cyan
         # THE PUBLISHED PORT AND NOT THE CONTAINER'S. The producer listens on
@@ -669,15 +686,19 @@ switch ($Task) {
         # varies between Airflow versions. The command is assembled by
         # concatenation rather than with continuations: mixing PowerShell's
         # backtick and bash's backslash in one call only works by accident.
+        # THE PASSWORD COMES FROM .env, passed by name (-e AIRFLOW_ADMIN_PASSWORD
+        # takes the value from this process, which Import-DotEnv filled) and read
+        # by bash inside the container: the single quotes keep PowerShell from
+        # expanding it, so the value never appears on a command line.
         $cmd = 'airflow users delete --username admin || true; ' +
-               'airflow users create --username admin --password admin ' +
+               'airflow users create --username admin --password "$AIRFLOW_ADMIN_PASSWORD" ' +
                '--firstname Nicolas --lastname Pichon --role Admin ' +
                '--email admin@example.com'
         Invoke-Step 'remise a plat de admin' {
-            & docker compose exec -T airflow-scheduler bash -c $cmd
+            & docker compose exec -T -e AIRFLOW_ADMIN_PASSWORD airflow-scheduler bash -c $cmd
         }
         Write-Host ""
-        Write-Host "admin / admin   sur http://localhost:8082" -ForegroundColor Green
+        Write-Host "admin sur http://localhost:8082 ; mot de passe : AIRFLOW_ADMIN_PASSWORD dans .env" -ForegroundColor Green
         Write-Host ""
     }
 
