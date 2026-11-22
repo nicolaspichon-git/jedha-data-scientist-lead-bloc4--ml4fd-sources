@@ -100,6 +100,11 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:16
+    # BACK AFTER A RESTART OF DOCKER ITSELF, like every long-running service of
+    # this stack. On 2026-11-22 Docker Desktop restarted; the services that had
+    # this line came back, this one did not, and the scoring service then
+    # failed to resolve its name -- the stack looked up and was not.
+    restart: unless-stopped
     # SHARED MEMORY, and 64 MB is not enough. Docker gives a container that
     # much /dev/shm by default, and PostgreSQL's parallel workers allocate
     # their segments there: a parallel VACUUM on fd_transactions asked for
@@ -189,6 +194,11 @@ services:
 
   mlflow:
     build: ./mlflow
+    # BACK AFTER A RESTART OF DOCKER ITSELF, like every long-running service of
+    # this stack. On 2026-11-22 Docker Desktop restarted; the services that had
+    # this line came back, this one did not, and the scoring service then
+    # failed to resolve its name -- the stack looked up and was not.
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -379,6 +389,16 @@ services:
       ML4FD_PEPPER: ${ML4FD_PEPPER}
       # The champion is resolved through the registry, like every other reader.
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      # THE REGISTRY ANSWERS FAST OR IS REPORTED ABSENT. MLflow's client retries
+      # several times with an exponential backoff by default: with mlflow down
+      # (2026-11-22), /health hung while it waited, the healthcheck (4 s)
+      # declared the container unhealthy, and the "degraded, not down" answer
+      # serve.health() is written to give never arrived. One retry half a
+      # second later, 5 s per request: an absent registry is reported in about
+      # a second, and a single blip is still absorbed.
+      MLFLOW_HTTP_REQUEST_MAX_RETRIES: "1"
+      MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR: "0.5"
+      MLFLOW_HTTP_REQUEST_TIMEOUT: "5"
     volumes:
       # NO CODE IS MOUNTED, since L6: ml4fd/, sql/ and governance.yml are in the
       # image, at the commit it was built from. What remains is DATA.

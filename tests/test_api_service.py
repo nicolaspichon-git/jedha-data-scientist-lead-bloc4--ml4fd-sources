@@ -205,6 +205,27 @@ def test_the_image_says_which_commit_it_was_built_from():
     assert 'os.environ.get("ML4FD_REVISION")' in APP
 
 
+def test_an_absent_registry_is_reported_and_not_waited_for():
+    """DEGRADED, NOT DOWN -- which only holds if the answer comes in time. With
+    MLflow's default retries, /health hung for as long as the client kept
+    trying, and the healthcheck read a hang as a dead service (2026-11-22)."""
+    env = SERVICE["environment"]
+    assert int(env["MLFLOW_HTTP_REQUEST_MAX_RETRIES"]) <= 1
+    assert float(env["MLFLOW_HTTP_REQUEST_TIMEOUT"]) <= 5
+    assert float(env["MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR"]) <= 1
+
+
+def test_every_long_running_service_comes_back_after_docker_restarts():
+    """On 2026-11-22 Docker Desktop restarted: what had a restart policy came
+    back, mlflow and postgres did not, and the stack looked up while the
+    scoring service could not reach its registry. Only the one-shot service
+    may stay down."""
+    for name, service in COMPOSE["services"].items():
+        if service.get("restart") == "no":
+            continue
+        assert service.get("restart") == "unless-stopped", name
+
+
 def test_the_python_version_matches_the_image_that_fits_the_model():
     """scikit-learn must unpickle a model fitted in the Airflow image."""
     assert "python:3.11-slim" in DOCKERFILE
