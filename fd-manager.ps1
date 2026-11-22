@@ -231,7 +231,7 @@ function Assert-Env {
         Write-Host ""
         exit 1
     }
-    <#  L1: the two service databases are created AT FIRST BOOT, by
+    <#  B3-L1: the two service databases are created AT FIRST BOOT, by
         sql/initdb/010_databases.sh, out of these two values. Missing, the
         cluster initialises WITHOUT the airflow and mlflow databases -- and
         the entrypoint never replays that directory, so the only way back is
@@ -249,7 +249,7 @@ function Assert-Env {
             exit 1
         }
     }
-    <#  L6: the two Airflow secrets that docker-compose.yml used to carry in
+    <#  B3-L6: the two Airflow secrets that docker-compose.yml used to carry in
         clear. compose refuses to start without them (${...:?}); refusing here
         says why in this script's words, before any container is touched.  #>
     foreach ($name in @('AIRFLOW_SECRET_KEY', 'AIRFLOW_ADMIN_PASSWORD')) {
@@ -264,6 +264,33 @@ function Assert-Env {
             exit 1
         }
     }
+}
+
+function Get-VerdictMode {
+    <#  verdicts.mode and the delay it puts in force, as governance.yml declares
+        them -- read by ml4fd.config in the scheduler container, the reader the
+        verdict writer itself uses, rather than parsed again here. For
+        s3_acceptance.sql, which cannot read a file: N6 judges a demo delay and
+        a nominal one differently. 'inconnu' when the scheduler cannot answer;
+        the SQL then fails on it by name.  #>
+    $ErrorActionPreference = 'Continue'
+    $global:LASTEXITCODE = 0
+    $out = @(& docker compose exec -T airflow-scheduler python3 -c "from ml4fd import config; s = config.load(); print(s.verdict_mode, int(s.verdict_delay().total_seconds()))" 2>$null)
+    $mode = @{ Mode = 'inconnu'; Seconds = 0; Label = 'inconnu (scheduler injoignable)' }
+    if ($LASTEXITCODE -eq 0 -and $out.Count -gt 0) {
+        $parts = "$($out[-1])".Trim() -split '\s+'
+        if ($parts.Count -eq 2 -and $parts[1] -match '^\d+$') {
+            $seconds = [int]$parts[1]
+            $delay = if ($seconds -ge 86400 -and $seconds % 86400 -eq 0) {
+                '{0} jours' -f ($seconds / 86400)
+            } else {
+                '{0} s' -f $seconds
+            }
+            $mode = @{ Mode = $parts[0]; Seconds = $seconds
+                       Label = '{0}, verdict {1} apres la transaction' -f $parts[0], $delay }
+        }
+    }
+    return $mode
 }
 
 function Assert-Docker {
@@ -451,10 +478,10 @@ switch ($Task) {
             Write-Host "  (a appliquer a la base :  .\fd-manager.ps1 init)"
         }
 
-        # THE TWO SERVICE DATABASE PASSWORDS (L1). Same treatment as the
+        # THE TWO SERVICE DATABASE PASSWORDS (B3-L1). Same treatment as the
         # dashboard's, and for the same reason: a versioned file is not a place
         # for a secret. The line is ADDED when absent -- every .env made before
-        # L1 lacks it, and a replace-only loop would leave the value empty,
+        # B3-L1 lacks it, and a replace-only loop would leave the value empty,
         # which Assert-Env then refuses at `up` for no reason anybody would
         # guess.
         # THE COMMENT FOLLOWS THE ROLE, since 2026-11-20. The loop wrote
@@ -617,7 +644,7 @@ switch ($Task) {
 
             Read through the Airflow CLI rather than by querying the dag table
             of the metadata database. That database belongs to fd_airflow, and
-            L1 exists precisely so that the business role cannot reach it --
+            B3-L1 exists precisely so that the business role cannot reach it --
             reading it from here would spend the separation it set up.
 
             The listing is matched line by line against the DAGs this project
@@ -1115,7 +1142,7 @@ ORDER BY state DESC, control;
         Write-Host "donc ce n'est pas un echec qu'elle voit -- c'est une execution" -ForegroundColor DarkGray
         Write-Host "qui n'a silencieusement jamais eu lieu." -ForegroundColor DarkGray
         Write-Host ""
-        Write-Host "Le verdict est un age : une heure. Depuis L1, Airflow a sa" -ForegroundColor DarkGray
+        Write-Host "Le verdict est un age : une heure. Depuis B3-L1, Airflow a sa" -ForegroundColor DarkGray
         Write-Host "propre base, donc dag_run n'est pas lisible d'ici. Le callback" -ForegroundColor DarkGray
         Write-Host "du DAG ferme deja chaque echec qu'Airflow sait rapporter ; il" -ForegroundColor DarkGray
         Write-Host "reste les executions tuees avec leur conteneur, qui attendent" -ForegroundColor DarkGray
@@ -1974,60 +2001,62 @@ LIMIT  14;
         Write-Host ""
         Write-Host "Criteres d'acceptation. Tous doivent lire OK." -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "=== S1 : chargement historique (L0 a L8)"
+        Write-Host "=== B3-S1 : chargement historique (B3-L0..B3-L8)"
         & docker @Psql -f '/work/sql/checks/s1_acceptance.sql'
 
         Write-Host ""
-        Write-Host "=== S2 : jeu d'entrainement (M0 a M4)"
+        Write-Host "=== B3-S2 : jeu d'entrainement (B3-M0..B3-M4)"
         & docker @Psql -f '/work/sql/checks/s2_acceptance.sql'
 
         Write-Host ""
-        Write-Host "=== S2 : artefacts et chaine de tracabilite (M5 a M8)"
+        Write-Host "=== B3-S2 : artefacts et chaine de tracabilite (B3-M5..B3-M8)"
         & docker compose exec -T airflow-scheduler `
             python3 /opt/project/tools/check_s2.py /opt/project/runtime/datasets
 
         Write-Host ""
-        Write-Host "=== S3 : ingestion temps reel (N1 a N9)"
-        & docker @Psql -f '/work/sql/checks/s3_acceptance.sql'
+        $verdicts = Get-VerdictMode
+        Write-Host "=== B3-S3 : ingestion temps reel (B3-N1..B3-N9) -- verdicts en mode $($verdicts.Label)"
+        & docker @Psql -v "verdict_mode=$($verdicts.Mode)" -v "verdict_delay_s=$($verdicts.Seconds)" `
+            -f '/work/sql/checks/s3_acceptance.sql'
 
         Write-Host ""
-        Write-Host "=== S4 : rapport du matin (P1 a P5)"
-        & docker @Psql -f '/work/sql/checks/s4_acceptance.sql'
-
-        Write-Host ""
-        Write-Host "=== S4 : documents, empreintes et decomptes recalcules"
-        & docker compose exec -T airflow-scheduler `
-            python3 /opt/project/tools/check_s4.py
-
-        Write-Host ""
-        Write-Host "=== S3 : fichiers et declarations (N8)"
+        Write-Host "=== B3-S3 : fichiers et declarations (B3-N8)"
         & docker compose exec -T airflow-scheduler `
             python3 /opt/project/tools/check_s3.py
 
         Write-Host ""
-        Write-Host "=== S5 : purge et retention (Q1 a Q6)"
+        Write-Host "=== B3-S4 : rapport du matin (B3-P1..B3-P5)"
+        & docker @Psql -f '/work/sql/checks/s4_acceptance.sql'
+
+        Write-Host ""
+        Write-Host "=== B3-S4 : documents, empreintes et decomptes recalcules"
+        & docker compose exec -T airflow-scheduler `
+            python3 /opt/project/tools/check_s4.py
+
+        Write-Host ""
+        Write-Host "=== B3-S5 : purge et retention (B3-Q1..B3-Q6)"
         & docker @Psql -f '/work/sql/checks/s5_acceptance.sql'
 
         Write-Host ""
-        Write-Host "=== S5 : declaration, DAG et fichiers des jeux"
+        Write-Host "=== B3-S5 : declaration, DAG et fichiers des jeux"
         & docker compose exec -T airflow-scheduler `
             python3 /opt/project/tools/check_s5.py
 
         Write-Host ""
-        Write-Host "=== S6 : le role fd_dashboard, lu dans le catalogue (R0 a R5)"
+        Write-Host "=== B3-S6 : le role fd_dashboard, lu dans le catalogue (B3-R0..B3-R5)"
         & docker @Psql -f '/work/sql/checks/s6_acceptance.sql'
 
         Write-Host ""
-        Write-Host "=== S6 : le conteneur du tableau de bord, tel qu'il tourne"
+        Write-Host "=== B3-S6 : le conteneur du tableau de bord, tel qu'il tourne"
         # On the HOST, not in the scheduler: there is no Docker inside a container.
         & python tools/check_s6.py
 
         Write-Host ""
-        Write-Host "=== L5 : le service de scoring, lu dans le catalogue"
+        Write-Host "=== B4-L5 : le service de scoring, lu dans le catalogue"
         & docker @Psql -f '/work/sql/checks/l5_acceptance.sql'
 
         Write-Host ""
-        Write-Host "=== L5 : le service de scoring, tel qu'il repond"
+        Write-Host "=== B4-L5 : le service de scoring, tel qu'il repond"
         # On the HOST too: it calls the service on 127.0.0.1:8012.
         & python tools/check_l5.py
 
@@ -2051,47 +2080,50 @@ LIMIT  14;
 
     'check' {
         Assert-Env; Assert-Docker
-        Invoke-Step 'criteres d''acceptation de S1' {
+        Invoke-Step 'criteres d''acceptation de B3-S1' {
             & docker @Psql -f '/work/sql/checks/s1_acceptance.sql'
         }
         Invoke-Step 'criteres d''acceptation de S2' {
             & docker @Psql -f '/work/sql/checks/s2_acceptance.sql'
         }
-        Invoke-Step 'artefacts et chaine de S2' {
+        Invoke-Step 'artefacts et chaine de B3-S2' {
             & docker compose exec -T airflow-scheduler `
                 python3 /opt/project/tools/check_s2.py /opt/project/runtime/datasets
         }
-        Invoke-Step 'criteres d''acceptation de S3' {
-            & docker @Psql -f '/work/sql/checks/s3_acceptance.sql'
+        $verdicts = Get-VerdictMode
+        Write-Host "    verdicts en mode $($verdicts.Label)" -ForegroundColor DarkGray
+        Invoke-Step 'criteres d''acceptation de B3-S3' {
+            & docker @Psql -v "verdict_mode=$($verdicts.Mode)" -v "verdict_delay_s=$($verdicts.Seconds)" `
+                -f '/work/sql/checks/s3_acceptance.sql'
         }
         Invoke-Step 'fichiers et declarations de S3' {
             & docker compose exec -T airflow-scheduler `
                 python3 /opt/project/tools/check_s3.py
         }
-        Invoke-Step 'criteres d''acceptation de S4' {
+        Invoke-Step 'criteres d''acceptation de B3-S4' {
             & docker @Psql -f '/work/sql/checks/s4_acceptance.sql'
         }
-        Invoke-Step 'documents et decomptes de S4' {
+        Invoke-Step 'documents et decomptes de B3-S4' {
             & docker compose exec -T airflow-scheduler `
                 python3 /opt/project/tools/check_s4.py
         }
-        Invoke-Step 'criteres d''acceptation de S5' {
+        Invoke-Step 'criteres d''acceptation de B3-S5' {
             & docker @Psql -f '/work/sql/checks/s5_acceptance.sql'
         }
-        Invoke-Step 'declaration, DAG et fichiers de S5' {
+        Invoke-Step 'declaration, DAG et fichiers de B3-S5' {
             & docker compose exec -T airflow-scheduler `
                 python3 /opt/project/tools/check_s5.py
         }
-        Invoke-Step 'criteres d''acceptation de S6' {
+        Invoke-Step 'criteres d''acceptation de B3-S6' {
             & docker @Psql -f '/work/sql/checks/s6_acceptance.sql'
         }
         Invoke-Step 'conteneur du tableau de bord (S6)' {
             & python tools/check_s6.py
         }
-        Invoke-Step 'criteres d''acceptation de L5' {
+        Invoke-Step 'criteres d''acceptation de B4-L5' {
             & docker @Psql -f '/work/sql/checks/l5_acceptance.sql'
         }
-        Invoke-Step 'service de scoring reel (L5)' {
+        Invoke-Step 'service de scoring reel (B4-L5)' {
             # On the HOST, like check_s6: there is no Docker inside a container,
             # and the service answers on 127.0.0.1:8012 here.
             & python tools/check_l5.py

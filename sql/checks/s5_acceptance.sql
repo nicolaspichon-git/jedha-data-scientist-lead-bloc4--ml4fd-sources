@@ -1,4 +1,4 @@
--- The acceptance criteria of S5, lots Q0 to Q6. Every verdict must read OK.
+-- The acceptance criteria of B3-S5, lots B3-Q0 to B3-Q6. Every verdict must read OK.
 -- Block: B3, B4.
 -- Lot: B3-Q6, B4-L0.
 -- Competency: B3-C1, B3-C4, B3-C5.
@@ -28,8 +28,8 @@
 -- 8 = the margin on the weekly cadence (purge.schedule, Sunday): a purge that
 --     has not run for more than eight days has stopped running.
 --
--- RETENTION PURGES ONLY, AND THE FILTER IS batch_id IS NULL (S6, after Q7).
--- fd_purges holds two kinds of rows since Q7: the weekly purge, which applies a
+-- RETENTION PURGES ONLY, AND THE FILTER IS batch_id IS NULL (S6, after B3-Q7).
+-- fd_purges holds two kinds of rows since B3-Q7: the weekly purge, which applies a
 -- BOUNDARY to a whole store, and the targeted forget, which removes ONE named
 -- batch (batch_id set). A forget's cutoff is its batch's own last row -- not a
 -- boundary -- and it journals only the stores that held rows of that batch.
@@ -57,7 +57,7 @@ batches AS (
     FROM   fd_raw_events r
     GROUP  BY r.batch_id
 ),
--- Every batch a purge has touched, from the marks of Q3, and whether the
+-- Every batch a purge has touched, from the marks of B3-Q3, and whether the
 -- fingerprint it held is still there. THE EVIDENCE MUST OUTLIVE THE DATA.
 purged AS (
     SELECT p.run_id,
@@ -124,27 +124,27 @@ forgets AS (
 ),
 criteria AS (
     SELECT 1 AS ord,
-           'Q1 lots de la zone brute sans empreinte relevee' AS criterion,
+           'B3-Q1 lots de la zone brute sans empreinte relevee' AS criterion,
            '0' AS expected,
            (SELECT count(*)::text FROM batches WHERE NOT has_digest) AS actual
     UNION ALL
-    SELECT 2, 'Q3 lignes survivant a la derniere borne appliquee (zone brute)',
+    SELECT 2, 'B3-Q3 lignes survivant a la derniere borne appliquee (zone brute)',
            '0', (SELECT raw_rows::text FROM survivors)
     UNION ALL
-    SELECT 3, 'Q4 lignes survivant a la derniere borne appliquee (quarantaine)',
+    SELECT 3, 'B3-Q4 lignes survivant a la derniere borne appliquee (quarantaine)',
            '0', (SELECT qrt_rows::text FROM survivors)
     UNION ALL
-    SELECT 4, 'Q3 droits de fd_purge sur la couche exploitee',
+    SELECT 4, 'B3-Q3 droits de fd_purge sur la couche exploitee',
            '0', (SELECT on_exploited::text FROM privileges)
     UNION ALL
-    SELECT 5, 'Q3 droits de fd_purge pour effacer un journal',
+    SELECT 5, 'B3-Q3 droits de fd_purge pour effacer un journal',
            '0', (SELECT can_erase::text FROM privileges)
     UNION ALL
-    SELECT 6, 'Q3 fd_purge peut supprimer dans la zone brute',
+    SELECT 6, 'B3-Q3 fd_purge peut supprimer dans la zone brute',
            'oui', (SELECT CASE WHEN can_purge_raw > 0 THEN 'oui' ELSE 'NON' END
                      FROM privileges)
     UNION ALL
-    SELECT 7, 'Q4 fd_purge peut supprimer dans la quarantaine',
+    SELECT 7, 'B3-Q4 fd_purge peut supprimer dans la quarantaine',
            'oui', (SELECT CASE WHEN can_purge_quarantine > 0 THEN 'oui'
                                ELSE 'NON' END FROM privileges)
     UNION ALL
@@ -153,7 +153,7 @@ criteria AS (
            (SELECT count(*)::text || ' perdue(s)' FROM purged
              WHERE digest IS NULL)
     UNION ALL
-    SELECT 9, 'Q6 chaque execution journalise les deux magasins',
+    SELECT 9, 'B3-Q6 chaque execution journalise les deux magasins',
            (SELECT CASE WHEN executions = 0 THEN 'mesure' ELSE 'oui' END
               FROM runs_journalled),
            (SELECT CASE
@@ -163,7 +163,7 @@ criteria AS (
                           || executions::text || ' execution(s)'
                    END FROM runs_journalled)
     UNION ALL
-    SELECT 10, 'Q6 une purge a eu lieu dans les 8 derniers jours',
+    SELECT 10, 'B3-Q6 une purge a eu lieu dans les 8 derniers jours',
            (SELECT CASE WHEN last_at IS NULL THEN 'mesure' ELSE 'oui' END
               FROM runs_journalled),
            (SELECT CASE

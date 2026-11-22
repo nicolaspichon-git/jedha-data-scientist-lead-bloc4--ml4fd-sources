@@ -1,6 +1,6 @@
 -- The acceptance criteria of S3, lots N1 to N9. Every verdict must read OK.
 -- Block: B3, B4.
--- Lot: B3-N8, B4-L0.
+-- Lot: B3-N8, B4-L0, B4-L4.
 -- Competency: B3-C1, B3-C4, B3-C5.
 -- Covers: B3-EE01, B3-EE02, B3-EE09, B3-EI01, B3-EI03, B3-EI05, B3-EC09, B3-EC14, B3-EC17, B3-EC23, B3-EC24.
 --
@@ -45,6 +45,21 @@
 -- files pasted into ONE session would fail on "already exists", which names
 -- itself.
 
+-- THE VERDICT MODE COMES FROM governance.yml, which SQL cannot read, so
+-- fd-manager reads it in the scheduler container (ml4fd.config) and hands it
+-- over as two psql variables:
+--     psql -v verdict_mode=demo -v verdict_delay_s=300 -f s3_acceptance.sql
+-- Run by hand without them, the file still runs, and the mode criterion
+-- below fails on NON TRANSMIS instead of N6 judging a mode it was not told.
+\if :{?verdict_mode}
+\else
+\set verdict_mode inconnu
+\endif
+\if :{?verdict_delay_s}
+\else
+\set verdict_delay_s 0
+\endif
+
 CREATE TEMP TABLE acceptance AS
 WITH stream_runs AS (
     SELECT * FROM fd_pipeline_runs WHERE dag_id = 'dag_ingest'
@@ -60,7 +75,11 @@ band AS (
     SELECT count(*)                                            AS verdicts,
            count(*) FILTER (WHERE g.label_ts > now())           AS not_due,
            count(DISTINCT g.label_ts - t.txn_ts)                AS distinct_delays,
-           min(g.label_ts - t.txn_ts)                           AS delay
+           min(g.label_ts - t.txn_ts)                           AS delay,
+           -- The delay of the verdict of the NEWEST stream transaction: what
+           -- the verdict writer does now, whatever it did before a switch.
+           (array_agg(g.label_ts - t.txn_ts
+                      ORDER BY t.txn_ts DESC, g.label_ts DESC))[1]  AS latest_delay
     FROM   fd_ground_truth g
     JOIN   stream_txn t ON t.txn_id = g.txn_id
 ),
@@ -91,13 +110,13 @@ window_24h AS (
 ),
 criteria AS (
     -- N1: the collector and the raw zone
-    SELECT 1 AS ord, 'N1 lots temps reel en zone brute' AS criterion,
+    SELECT 1 AS ord, 'B3-N1 lots temps reel en zone brute' AS criterion,
            'au moins 1' AS expected,
            CASE WHEN (SELECT count(DISTINCT batch_id) FROM fd_raw_events
                       WHERE source = 'current-transactions') > 0
                 THEN 'au moins 1' ELSE 'AUCUN' END AS actual
     UNION ALL
-    SELECT 2, 'N1 une execution par lot, jamais deux',
+    SELECT 2, 'B3-N1 une execution par lot, jamais deux',
            '0 lot partage',
            CASE WHEN NOT EXISTS (
                     SELECT batch_id FROM stream_runs WHERE batch_id IS NOT NULL
@@ -106,7 +125,7 @@ criteria AS (
     -- N2: the counters close. The CHECK constraint already refuses otherwise,
     -- so this reads as a confirmation that the constraint was exercised.
     UNION ALL
-    SELECT 3, 'N2 compteurs fermes sur chaque execution',
+    SELECT 3, 'B3-N2 compteurs fermes sur chaque execution',
            '0 ecart',
            CASE WHEN NOT EXISTS (
                     SELECT 1 FROM stream_runs
@@ -122,7 +141,7 @@ criteria AS (
     -- Airflow a database of its own, which put dag_run out of reach from here
     -- and broke the two of them at once -- consistently, at least. Both now
     -- rest on the age alone, and abandoned_runs.sql carries the reasoning.
-    SELECT 4, 'N7 aucune execution que personne ne peut fermer',
+    SELECT 4, 'B3-N7 aucune execution que personne ne peut fermer',
            '0',
            (SELECT count(*)::text FROM stream_runs r
              WHERE r.state = 'running'
@@ -131,7 +150,7 @@ criteria AS (
     -- restricted to dag_ingest, so a historical load or a hand-run tool that
     -- left a row behind shows up here even though criterion 4 cannot see it.
     UNION ALL
-    SELECT 5, 'info executions ouvertes depuis plus d''une heure', 'mesure',
+    SELECT 5, 'B3-info executions ouvertes depuis plus d''une heure', 'mesure',
            (SELECT CASE WHEN count(*) = 0 THEN 'aucune'
                         ELSE count(*)::text || ' : '
                              || string_agg(dag_id, ', ' ORDER BY dag_id)
@@ -142,7 +161,7 @@ criteria AS (
     -- N3: no identifying column reaches the exploited layer. Checked against
     -- the catalogue, not against a list written here.
     UNION ALL
-    SELECT 6, 'N3 aucune colonne nominative dans fd_transactions',
+    SELECT 6, 'B3-N3 aucune colonne nominative dans fd_transactions',
            '0',
            (SELECT count(*)::text FROM information_schema.columns
             WHERE table_name = 'fd_transactions'
@@ -150,12 +169,12 @@ criteria AS (
                                   'job','dob','gender','cc_num','lat','long',
                                   'is_fraud','label'))
     UNION ALL
-    SELECT 7, 'N3 aucune transaction du flux sans features',
+    SELECT 7, 'B3-N3 aucune transaction du flux sans features',
            '0',
            (SELECT count(*)::text FROM stream_txn WHERE f_tx_count IS NULL)
     -- N4: every scored row carries the version that scored it
     UNION ALL
-    SELECT 8, 'N4 transactions scorees sans version de modele',
+    SELECT 8, 'B3-N4 transactions scorees sans version de modele',
            '0', (SELECT without_version::text FROM scored)
     UNION ALL
     SELECT 9, 'N4 decision stockee conforme au seuil stocke',
@@ -163,19 +182,45 @@ criteria AS (
            (SELECT count(*)::text FROM fd_scores
             WHERE flagged <> (score >= threshold))
     -- N6: THE BLIND BAND, measured in production
+    --
+    -- WHAT N6 CAN DEMAND DEPENDS ON verdicts.mode, since 2026-11-22. The two
+    -- criteria below were written for nominal and its thirty days: then no
+    -- verdict of the stream can be due yet, and one delay is all there is.
+    -- In demo a verdict falls due 300 s after its transaction, ON PURPOSE --
+    -- that is what lets the loop verdict > performance > retraining be seen
+    -- in a recording -- and the rows written before the switch keep the
+    -- delay they were written with. Judged as in nominal, the system failed
+    -- for doing what governance asked. So in demo both become figures, and
+    -- the criterion that holds in either mode is the third: the NEWEST
+    -- verdict carries the delay governance declares now.
     UNION ALL
-    SELECT 10, 'N6 verdicts du flux deja echus',
-           '0', (SELECT (verdicts - not_due)::text FROM band)
+    SELECT 9.5, 'B3-N6 mode des verdicts (governance.yml)',
+           CASE WHEN :'verdict_mode' IN ('nominal', 'demo')
+                THEN :'verdict_mode' ELSE 'nominal ou demo' END,
+           CASE WHEN :'verdict_mode' IN ('nominal', 'demo')
+                THEN :'verdict_mode' ELSE 'NON TRANSMIS' END
+    UNION ALL
+    SELECT 10, 'B3-N6 verdicts du flux deja echus',
+           CASE WHEN :'verdict_mode' = 'demo' THEN 'mesure' ELSE '0' END,
+           (SELECT (verdicts - not_due)::text FROM band)
     UNION ALL
     SELECT 11, 'N6 un seul delai de verdict',
-           CASE WHEN (SELECT verdicts FROM band) = 0 THEN '0' ELSE '1' END,
+           CASE WHEN :'verdict_mode' = 'demo' THEN 'mesure'
+                WHEN (SELECT verdicts FROM band) = 0 THEN '0' ELSE '1' END,
            (SELECT distinct_delays::text FROM band)
+    UNION ALL
+    SELECT 11.5, 'B3-N6 delai du dernier verdict egal au delai declare',
+           CASE WHEN (SELECT verdicts FROM band) = 0 THEN 'aucun verdict'
+                ELSE justify_hours(:verdict_delay_s * interval '1 second')::text
+           END,
+           (SELECT COALESCE(justify_hours(latest_delay)::text, 'aucun verdict')
+              FROM band)
     -- N5: one alert per transaction, and the ceiling respected
     UNION ALL
-    SELECT 12, 'N5 alertes en double sur un txn_id',
+    SELECT 12, 'B3-N5 alertes en double sur un txn_id',
            '0', (SELECT (raised - distinct_txn)::text FROM alerts)
     UNION ALL
-    SELECT 13, 'N5 notifications sur 24 h sous la capacite',
+    SELECT 13, 'B3-N5 notifications sur 24 h sous la capacite',
            'oui',
            CASE WHEN (SELECT notified_24h FROM alerts) <= 60
                 THEN 'oui' ELSE 'DEPASSEE' END
@@ -215,12 +260,23 @@ criteria AS (
     -- again -- it would sit in the table as a state nobody computes, and the
     -- channel would go quiet about whatever that control used to watch.
     UNION ALL
-    SELECT 21, 'N9 controles enregistres hors des quatre declares',
+    --
+    -- EIGHT AND NOT FOUR since B4-L4, 2026-11-22. dag_monitor records its four
+    -- families in the same table, deliberately: fd_ops_state is the one place
+    -- where a control's last state lives, so the channel and the dashboard
+    -- read both kinds alike. The four pipeline controls are health.py's, the
+    -- four monitoring ones ml4fd/monitor.py's (and the CHECK of
+    -- sql/ddl/170_monitoring.sql). Counting the second as unknown failed this
+    -- criterion as soon as one of them changed state, and differently each
+    -- time another did.
+    SELECT 21, 'B3-N9 controles enregistres hors des huit declares',
            '0 inconnu',
            (SELECT count(*)::text || ' inconnu'
               FROM fd_ops_state
              WHERE control NOT IN ('freshness', 'empty_run',
-                                   'rejection_rate', 'volume_invariant'))
+                                   'rejection_rate', 'volume_invariant',
+                                   'input_drift', 'prediction_drift',
+                                   'performance', 'data_quality'))
     -- Informative and NOT a criterion, for the same reason as 13: a pipeline
     -- legitimately in alert would otherwise fail its own acceptance, and an
     -- acceptance check that fails on reality teaches people to ignore it.
@@ -255,7 +311,7 @@ BEGIN
       FROM acceptance
      WHERE verdict LIKE '%ECHEC%';
     IF failed > 0 THEN
-        RAISE EXCEPTION 'S3 : % critere(s) en echec : %', failed, names
+        RAISE EXCEPTION 'B3-S3 : % critere(s) en echec : %', failed, names
             USING HINT = 'Le tableau ci-dessus donne attendu et constate pour chacun.';
     END IF;
 END $$;
