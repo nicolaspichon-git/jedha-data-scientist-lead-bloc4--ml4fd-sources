@@ -210,9 +210,12 @@ def test_an_absent_registry_is_reported_and_not_waited_for():
     MLflow's default retries, /health hung for as long as the client kept
     trying, and the healthcheck read a hang as a dead service (2026-11-22)."""
     env = SERVICE["environment"]
+    # int() and not float(): MLflow converts its own variables, these three as
+    # integers, and "0.5" broke every load of the champion on 2026-11-22. A
+    # value this test accepts must be one MLflow accepts.
     assert int(env["MLFLOW_HTTP_REQUEST_MAX_RETRIES"]) <= 1
-    assert float(env["MLFLOW_HTTP_REQUEST_TIMEOUT"]) <= 5
-    assert float(env["MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR"]) <= 1
+    assert int(env["MLFLOW_HTTP_REQUEST_TIMEOUT"]) <= 5
+    assert int(env["MLFLOW_HTTP_REQUEST_BACKOFF_FACTOR"]) <= 1
 
 
 def test_every_long_running_service_comes_back_after_docker_restarts():
