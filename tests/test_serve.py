@@ -1,9 +1,9 @@
 """B4-L5: the scoring service's logic, exercised without a web framework.
 
 Block: B4.
-Lot: B4-L5.
-Competency: B4-C2, B4-C3.
-Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
+Lot: B4-L5, B4-L6.
+Competency: B4-C2, B4-C3, B4-C4.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21, B4-EC27.
 
 WHAT THESE TESTS ARE FOR. The refusals are the branches a live call almost
 never produces -- a caller sending a naive timestamp, an amount above what the

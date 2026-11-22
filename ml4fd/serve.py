@@ -379,9 +379,9 @@ def health(scorer: score.Scorer | None, problem: str | None = None,
     process that has stopped.
     \f
     Block: B4.
-    Lot: B4-L5.
-    Competency: B4-C3.
-    Covers: B4-EC21.
+    Lot: B4-L5, B4-L6.
+    Competency: B4-C3, B4-C4.
+    Covers: B4-EC21, B4-EC27.
     """
     revision = revision or "inconnue"
     if scorer is None:

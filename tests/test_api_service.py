@@ -1,9 +1,9 @@
 """B4-L5: the scoring service as it is deployed -- its image, its service, its role.
 
 Block: B4.
-Lot: B4-L5.
+Lot: B4-L5, B4-L6.
 Competency: B4-C3, B4-C4.
-Covers: B4-EC16, B4-EC17, B4-EC19, B4-EC20, B4-EC21, B4-EC22, B4-EC23, B4-EC28.
+Covers: B4-EC16, B4-EC17, B4-EC19, B4-EC20, B4-EC21, B4-EC22, B4-EC23, B4-EC27, B4-EC28.
 
 READ FROM THE FILES rather than exercised, like tests/test_dashboard_service.py
 and for the same reason: fastapi, uvicorn and mlflow live in the api image and

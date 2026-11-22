@@ -13,11 +13,15 @@ name: CI
 on:
   push:
   pull_request:
-  # THE ROLLBACK (B4-L6, B4-EC27): run this workflow by hand from the Actions
+  # THE ROLLBACK (B4-L6, B4-EC30): run this workflow by hand from the Actions
   # tab, give it a tag already in the registry, and the deploy job puts that
   # image back in service -- with the same checks as a deployment, and a line
   # in the same journal. Nothing is rebuilt: the image of a past commit is the
   # one that was tested and published then.
+  # Block: B4.
+  # Lot: B4-L6.
+  # Competency: B4-C4.
+  # Covers: B4-EC30.
   workflow_dispatch:
     inputs:
       tag:
@@ -89,6 +93,10 @@ jobs:
   # deployment and a rollback point at; main moves with the branch. The FULL
   # commit goes into the image (GIT_SHA), which /health announces: the tag is
   # for people, the revision is for the check that a deployment landed.
+  # Block: B4.
+  # Lot: B4-L6.
+  # Competency: B4-C4.
+  # Covers: B4-EC27, B4-EC29.
   image:
     needs: tests
     if: github.event_name != 'workflow_dispatch'
@@ -148,6 +156,10 @@ jobs:
   #
   # A DEPLOYMENT THAT IS NOT CHECKED IS ONLY A COMMAND THAT RAN: the job fails
   # unless /health announces the very commit it was asked to deploy.
+  # Block: B4.
+  # Lot: B4-L6.
+  # Competency: B4-C4.
+  # Covers: B4-EC27, B4-EC30.
   deploy:
     needs: image
     # TWO WAYS IN. A push on main deploys the image just published, and only

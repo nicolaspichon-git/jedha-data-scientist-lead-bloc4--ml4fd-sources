@@ -1,9 +1,9 @@
 """B4-L5: the scoring service. `gunicorn app:app`, behind compose.
 
 Block: B4.
-Lot: B4-L5.
-Competency: B4-C3.
-Covers: B4-EC15, B4-EC16, B4-EC17, B4-EC19, B4-EC20, B4-EC21, B4-EC23.
+Lot: B4-L5, B4-L6.
+Competency: B4-C2, B4-C3, B4-C4.
+Covers: B4-EC15, B4-EC16, B4-EC17, B4-EC19, B4-EC20, B4-EC21, B4-EC23, B4-EC27.
 
 THIN ON PURPOSE. Every decision lives in ml4fd/serve.py, where pytest can hold
 it without a web framework; this file routes, declares the request and the
@@ -142,9 +142,9 @@ def health() -> dict:
     """Announce whether a model is in service, which version, and which code serves it.
     \f
     Block: B4.
-    Lot: B4-L5.
-    Competency: B4-C2, B4-C3.
-    Covers: B4-EC21.
+    Lot: B4-L5, B4-L6.
+    Competency: B4-C2, B4-C3, B4-C4.
+    Covers: B4-EC21, B4-EC27.
     """
     scorer, problem = _scorer()
     # ML4FD_REVISION is written into the image at build time (Dockerfile).
