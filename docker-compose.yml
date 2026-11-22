@@ -147,6 +147,14 @@ services:
   # Migrates Airflow's schema and creates the user. Exits once done.
   airflow-init:
     <<: *airflow-common
+    # ITS OWN environment, and the anchor merged back in: a service that writes
+    # `environment:` REPLACES the inherited map rather than adding to it, so
+    # without <<: *airflow-env this service would lose every AIRFLOW__ setting.
+    # The admin password is needed here only -- the one service that creates
+    # the account -- and nowhere else.
+    environment:
+      <<: *airflow-env
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD is missing from .env -- run .\fd-manager.ps1 setup}
     depends_on:
       postgres:
         condition: service_healthy
