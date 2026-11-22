@@ -2,7 +2,7 @@
 
 > Fichier **genere** par `tools/build_traceability.py`. Ne pas editer a la main.
 > Les emplacements viennent des marques `Covers:` du code.
-> Perimetre : les exigences de competence (B4-EC) de `step-0/ml4fd-project--d0-requirements.md`.
+> Perimetre : les exigences de competence (B4-EC) de `docs/ml4fd-project--d0-requirements.md`.
 
 > **A lire avant de se fier a la colonne Code.** BC03 et BC04 numerotent chacun leurs exigences a partir de EC01 : un `EC07` nu designe deux choses. Depuis le 21/11/2026, chaque marque porte son prefixe, et seules les marques `B4-` comptent ici. Les marques `B3-` -- l'heritage de BC03, dont ce projet est issu -- sont listees a part, hors perimetre, et ne couvrent aucune exigence de ce document : `ml4fd/stream.py` marque `B3-EC01`, qui n'est pas `B4-EC01` (*produire un cahier des charges*). Une marque sans prefixe n'est comptee nulle part.
 
@@ -38,7 +38,7 @@
 | **B4-EC26** | B4-C4 | F | Bloquer le déploiement lorsqu'une étape d'intégration échoue (11) | `.github/workflows/ci.yml:6` |
 | **B4-EC27** | B4-C4 | A | Déclencher le déploiement sans intervention manuelle, et le tracer jusqu'au *commit* et à la version de modèle déployé | - |
 | **B4-EC28** | B4-C4 | F | Tester la solution au-delà du code applicatif : contrat de l'API, préparation des *features*, chargement du modèle (12 | `tests/test_api_service.py:6`<br/>`tests/test_features_reconciliation.py:6`<br/>`tests/test_score.py:6` |
-| **B4-EC29** | B4-C4 | A | Gérer les secrets par le magasin de secrets de la chaîne, sans valeur en clair dans le dépôt | - |
+| **B4-EC29** | B4-C4 | A | Gérer les secrets par le magasin de secrets de la chaîne, sans valeur en clair dans le dépôt | `tests/test_compose_secrets.py:6` |
 | **B4-EC30** | B4-C4 | F | Permettre le retour à la version précédente du service | - |
 | **B4-EC31** | B4-C5 | A | Implémenter le réentraînement comme un script exécutable sans intervention manuelle | `airflow/dags/dag_train.py:6` |
 | **B4-EC32** | B4-C5 | A | Déclencher le réentraînement par un ordonnanceur, et déclarer sa cadence | `ml4fd/config.py:219 monitoring_schedule()` |
@@ -65,8 +65,8 @@
 ## Decompte
 
 - exigences definies : **51**
-- portees par du code : **33**
-- sans code : **18**, dont de nature fonctionnelle : **3**
+- portees par du code : **34**
+- sans code : **17**, dont de nature fonctionnelle : **3**
 - livrables, dont l'existence n'est pas verifiee ici : **4**
 - marques a verifier (desaccord de competence) : **1**
 - ruptures de tracabilite : **0**
@@ -88,7 +88,7 @@ Une exigence de nature L designe une chose qui doit EXISTER -- une presentation,
 - B4-C1 : 0/7 portee(s) par du code, manque B4-EC01, B4-EC02, B4-EC03, B4-EC04, B4-EC05, B4-EC06, B4-EC07
 - B4-C2 : 4/8 portee(s) par du code, manque B4-EC08, B4-EC09, B4-EC10, B4-EC11
 - B4-C3 : 8/8 portee(s) par du code
-- B4-C4 : 4/7 portee(s) par du code, manque B4-EC27, B4-EC29, B4-EC30
+- B4-C4 : 5/7 portee(s) par du code, manque B4-EC27, B4-EC30
 - B4-C5 : 7/7 portee(s) par du code
 - B4-C6 : 10/14 portee(s) par du code, manque B4-EC43, B4-EC46, B4-EC47, B4-EC48
 

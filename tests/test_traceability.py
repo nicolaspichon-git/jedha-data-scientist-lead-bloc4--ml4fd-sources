@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "TRACEABILITY.md"
 
 # THE MATRIX IS GENERATED, NOT WRITTEN (tools/build_traceability.py). It was
-# repointed on 2026-11-20 -- at step-0/ml4fd-project--d0-requirements.md, the
-# EC of this dossier -- and generated for the first time, so the two guards
+# repointed on 2026-11-20 -- at the requirements document of this dossier, read
+# from docs/ since 2026-11-22 -- and generated for the first time, so the two guards
 # below are armed now. They were written to abstain while the file was absent
 # rather than fail, which is why the chain was green through the months the
 # generator read two documents that did not exist. The abstention stays: it
@@ -114,8 +114,34 @@ def test_the_requirements_document_exists():
     REQUIREMENTS pointed at a BC03 file absent from this dossier, so defined()
     returned {} , the matrix was never written, and --check printed
     "0 requirements defined" and exited 0. An empty expectation is met by
-    anything."""
+    anything.
+
+    INSIDE THE REPOSITORY, since 2026-11-22: the CI checks out the repository
+    alone, and this test is what found the document missing there."""
     assert bt.REQUIREMENTS.exists(), bt.REQUIREMENTS
+    assert bt.REQUIREMENTS.parent == ROOT / "docs", bt.REQUIREMENTS
+
+
+def _text(path: Path) -> str:
+    """The content, whatever line endings the checkout gave it: .gitattributes
+    stores LF, a Windows working tree may hold CRLF, and the two say the same."""
+    raw = path.read_bytes().decode("utf-8-sig")
+    return raw.replace("\r\n", "\n")
+
+
+def test_the_repository_copy_matches_the_dossier():
+    """THE COPY CANNOT DRIFT. docs/ holds a copy of the dossier's requirements
+    document, so that the generator reads inside the repository. A copy that
+    lagged behind the dossier would make the matrix answer to a document the
+    jury does not read. Compared wherever both exist -- on the machine that
+    holds the whole dossier; the CI holds the repository alone, and there is
+    nothing to compare against."""
+    if not bt.DOSSIER_REQUIREMENTS.exists():
+        pytest.skip("pas de dossier step-0/ a cote du depot (CI) : rien a comparer")
+    assert _text(bt.REQUIREMENTS) == _text(bt.DOSSIER_REQUIREMENTS), (
+        "docs/%s differe de step-0/%s ; recopier :\n"
+        "  Copy-Item ..\\step-0\\%s docs\\"
+        % (bt.REQUIREMENTS_NAME, bt.REQUIREMENTS_NAME, bt.REQUIREMENTS_NAME))
 
 
 def test_a_document_without_a_requirements_table_is_refused(tmp_path):

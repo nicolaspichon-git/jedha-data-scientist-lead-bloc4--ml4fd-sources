@@ -30,7 +30,7 @@ WHAT CHANGED ON 2026-11-20, and both changes are reductions.
      this dossier, so defined() returned an empty dict, the matrix was never
      generated, and --check reported "0 requirements defined" as a success.
      An empty expectation is met by anything. It now reads
-     step-0/ml4fd-project--d0-requirements.md, which holds the 51 EC.
+     docs/ml4fd-project--d0-requirements.md, which holds the 51 EC.
 
   2. NO FUNCTIONAL DERIVATION. BC03 decomposed each requirement into F/K/D rows
      in D0 section 0.4 and the matrix carried a column for them. This project
@@ -62,8 +62,15 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent          # step-2/
-REQUIREMENTS = (ROOT.parent / "step-0"
-                / "ml4fd-project--d0-requirements.md")
+# THE REQUIREMENTS DOCUMENT IS READ INSIDE THE REPOSITORY, since 2026-11-22.
+# It used to be read from ../step-0/, beside the repository: true on the
+# machine that holds the whole dossier, false in the CI, which checks out the
+# repository alone -- and six tests failed there while passing here. docs/
+# holds a COPY of the dossier's document; tests/test_traceability.py requires
+# the two to be identical wherever both exist, so the copy cannot drift.
+REQUIREMENTS_NAME = "ml4fd-project--d0-requirements.md"
+REQUIREMENTS = ROOT / "docs" / REQUIREMENTS_NAME
+DOSSIER_REQUIREMENTS = ROOT.parent / "step-0" / REQUIREMENTS_NAME
 MATRIX = ROOT / "TRACEABILITY.md"
 # EVERY TOP-LEVEL DIRECTORY THAT CARRIES "Covers:" MARKS, and a test ties
 # this tuple to what the repository actually holds. scoring_service/ was
@@ -369,7 +376,7 @@ def render(req: dict[str, dict], code: dict[str, list[str]],
            "Ne pas editer a la main.",
            "> Les emplacements viennent des marques `Covers:` du code.",
            "> Perimetre : les exigences de competence (B4-EC) de "
-           "`step-0/ml4fd-project--d0-requirements.md`.",
+           "`docs/ml4fd-project--d0-requirements.md`.",
            "",
            "> **A lire avant de se fier a la colonne Code.** BC03 et BC04 "
            "numerotent chacun leurs exigences a partir de EC01 : un `EC07` "
