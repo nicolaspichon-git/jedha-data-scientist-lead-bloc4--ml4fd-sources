@@ -4,7 +4,7 @@
 > Les emplacements viennent des marques `Covers:` du code.
 > Perimetre : les exigences de competence (B4-EC) de `docs/ml4fd-project--d0-requirements.md`.
 
-> **A lire avant de se fier a la colonne Code.** BC03 et BC04 numerotent chacun leurs exigences a partir de EC01 : un `EC07` nu designe deux choses. Depuis le 21/11/2026, chaque marque porte son prefixe, et seules les marques `B4-` comptent ici. Les marques `B3-` -- l'heritage de BC03, dont ce projet est issu -- sont listees a part, hors perimetre, et ne couvrent aucune exigence de ce document : `ml4fd/stream.py` marque `B3-EC01`, qui n'est pas `B4-EC01` (*produire un cahier des charges*). Une marque sans prefixe n'est comptee nulle part.
+> **A lire.** BC03 et BC04 numerotent chacun leurs exigences a partir de EC01 : un `EC07` nu designe deux choses. Depuis le 21/11/2026, chaque marque porte son prefixe, et seules les marques `B4-` comptent ici. Les marques `B3-` -- l'heritage de BC03, dont ce projet est issu -- sont listees a part, hors perimetre, et ne couvrent aucune exigence de ce document : `ml4fd/stream.py` marque `B3-EC01`, qui n'est pas `B4-EC01` (*produire un cahier des charges*). Une marque sans prefixe n'est comptee nulle part.
 
 > Nature : L = livrable, D = documentaire, DM = demonstration, A = architectural, F = fonctionnel.
 
