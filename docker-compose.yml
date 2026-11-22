@@ -349,7 +349,17 @@ services:
   # the pipeline has never seen, which is why it writes fd_scoring_service_calls and not
   # fd_scores -- see sql/ddl/190_scoring_service_calls.sql.
   scoring-service:
-    build: ./scoring_service
+    # BUILT FROM THE ROOT, since L6: the image carries its code (see
+    # scoring_service/Dockerfile and /.dockerignore). The name is the registry's,
+    # so the image the CI publishes and the image built here are one name; the
+    # tag says which. SCORING_SERVICE_TAG is set by the deployment, "local" for
+    # a build on this machine.
+    build:
+      context: .
+      dockerfile: scoring_service/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
+    image: ghcr.io/nicolaspichon-git/jedha-data-scientist-lead-bloc4--ml4fd-sources/scoring-service:${SCORING_SERVICE_TAG:-local}
     depends_on:
       postgres:
         condition: service_healthy
@@ -370,12 +380,9 @@ services:
       # The champion is resolved through the registry, like every other reader.
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
     volumes:
-      # MOUNTED, never copied: ml4fd.serve, ml4fd.score and the feature query
-      # are the scoring path itself, and a copy in the image would be a second
-      # version of it.
-      - ./ml4fd:/opt/project/ml4fd:ro
-      - ./sql:/opt/project/sql:ro
-      - ./governance.yml:/opt/project/governance.yml:ro
+      # NO CODE IS MOUNTED, since L6: ml4fd/, sql/ and governance.yml are in the
+      # image, at the commit it was built from. What remains is DATA.
+      #
       # THE MANIFESTS, AND NOT THE MODEL. Found missing on the first /health,
       # 2026-11-20 22:38: the service resolved the champion in MLflow, read its
       # dataset_version, and could not open run.json -- "Recipes present:

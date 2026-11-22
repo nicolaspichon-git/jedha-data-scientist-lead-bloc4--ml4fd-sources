@@ -358,8 +358,14 @@ def record(conn: "psycopg.Connection", call: dict, row: dict,
     return dict(zip(names, rows[0]))
 
 
-def health(scorer: score.Scorer | None, problem: str | None = None) -> dict:
+def health(scorer: score.Scorer | None, problem: str | None = None,
+           revision: str | None = None) -> dict:
     """What the health endpoint announces, including the version served.
+
+    AND THE CODE THAT SERVES IT, since L6: the revision is the commit the image
+    was built from. One call then names both halves of a decision -- the model,
+    which the registry's alias chooses, and the code, which the deployment
+    chooses -- and they move independently, so both must be read.
 
     THE VERSION IS THE POINT, which is what B4-EC21 asks for: a service that
     answers "ok" without saying what it serves cannot be distinguished from
@@ -377,13 +383,15 @@ def health(scorer: score.Scorer | None, problem: str | None = None) -> dict:
     Competency: B4-C3.
     Covers: B4-EC21.
     """
+    revision = revision or "inconnue"
     if scorer is None:
         return {"state": "degraded", "model_version": None,
-                "recipe_digest": None,
+                "recipe_digest": None, "revision": revision,
                 "detail": problem or "aucun modele charge"}
     return {"state": "ok",
             "model_version": scorer.model_version,
             "recipe_digest": scorer.recipe_digest,
             "features": list(scorer.features),
             "threshold": scorer.threshold,
+            "revision": revision,
             "detail": "modele en service"}

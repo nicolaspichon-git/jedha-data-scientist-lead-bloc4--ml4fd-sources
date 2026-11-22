@@ -1,0 +1,19 @@
+# The build context of the scoring service image, and only of it: the other
+# images build from their own directory (./airflow, ./dashboard, ./producer,
+# ./mlflow) and never read this file.
+#
+# AN ALLOWLIST, NOT A DENYLIST. Everything is excluded, then what the image
+# needs is named. A file added to the repository later -- .env first among
+# them -- stays out until somebody names it; a denylist would let it in until
+# somebody remembered to exclude it. B4-EC29: no secret in a published image.
+#
+# The last matching line wins: "*" excludes, each "!" re-admits, and the two
+# final lines take the compiled leftovers back out of what was re-admitted.
+* 
+!scoring_service/app.py
+!scoring_service/requirements.txt
+!ml4fd/
+!sql/
+!governance.yml
+**/__pycache__
+**/*.pyc

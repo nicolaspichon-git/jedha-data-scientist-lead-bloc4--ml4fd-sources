@@ -141,7 +141,7 @@ def inspect(**changes):
 HEALTH = {"state": "ok", "model_version": SERVED, "recipe_digest": "93d16ede",
           "features": ["amt", "category", "f_tx_count", "f_avg_amount",
                        "f_home_distance_km"],
-          "threshold": 0.86, "detail": "modele en service"}
+          "threshold": 0.86, "revision": "local", "detail": "modele en service"}
 DECISION = {"call_id": 1, "decision": "acceptee", "flagged": False,
             "score": 0.00429507, "threshold": 0.86, "model_version": SERVED,
             "recipe_digest": "93d16ede",
