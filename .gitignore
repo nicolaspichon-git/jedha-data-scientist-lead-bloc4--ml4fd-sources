@@ -18,4 +18,4 @@ _to_delete/
 /runtime/channels/monitoring/
 /runtime/producer/
 # The journal of deployments (B4-L6): written on this machine by the deploy job.
-runtime/deployments.csv
+/runtime/deployments/

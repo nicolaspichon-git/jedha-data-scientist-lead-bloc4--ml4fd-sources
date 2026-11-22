@@ -41,7 +41,7 @@ param(
                  'promote',
                  'monitor',
                  'drift',
-                 'replay', 'forget', 'dashboard', 'scoring-service',
+                 'replay', 'forget', 'dashboard', 'scoring-service', 'rollback',
                  'tasklog', 'dag-test', 'accept', 'test', 'lint', 'traceability',
                  'typology',
                  'check')]
@@ -122,6 +122,9 @@ param(
     # version, which is what the scheduler will do; naming one is for
     # re-judging a version by hand, after a policy change for instance.
     [string]$Candidate,
+    # Used by 'rollback'. Without it the service goes back to the tag deployed
+    # before the current one, as runtime/deployments/deployments.csv records them.
+    [string]$Tag,
     [switch]$Force
 )
 
@@ -372,6 +375,7 @@ switch ($Task) {
             @{ n = 'forget';       d = 'forget a failed batch: forget -Batch <uuid> [-Apply]' }
             @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8502) [-Stop]' }
             @{ n = 'scoring-service'; d = 'start the scoring service (http://localhost:8012/docs) [-Stop]' }
+            @{ n = 'rollback';     d = 'put the previously deployed scoring image back, offline [-Tag sha-<7>]' }
             @{ n = 'tasklog';      d = 'show the last log: .\fd-manager.ps1 tasklog -TaskId backfill_features' }
             @{ n = 'dag-test';     d = 'run one task live: .\fd-manager.ps1 dag-test -TaskId preflight' }
             @{ n = 'test';         d = 'unit tests, with no database and no Airflow' }
@@ -1670,6 +1674,115 @@ LIMIT  14;
         Write-Host "  connecte en fd_scoring_service : trois colonnes de fd_transactions en lecture," -ForegroundColor DarkGray
         Write-Host "  fd_scoring_service_calls en ajout seul, rien de plus" -ForegroundColor DarkGray
         Write-Host "  journaux :  .\fd-manager.ps1 logs -Service scoring-service"
+        Write-Host ""
+    }
+
+    # THE ROLLBACK WITHOUT GITHUB (B4-L6). The usual way back is the CI
+    # workflow run by hand with a tag (Actions > CI > Run workflow): it pulls
+    # the image and leaves its trace in the run. This task is the fallback for
+    # when GitHub or the registry cannot be reached: it only uses an image
+    # already on this machine, which every past deployment left there.
+    # The checks are the same as the deploy job's: healthy, and /health
+    # announcing the commit written in the image's revision label.
+    # Block: B4.
+    # Lot: B4-L6.
+    # Competency: B4-C4.
+    # Covers: B4-EC27.
+    'rollback' {
+        Assert-Env; Assert-Docker
+        $journal = 'runtime\deployments\deployments.csv'
+        if (-not (Test-Path $journal)) {
+            Write-Host ""
+            Write-Host "Aucun deploiement journalise ($journal) : rien a quoi revenir." -ForegroundColor Red
+            Write-Host ""
+            exit 1
+        }
+        $rows = @(Import-Csv $journal)
+        if ($rows.Count -eq 0) {
+            Write-Host "Le journal $journal est vide : rien a quoi revenir." -ForegroundColor Red
+            exit 1
+        }
+        $current = $rows[-1].tag
+        if ($Tag) {
+            if ($Tag -notmatch '^sha-[0-9a-f]{7}$') {
+                Write-Host "Etiquette '$Tag' invalide : attendu sha-<7 chiffres hexadecimaux>." -ForegroundColor Red
+                exit 1
+            }
+            $target = $Tag
+        } else {
+            $previous = @($rows | Where-Object { $_.tag -ne $current })
+            if ($previous.Count -eq 0) {
+                Write-Host "Le journal ne connait qu'une version ($current) : pas de version precedente." -ForegroundColor Red
+                exit 1
+            }
+            $target = $previous[-1].tag
+        }
+        if ($target -eq $current) {
+            Write-Host "La version $target est deja celle en service." -ForegroundColor Yellow
+            exit 0
+        }
+
+        # The image name comes from docker-compose.yml, with the target tag,
+        # so it is written in one place only.
+        $env:SCORING_SERVICE_TAG = $target
+        $ref = @(& docker compose config --images scoring-service)[0]
+        if (-not (& docker image ls -q $ref)) {
+            Write-Host ""
+            Write-Host "L'image $ref n'est pas sur cette machine." -ForegroundColor Red
+            Write-Host "Passer par le workflow : Actions > CI > Run workflow, tag = $target" -ForegroundColor Yellow
+            Write-Host ""
+            exit 1
+        }
+        $meta = (& docker image inspect $ref) -join "`n" | ConvertFrom-Json
+        $revision = $meta[0].Config.Labels.'org.opencontainers.image.revision'
+        if ($revision -notmatch '^[0-9a-f]{40}$') {
+            Write-Host "L'image $ref ne dit pas de quel commit elle vient ('$revision')." -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  en service : $current" -ForegroundColor DarkGray
+        Write-Host "  retour a   : $target (commit $revision)" -ForegroundColor Yellow
+
+        Invoke-Step "docker compose up scoring-service ($target)" {
+            & docker compose up -d --no-build --no-deps --pull never scoring-service
+        }
+
+        # Same line as the deploy job writes: a later "docker compose up -d"
+        # keeps the version chosen here.
+        $file = Join-Path $PWD.Path '.env'
+        $lines = @(Get-Content $file)
+        if ($lines -match '^SCORING_SERVICE_TAG=') {
+            $lines = $lines | ForEach-Object {
+                if ($_ -match '^SCORING_SERVICE_TAG=') { "SCORING_SERVICE_TAG=$target" } else { $_ }
+            }
+        } else {
+            $lines += "SCORING_SERVICE_TAG=$target"
+        }
+        [System.IO.File]::WriteAllLines($file, $lines, (New-Object System.Text.UTF8Encoding($false)))
+
+        $id = @(& docker compose ps -q scoring-service)[0]
+        $deadline = (Get-Date).AddSeconds(180)
+        do {
+            $state = & docker inspect --format '{{.State.Health.Status}}' $id
+            if ($state -eq 'healthy') { break }
+            Start-Sleep -Seconds 5
+        } while ((Get-Date) -lt $deadline)
+        if ($state -ne 'healthy') {
+            Write-Host "Le service de scoring est '$state' apres 180 s." -ForegroundColor Red
+            & docker compose logs --tail 40 scoring-service
+            exit 1
+        }
+        $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8012/health' -TimeoutSec 10
+        if ($health.revision -ne $revision) {
+            Write-Host "/health annonce la revision '$($health.revision)', attendu '$revision'." -ForegroundColor Red
+            exit 1
+        }
+
+        $digest = & docker inspect --format '{{index .RepoDigests 0}}' $ref
+        $line = "{0},{1},{2},{3},{4},{5}" -f (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'), $target, $revision, $digest, $health.model_version, 'fd-manager rollback'
+        Add-Content -Path $journal -Value $line -Encoding ascii
+
+        Write-Host ""
+        Write-Host "Retour a $target fait : /health annonce $revision, modele $($health.model_version), etat $($health.state)." -ForegroundColor Green
         Write-Host ""
     }
 
