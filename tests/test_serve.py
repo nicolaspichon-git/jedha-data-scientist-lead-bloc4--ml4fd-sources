@@ -311,6 +311,18 @@ def test_no_champion_is_degraded_and_not_down():
     assert "alias" in said["detail"]
 
 
+def test_the_health_check_announces_the_code_it_runs():
+    """L6: the model and the code move independently -- the alias chooses one,
+    the deployment the other -- so /health names both, degraded or not."""
+    assert serve.health(FakeScorer(), revision="3e17977")["revision"] == "3e17977"
+    assert serve.health(None, revision="3e17977")["revision"] == "3e17977"
+
+
+def test_an_unknown_revision_says_so():
+    """A build that was not given its commit must not look like one that was."""
+    assert serve.health(FakeScorer())["revision"] == "inconnue"
+
+
 # --- the module stays installable and the SQL stays single-sourced -----------
 
 def test_the_logic_imports_no_web_framework_at_load_time():

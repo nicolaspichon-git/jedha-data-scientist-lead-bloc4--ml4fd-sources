@@ -66,9 +66,10 @@ MLFLOW = "http://127.0.0.1:8002"
 REGISTERED_NAME = "fraud_scoring"
 ALIAS = "champion"
 
-EXPECTED_MOUNTS = {"/opt/project/ml4fd", "/opt/project/sql",
-                   "/opt/project/governance.yml",
-                   "/opt/project/runtime/datasets"}
+# DATA ONLY, since L6: the code is in the image, at the commit it was built
+# from. A code mount reappearing here would silently undo that -- the service
+# would again run whatever the disk holds -- so it is refused by name.
+EXPECTED_MOUNTS = {"/opt/project/runtime/datasets"}
 EXPECTED_ROUTES = {"/health", "/score", "/score/batch"}
 
 # A card number that is not one of the corpus cardholders, so the call exercises
@@ -268,6 +269,9 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
            sante.get("state", "injoignable"))
     yield ("B4-L5 le point de sante annonce la version servie", "oui",
            "oui" if served not in ("aucune", "None") else "NON")
+    yield ("B4-L6 le point de sante annonce la revision du code", "oui",
+           "oui" if sante.get("revision") not in (None, "", "inconnue")
+           else "NON")
 
     status, refused = get("%s/score" % BASE, MALFORMED)
     named = fields_named(refused)

@@ -433,7 +433,7 @@ switch ($Task) {
             }
             else {
                 $lines += ''
-                $lines += '# Password of fd_dashboard, the role the dashboard logs in as (S6).'
+                $lines += '# Password of fd_dashboard, the role the dashboard logs in as.'
                 $lines += "FD_DASHBOARD_PASSWORD=$d"
             }
             [System.IO.File]::WriteAllLines(
@@ -454,11 +454,11 @@ switch ($Task) {
         # true of the two it had and false of FD_SCORING_SERVICE_PASSWORD -- a secret
         # whose own .env line would have described someone else.
         $secrets = @(
-            @{ n = 'AIRFLOW_DB_PASSWORD'; c = 'Password of the owner of a service database (L1).' }
-            @{ n = 'MLFLOW_DB_PASSWORD';  c = 'Password of the owner of a service database (L1).' }
-            @{ n = 'FD_SCORING_SERVICE_PASSWORD';     c = 'Password of fd_scoring_service, the role the scoring service logs in as (L5).' }
-            @{ n = 'AIRFLOW_SECRET_KEY';     c = 'Key that signs the sessions of the Airflow webserver (L6). Never versioned.' }
-            @{ n = 'AIRFLOW_ADMIN_PASSWORD'; c = 'Password of the admin account of the Airflow web interface (L6). Never versioned.' }
+            @{ n = 'AIRFLOW_DB_PASSWORD'; c = 'Password of the owner of a service database.' }
+            @{ n = 'MLFLOW_DB_PASSWORD';  c = 'Password of the owner of a service database.' }
+            @{ n = 'FD_SCORING_SERVICE_PASSWORD';     c = 'Password of fd_scoring_service, the role the scoring service logs in as.' }
+            @{ n = 'AIRFLOW_SECRET_KEY';     c = 'Key that signs the sessions of the Airflow webserver. Never versioned.' }
+            @{ n = 'AIRFLOW_ADMIN_PASSWORD'; c = 'Password of the admin account of the Airflow web interface. Never versioned.' }
         )
         foreach ($secret in $secrets) {
             $name = $secret.n

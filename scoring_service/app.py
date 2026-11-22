@@ -146,7 +146,9 @@ def health() -> dict:
     Covers: B4-EC21.
     """
     scorer, problem = _scorer()
-    return serve.health(scorer, problem)
+    # ML4FD_REVISION is written into the image at build time (Dockerfile).
+    return serve.health(scorer, problem,
+                        revision=os.environ.get("ML4FD_REVISION"))
 
 
 @app.get("/", include_in_schema=False)

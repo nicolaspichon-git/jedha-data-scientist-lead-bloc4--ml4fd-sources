@@ -158,22 +158,51 @@ def test_one_worker_and_the_reason_is_the_model_cache():
     assert "--workers 1" in DOCKERFILE
 
 
-def test_the_scoring_path_is_mounted_and_never_copied():
-    """A copy of ml4fd/ in the image would be a second version of the scoring
-    path -- the one thing reusing it was meant to avoid."""
+def test_the_scoring_code_is_in_the_image_and_never_mounted():
+    """THE CODE IS THE COMMIT'S, since L6 (2026-11-22) -- the reverse of what
+    this test pinned until then, and for a reason that disappeared.
+
+    It read "the scoring path is mounted and never copied": while dag_ingest
+    loaded the model itself, two processes decided, and a copy in the image
+    would have been a second version of the scoring path. L5 moved the decision
+    into this service -- the pipeline sends its rows over HTTP -- so only one
+    process decides, and copying its code duplicates nothing. The mount then
+    had only its cost: an image tagged with a commit ran whatever the disk held,
+    and no deployment could be traced to the code it served (B4-EC27).
+
+    What remains mounted is data: the manifests of runtime/datasets."""
+    for target in ("/opt/project/ml4fd/", "/opt/project/sql/",
+                   "/opt/project/governance.yml"):
+        assert target in DOCKERFILE, target
     mounts = {entry.split(":")[1]: entry for entry in SERVICE["volumes"]}
     for target in ("/opt/project/ml4fd", "/opt/project/sql",
-                   "/opt/project/governance.yml",
-                   # THE MANIFESTS, missing on the first /health of 2026-11-20:
-                   # score.load() loads the model from MLflow and reads the
-                   # feature list and the threshold from run.json on disk, so a
-                   # service without this mount resolves its champion and then
-                   # cannot say what to feed it.
-                   "/opt/project/runtime/datasets"):
-        assert target in mounts, target
-        assert mounts[target].endswith(":ro"), mounts[target]
-    assert "COPY ml4fd" not in DOCKERFILE
-    assert "COPY sql" not in DOCKERFILE
+                   "/opt/project/governance.yml"):
+        assert target not in mounts, "%s is mounted again" % target
+    # THE MANIFESTS, missing on the first /health of 2026-11-20: score.load()
+    # loads the model from MLflow and reads the feature list and the threshold
+    # from run.json on disk.
+    assert mounts["/opt/project/runtime/datasets"].endswith(":ro")
+
+
+def test_nothing_but_the_named_files_enters_the_image():
+    """AN ALLOWLIST: .env -- the pepper, the passwords -- cannot reach a
+    published image unless somebody names it (B4-EC29)."""
+    rules = [line.strip() for line in
+             (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.startswith("#")]
+    assert rules[0] == "*", "the ignore file must exclude everything first"
+    admitted = [rule[1:] for rule in rules if rule.startswith("!")]
+    assert not [rule for rule in admitted if ".env" in rule], admitted
+    assert SERVICE["build"]["context"] == "."
+
+
+def test_the_image_says_which_commit_it_was_built_from():
+    """B4-EC27 traces a deployment to its commit: the image carries it, and
+    /health announces it."""
+    assert "ARG GIT_SHA" in DOCKERFILE
+    assert "ML4FD_REVISION" in DOCKERFILE
+    assert "org.opencontainers.image.revision" in DOCKERFILE
+    assert 'os.environ.get("ML4FD_REVISION")' in APP
 
 
 def test_the_python_version_matches_the_image_that_fits_the_model():
