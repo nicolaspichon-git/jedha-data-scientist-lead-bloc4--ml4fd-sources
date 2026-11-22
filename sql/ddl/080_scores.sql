@@ -1,5 +1,8 @@
 -- The score of a transaction, and the model that produced it.
--- Covers: EE09, EI04, EC24   Lot: N4   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-N4, B4-L0.
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EE09, B3-EI04, B3-EC24.
 --
 -- THE PRIMARY KEY IS (txn_id, model_version), and that is the whole design.
 --

@@ -1,5 +1,8 @@
 -- The latest runs of the watched DAG, most recent first. Read by the dashboard.
--- Covers: EC14   Lot: R6   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R6, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14.
 --
 -- What the four controls are computed FROM, shown beside them: a red control
 -- is read against the runs that made it red. One table, no join, so nothing

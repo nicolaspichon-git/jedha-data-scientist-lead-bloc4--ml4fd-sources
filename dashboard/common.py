@@ -1,8 +1,9 @@
 """What the pages of the dashboard share. DISPLAY ONLY.
 
-Covers: EC19
-Lot: R2
-Competency: C4
+Block: B3, B4.
+Lot: B3-R2, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC19.
 
 Everything a page shows is decided in ml4fd/dashboard.py, where pytest can hold
 it. This module only does what needs Streamlit: the cached configuration, the

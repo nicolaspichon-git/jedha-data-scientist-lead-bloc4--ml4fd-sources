@@ -1,8 +1,9 @@
 """An acceptance file must be able to fail the chain it is run from.
 
-Covers: EC07, EC14
-Lot: N9
-Competency: C5
+Block: B3, B4.
+Lot: B3-N9, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC07, B3-EC14.
 
 THE DEFECT THIS EXISTS FOR, and it was found by reading a real run rather than
 by any check. The three acceptance files printed a `verdict` column holding

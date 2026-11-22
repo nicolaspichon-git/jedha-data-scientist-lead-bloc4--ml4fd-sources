@@ -1,17 +1,18 @@
-"""Acceptance criteria of S2 that SQL cannot reach: the files and the chain.
+"""Acceptance criteria of B3-S2 that SQL cannot reach: the files and the chain.
 
-Covers: EC23, EI04
-Lot: M8
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-M8, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EC23, B3-EI04.
 
-The criteria of M0 to M4 live in sql/checks/s2_acceptance.sql, because they are
+The criteria of B3-M0 to B3-M4 live in sql/checks/s2_acceptance.sql, because they are
 about rows. These are about ARTEFACTS -- the Parquet pair, the model, the
 manifest, the lock file -- and about whether they agree with each other.
 
 THE CRITERION THAT MATTERS MOST is the last: the version of scikit-learn named
 in the report must be the version pinned in the lock file. If they disagree, the
 model on disk was not produced by the environment the lock file describes, and
-the whole reproducibility claim of M8 is void.
+the whole reproducibility claim of B3-M8 is void.
 
 Run: python3 tools/check_s2.py [datasets_root]
 """
@@ -49,18 +50,18 @@ def criteria(directory: Path):
 
     for name in REQUIRED_FILES:
         path = directory / name
-        yield item("M5-M8 fichier %s" % name, "present",
+        yield item("B3-M5..B3-M8 fichier %s" % name, "present",
                    "present" if path.is_file() else "ABSENT")
 
     run_path = directory / "run.json"
     if not run_path.is_file():
-        yield item("M8 manifeste lisible", "oui", "ABSENT")
+        yield item("B3-M8 manifeste lisible", "oui", "ABSENT")
         return
 
     try:
         payload = json.loads(run_path.read_text(encoding="utf-8"))
     except Exception as problem:                              # noqa: BLE001
-        yield item("M8 manifeste lisible", "oui", "ILLISIBLE : %s" % problem)
+        yield item("B3-M8 manifeste lisible", "oui", "ILLISIBLE : %s" % problem)
         return
 
     dataset = payload.get("dataset", {})
@@ -68,35 +69,35 @@ def criteria(directory: Path):
     metrics = payload.get("metrics", {})
     threshold = payload.get("threshold") or {}
 
-    yield item("M8 empreinte de recette sur 64 hexa", "oui",
+    yield item("B3-M8 empreinte de recette sur 64 hexa", "oui",
                "oui" if HEX64.match(dataset.get("recipe_digest", "")) else "NON")
-    yield item("M8 coupure datee et avec fuseau", "oui",
+    yield item("B3-M8 coupure datee et avec fuseau", "oui",
                _dated(dataset.get("cut_off")))
-    yield item("M8 liste de features non vide", "oui",
+    yield item("B3-M8 liste de features non vide", "oui",
                "oui" if dataset.get("features") else "NON")
-    yield item("M8 graine enregistree", "oui",
+    yield item("B3-M8 graine enregistree", "oui",
                "oui" if model.get("seed") else "NON")
-    yield item("M8 versions de bibliotheques relevees", "oui",
+    yield item("B3-M8 versions de bibliotheques relevees", "oui",
                "oui" if model.get("versions") else "NON")
 
     policy = threshold.get("policy")
-    yield item("M6 seuil choisi par une politique declaree", "oui",
+    yield item("B3-M6 seuil choisi par une politique declaree", "oui",
                "oui" if policy in ("cost", "capacity")
                else "NON : %r" % (policy,))
-    # The one mistake in M6 that no metric would reveal.
-    yield item("M6 seuil choisi HORS du jeu de test", "oui",
+    # The one mistake in B3-M6 that no metric would reveal.
+    yield item("B3-M6 seuil choisi HORS du jeu de test", "oui",
                "oui" if "validation" in (threshold.get("chosen_on") or "")
                else "NON : " + (threshold.get("chosen_on") or "non renseigne"))
-    yield item("M6 les deux politiques calculees", "oui",
+    yield item("B3-M6 les deux politiques calculees", "oui",
                "oui" if {"by_cost", "by_capacity"} <= set(threshold)
                else "NON")
 
-    yield item("M5 aucune exactitude du modele enregistree", "0",
+    yield item("B3-M5 aucune exactitude du modele enregistree", "0",
                str(sum(1 for k in metrics if "accuracy" in k)))
-    yield item("M5 taux de base des deux cotes", "oui",
+    yield item("B3-M5 taux de base des deux cotes", "oui",
                "oui" if payload.get("counts", {}).get("base_rate_test")
                else "NON")
-    yield item("M5 gain sur la regle d'analyste", "> 0",
+    yield item("B3-M5 gain sur la regle d'analyste", "> 0",
                "%+d" % metrics.get("frauds_caught_over_rule", 0))
 
     # Informative: the figures a reader needs beside any verdict above.
@@ -111,15 +112,15 @@ def criteria(directory: Path):
 
     report = (directory / "rapport.txt")
     text = report.read_text(encoding="utf-8") if report.is_file() else ""
-    yield item("M5 rapport sans exactitude du modele", "oui",
+    yield item("B3-M5 rapport sans exactitude du modele", "oui",
                "oui" if "n'est pas calculee" in text else "NON")
 
-    # THE criterion of M8.
+    # THE criterion of B3-M8.
     lock = (directory / "requirements.lock")
     lock_text = lock.read_text(encoding="utf-8") if lock.is_file() else ""
     for package, version in sorted((model.get("versions") or {}).items()):
         pinned = _pinned(lock_text, package)
-        yield item("M8 %s du rapport = celui du verrou" % package,
+        yield item("B3-M8 %s du rapport = celui du verrou" % package,
                    version, pinned or "ABSENT DU VERROU")
 
 

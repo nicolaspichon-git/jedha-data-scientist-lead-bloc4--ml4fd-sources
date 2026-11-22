@@ -1,5 +1,8 @@
 -- The journal of the morning reports: one row per covered day.
--- Covers: EE04, EC14, EC23   Lot: P3   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-P3, B4-L0.
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EE04, B3-EC14, B3-EC23.
 --
 -- A WRONG REPORT IS SEEN. AN ABSENT ONE IS NOT. The analyst who finds no
 -- document in his inbox concludes there was nothing to report, which is the

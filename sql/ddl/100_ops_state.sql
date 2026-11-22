@@ -1,5 +1,8 @@
 -- The state of each pipeline control, so an incident is announced ONCE.
--- Covers: EC14   Lot: N9   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-N9, B4-L0.
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EC14.
 --
 -- WITHOUT THIS TABLE THE OPERATIONS CHANNEL IS UNUSABLE, and the arithmetic
 -- says it plainly: the real-time DAG runs 1,440 times a day, so a freshness

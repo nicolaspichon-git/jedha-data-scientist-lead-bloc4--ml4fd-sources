@@ -1,8 +1,9 @@
 """Simulating, on historical data, the clock the stream actually hands us.
 
-Covers: EI04, EC24
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EI04, B3-EC24.
 
 WHAT THIS IS FOR. The model was trained on the hour of the PAYMENT. On the
 stream, current_time is the instant our own call returned, and the simulator

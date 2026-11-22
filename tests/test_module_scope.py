@@ -1,8 +1,9 @@
 """A name a module-level function uses but another function imports.
 
-Covers: EC06
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC06.
 
 THE DEFECT THIS EXISTS FOR. tools/rechoose_threshold.py imported `paired`
 inside main() and used it inside render(). Python binds a function-level import

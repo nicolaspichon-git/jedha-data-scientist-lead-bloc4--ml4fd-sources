@@ -1,5 +1,8 @@
 -- Deterministic digest of the exploited layer. Proves a replay is identical.
--- Covers: EC23, EC24   Lot: L6   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-L6, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EC23, B3-EC24.
 --
 -- to_jsonb(t) minus the bookkeeping columns, and not t::text: ingested_at
 -- carries DEFAULT now() and batch_id changes on a replay under a new

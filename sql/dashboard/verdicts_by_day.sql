@@ -1,6 +1,9 @@
 -- The verdicts that fell, day by day, in the declared zone (S6/R10): the
 -- series behind the performance page's chart. Section 3's counts, per day.
--- Covers: EE04, EI02   Lot: R10   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R10, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EE04, B3-EI02.
 --
 -- The day is label_ts's in the DECLARED zone, passed as a parameter: the
 -- session's zone is UTC in the postgres image, and a verdict received at 00:30

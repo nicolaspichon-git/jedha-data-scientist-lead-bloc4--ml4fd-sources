@@ -1,6 +1,11 @@
 """Collecting the stream. No network, no database: the decode, the text
 contract, the clock bound and the failure handling are all pure.
 
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+
 The payload used throughout is a REAL response, observed on 2026-11-16."""
 import json
 

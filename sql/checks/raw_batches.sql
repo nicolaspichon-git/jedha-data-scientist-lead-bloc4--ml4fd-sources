@@ -1,5 +1,8 @@
 -- What the raw zone holds, by batch.
--- Covers: EC12, EC23   Lot: L7   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-L7, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC12, B3-EC23.
 --
 -- THE RULE THIS FILE EXISTS TO HOLD: aggregate BEFORE joining.
 --

@@ -1,8 +1,9 @@
 """The journal of the reports, and the mornings it proves are missing.
 
-Covers: EC14, EC23
-Lot: P3
-Competency: C5
+Block: B3, B4.
+Lot: B3-P3, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC14, B3-EC23.
 
 A WRONG REPORT IS SEEN; AN ABSENT ONE IS NOT. The analyst who finds nothing in
 his inbox concludes there was nothing to report. fd_reports turns that silence

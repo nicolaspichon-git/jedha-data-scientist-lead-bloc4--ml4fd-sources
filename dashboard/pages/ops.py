@@ -1,8 +1,9 @@
 """The operations channel: what it was told, and when (R9).
 
-Covers: EC14, EC17
-Lot: R9
-Competency: C4
+Block: B3, B4.
+Lot: B3-R9, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC14, B3-EC17.
 
 Reads fd_ops_notifications, the journal notify_ops writes after each message
 it sends -- whatever the channel, log or file. ml4fd/dashboard.ops_view()

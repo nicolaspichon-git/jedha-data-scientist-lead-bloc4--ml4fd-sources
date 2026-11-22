@@ -1,16 +1,18 @@
-"""L4: the monitoring of the model in service, and the retraining it asks for.
+"""B4-L4: the monitoring of the model in service, and the retraining it asks for.
 
-Covers: EC33, EC38, EC39, EC40, EC42, EC44, EC45   Lot: L4
-Competency: C5, C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C5, B4-C6.
+Covers: B4-EC33, B4-EC38, B4-EC39, B4-EC40, B4-EC42, B4-EC44, B4-EC45.
 
-C5 AND NOT ONLY C6, corrected 2026-11-20. The requirements document
-files EC33 -- the trigger policy -- under C5, and this file exercises
+B4-C5 AND NOT ONLY B4-C6, corrected 2026-11-20. The requirements document
+files EC33 -- the trigger policy -- under B4-C5, and this file exercises
 retraining_due, which IS that policy: the alert that must not trigger, the
-cooldown, the unanswered alert. Declaring C6 alone made the matrix flag the
+cooldown, the unanswered alert. Declaring B4-C6 alone made the matrix flag the
 mark, and the matrix was right. Monitoring raises the alert, retraining
 answers it; the file sits on both sides of that line and now says so.
 
-WHAT THESE TESTS ARE FOR. The whole policy of C6 is a set of comparisons, and
+WHAT THESE TESTS ARE FOR. The whole policy of B4-C6 is a set of comparisons, and
 a live run almost never produces the interesting ones: a stream that has not
 drifted gives an ok on every control, every hour, for ever. So the cases worth
 guarding -- the floor crossed, the window too thin to judge, the alert that
@@ -449,7 +451,7 @@ def test_a_row_carries_the_window_the_tool_and_the_version():
 def test_the_row_names_match_the_insert_file():
     """The parameters of the INSERT and the keys of row() must be the same set,
     or psycopg raises on a missing key at the first real run -- which is the
-    class of defect that cost the gate of L3 a KeyError on is_fraud."""
+    class of defect that cost the gate of B4-L3 a KeyError on is_fraud."""
     text = (ROOT / "sql" / "monitoring" / "record_measurement.sql").read_text(
         encoding="utf-8")
     named = set(re.findall(r"%\((\w+)\)s", text))
@@ -606,7 +608,7 @@ def test_a_declared_feature_the_window_does_not_carry_is_skipped():
     assert list(out.columns) == ["amt"]
 
 
-# --- L4: which columns the drift is measured on, and why not all of them ---
+# --- B4-L4: which columns the drift is measured on, and why not all of them ---
 
 SERVED = ("amt", "category", "f_tx_count", "f_avg_amount",
           "f_home_distance_km")

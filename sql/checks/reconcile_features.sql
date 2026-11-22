@@ -1,5 +1,8 @@
 -- Agreement between the two computation modes. MUST return zero rows.
--- Covers: EE07   Lot: L4   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-L4, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EE07.
 --
 -- STRATIFIED, not random, and that is the whole point of this file.
 --

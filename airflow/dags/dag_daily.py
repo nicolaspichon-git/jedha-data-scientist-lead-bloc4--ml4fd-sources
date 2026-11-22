@@ -1,8 +1,9 @@
 """S4 / P4: the morning report, one run a day.
 
-Covers: EE04, EE06, EI04, EI06, EC09, EC14
-Lot: P4
-Competency: C1, C3, C4
+Block: B3, B4.
+Lot: B3-P4, B4-L0.
+Competency: B3-C1, B3-C3, B3-C4.
+Covers: B3-EE04, B3-EE06, B3-EI04, B3-EI06, B3-EC09, B3-EC14.
 
 THE ONLY DAG OF THIS PROJECT WHERE catchup=True, and that is a consequence of
 the two axes of time rather than a convenience. A missing morning must be
@@ -71,9 +72,10 @@ def _mark_failed(context) -> None:
     is still RUNNING, so a failure after close_run cannot overwrite a recorded
     success.
 
-    Covers: EC14
-    Lot: P4
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-P4, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EC14.
     """
     run_id = str(context.get("run_id", "?"))
     try:
@@ -111,9 +113,10 @@ def daily():
         """Open the pipeline journal. Under fd_ingest: the journal is the
         pipeline's, not the report's.
 
-        Covers: EC14
-        Lot: P4
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-P4, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC14.
         """
         from airflow.operators.python import get_current_context
 
@@ -133,9 +136,10 @@ def daily():
         is what makes a catch-up produce the document of its own day. See the
         module docstring for why the covered day is not the interval.
 
-        Covers: EE04, EE06, EI04
-        Lot: P4
-        Competency: C2, C3
+        Block: B3, B4.
+        Lot: B3-P4, B4-L0.
+        Competency: B3-C2, B3-C3.
+        Covers: B3-EE04, B3-EE06, B3-EI04.
         """
         from airflow.operators.python import get_current_context
 
@@ -177,9 +181,10 @@ def daily():
     def close_run(opened: dict, produced: dict) -> dict:
         """Close the journal as a success. No counts: see the module docstring.
 
-        Covers: EC14
-        Lot: P4
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-P4, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC14.
         """
         from ml4fd import db, runs
 

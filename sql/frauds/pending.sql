@@ -1,5 +1,8 @@
 -- The alerts not yet notified, oldest first.
--- Covers: EI05   Lot: N5   Competency: C3
+-- Block: B3, B4.
+-- Lot: B3-N5, B4-L0.
+-- Competency: B3-C3.
+-- Covers: B3-EI05.
 --
 -- NO MAXIMUM ATTEMPT COUNT. An alert abandoned after N failures is a fraud
 -- nobody is told about, and the table would hold it looking settled. So every

@@ -1,8 +1,9 @@
-"""L5: the scoring service's logic, exercised without a web framework.
+"""B4-L5: the scoring service's logic, exercised without a web framework.
 
-Covers: EC15, EC16, EC19, EC20, EC21
-Lot: L5
-Competency: C2, C3
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C2, B4-C3.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
 
 WHAT THESE TESTS ARE FOR. The refusals are the branches a live call almost
 never produces -- a caller sending a naive timestamp, an amount above what the
@@ -51,7 +52,7 @@ def request(**over):
     return payload
 
 
-# --- the refusals, which is what EC20 asks for -------------------------------
+# --- the refusals, which is what B4-EC20 asks for -------------------------------
 
 def test_a_complete_request_has_no_problem():
     assert serve.problems(request(), MAX_AMOUNT) == []
@@ -100,7 +101,7 @@ def test_a_coordinate_outside_the_globe_is_refused():
 
 
 def test_the_problem_names_the_field_and_what_was_received():
-    """"requete non conforme" names nothing. EC20 asks for an explicit error,
+    """"requete non conforme" names nothing. B4-EC20 asks for an explicit error,
     so the sentence carries the field, the value and the expectation."""
     found = serve.problems(request(amt="beaucoup"), MAX_AMOUNT)[0]
     assert "amt" in found and "beaucoup" in found
@@ -142,7 +143,7 @@ def test_the_card_number_never_leaves_the_request():
 
 def test_the_home_location_becomes_a_distance():
     """A distance describes a circle around the merchant, not a point -- the
-    minimisation EC17 allows."""
+    minimisation B4-EC17 allows."""
     call = serve.anonymous(request(), PEPPER)
     for field in ("home_lat", "home_long", "merch_lat", "merch_long"):
         assert field not in call
@@ -255,7 +256,7 @@ def test_the_decision_carries_what_answered_it():
     assert decision["threshold"] == 0.93
 
 
-# --- the sentence, which is what EC15 asks for -------------------------------
+# --- the sentence, which is what B4-EC15 asks for -------------------------------
 
 def test_the_decision_is_also_a_sentence():
     """"Restituer la sortie du modele sous une forme exploitable par une
@@ -289,7 +290,7 @@ def test_the_figures_stay_beside_the_sentence_and_are_not_replaced_by_it():
                              "model_version", "recipe_digest"}
 
 
-# --- the health endpoint, which is what EC21 asks for ------------------------
+# --- the health endpoint, which is what B4-EC21 asks for ------------------------
 
 def test_the_health_check_announces_the_version_it_serves():
     """A service that answers "ok" without saying what it serves cannot be
@@ -370,7 +371,7 @@ def test_the_recorded_call_names_every_column_the_table_requires():
     assert required <= named, sorted(required - named)
 
 
-# --- L5: the batch the pipeline sends ----------------------------------------
+# --- B4-L5: the batch the pipeline sends ----------------------------------------
 
 def batch_rows(n=3):
     return [dict(row(), txn_id="t%d" % i) for i in range(n)]

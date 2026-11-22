@@ -1,8 +1,9 @@
 """History features: drives both computation modes and proves they agree.
 
-Covers: EE07
-Lot: L4
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-L4, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EE07.
 
 One definition, expressed twice, and a test that proves the equality:
   - real time : sql/functions/fd_client_features.sql   (per row)
@@ -51,9 +52,10 @@ def backfill(conn: "psycopg.Connection") -> int:
     the values of rows that were already stored. Deterministic given the data,
     therefore replayable (EC23).
 
-    Covers: EE07
-    Lot: L4
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-L4, B4-L0.
+    Competency: B3-C2.
+    Covers: B3-EE07.
     """
     rows = db.execute_file(conn, BACKFILL_SQL)
     log.info("backfill: %d row(s) updated", rows)
@@ -68,9 +70,10 @@ def batch_is_latest(conn: "psycopg.Connection", batch_id) -> tuple[int, object]:
     current_time and is therefore later than everything stored -- true today,
     and nothing in the schema enforces it.
 
-    Covers: EE07
-    Lot: N3
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-N3, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EE07.
     """
     rows = db.query_file(conn, IS_LATEST_SQL, batch_id=batch_id)
     return (rows[0][0], rows[0][1]) if rows else (0, None)
@@ -84,9 +87,10 @@ def apply_batch(conn: "psycopg.Connection", batch_id) -> int:
     -- the values would simply be wrong, which is the failure mode this whole
     lot exists to avoid.
 
-    Covers: EE07, EI03
-    Lot: N3
-    Competency: C2, C5
+    Block: B3, B4.
+    Lot: B3-N3, B4-L0.
+    Competency: B3-C2, B3-C5.
+    Covers: B3-EE07, B3-EI03.
     """
     later, offender = batch_is_latest(conn, batch_id)
     if later:
@@ -124,9 +128,10 @@ def coverage(conn: "psycopg.Connection") -> dict:
 def reconcile(conn: "psycopg.Connection") -> list[tuple]:
     """Confront both modes over the stratified sample. MUST return [].
 
-    Covers: EE07
-    Lot: L4
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-L4, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EE07.
     """
     rows = db.query_file(conn, RECONCILE_SQL)
     if rows:

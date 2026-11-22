@@ -1,5 +1,8 @@
 -- Which of these transaction identifiers exist in the exploited layer.
--- Covers: EC14, EC23   Lot: N6   Competency: C3
+-- Block: B3, B4.
+-- Lot: B3-N6, B4-L0.
+-- Competency: B3-C3.
+-- Covers: B3-EC14, B3-EC23.
 --
 -- WHY THIS EXISTS. fd_ground_truth.txn_id REFERENCES fd_transactions(txn_id),
 -- so a verdict for a line that never became a transaction is refused by the

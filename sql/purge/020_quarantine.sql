@@ -1,5 +1,8 @@
 -- Delete ONE SLICE of ONE batch's quarantined records.
--- Covers: EC16, EC19   Lot: Q4   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-Q4, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EC16, B3-EC19.
 --
 -- WHY THIS STORE IS PURGED AT ALL, and at the same duration as the raw zone.
 -- fd_quarantine.payload is the raw payload of a REJECTED record: the same

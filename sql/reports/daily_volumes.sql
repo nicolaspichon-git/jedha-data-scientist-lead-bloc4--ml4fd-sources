@@ -1,5 +1,8 @@
 -- Section 1 of the morning report: yesterday's payments, on the PAYMENT axis.
--- Covers: EE04, EI08   Lot: P1   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-P1, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EE04, B3-EI08.
 --
 -- ONE STATEMENT, THREE READINGS, by GROUPING SETS: the total, the breakdown by
 -- category and the breakdown by local hour. Three separate queries would let

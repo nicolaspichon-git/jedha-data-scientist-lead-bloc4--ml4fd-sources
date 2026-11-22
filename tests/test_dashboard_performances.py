@@ -1,8 +1,9 @@
 """R10: the performances page, and the reference of M5 kept in the database.
 
-Covers: EE04, EI02, EI03, EC23
-Lot: R10
-Competency: C2, C4
+Block: B3, B4.
+Lot: B3-R10, B4-L0.
+Competency: B3-C2, B3-C4.
+Covers: B3-EE04, B3-EI02, B3-EI03, B3-EC23.
 
 The page is section 3 of the report over a period, compared with what M5
 measured -- which fit_model now copies into fd_datasets beside run.json, so a

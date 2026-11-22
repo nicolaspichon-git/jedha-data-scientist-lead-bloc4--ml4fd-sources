@@ -1,6 +1,8 @@
 -- The training set, at a cut-off, with its temporal split.
--- Covers: EI02, EI04, EE07   Lot: M3 (revu en L4, 20/11/2026)
--- Competency: C2, C5
+-- Block: B3, B4.
+-- Lot: B3-M3 (revu en L4, 20/11/2026), B4-L0.
+-- Competency: B3-C2, B3-C5.
+-- Covers: B3-EI02, B3-EI04, B3-EE07.
 --
 -- THE FILTER THAT MATTERS: g.label_ts <= %(cut_off)s, and NOT t.txn_ts.
 --

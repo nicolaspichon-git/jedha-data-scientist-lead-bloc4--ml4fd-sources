@@ -1,5 +1,8 @@
 -- The batches of the raw zone whose fingerprint was never recorded.
--- Covers: EC23, EI12   Lot: Q1   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-Q1, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC23, B3-EI12.
 --
 -- READ ONLY. A batch listed here cannot be purged: the purge refuses it, and
 -- says so. `fd-manager digests` lists them, and -Apply records them.

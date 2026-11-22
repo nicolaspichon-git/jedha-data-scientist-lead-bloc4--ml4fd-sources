@@ -1,8 +1,9 @@
 """Acquisition of the historical CSV.
 
-Covers: EI04, EI05
-Lot: L1
-Competency: C2
+Block: B3, B4.
+Lot: B3-L1, B4-L0.
+Competency: B3-C2.
+Covers: B3-EI04, B3-EI05.
 
 Local cache with a checksum: re-downloading 143 MB on every debugging attempt is
 slow, and makes attempts irreproducible if the source moves. The checksum is not

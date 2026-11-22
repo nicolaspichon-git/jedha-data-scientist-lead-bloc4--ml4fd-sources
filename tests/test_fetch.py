@@ -1,4 +1,10 @@
-"""Reading the CSV: the properties that typing must not destroy later."""
+"""Reading the CSV: the properties that typing must not destroy later.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 import hashlib
 
 import pytest

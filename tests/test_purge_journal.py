@@ -1,8 +1,9 @@
 """S5 / Q6: the journal of the purges, and the acceptance of S5.
 
-Covers: EC14, EC16, EC18, EC19, EC23, EC27
-Lot: Q6
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-Q6, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EC14, B3-EC16, B3-EC18, B3-EC19, B3-EC23, B3-EC27.
 
 "UNE DUREE NON APPLIQUEE N'EST PAS UNE POLITIQUE" (D1, annexe B). governance.yml
 claims that personal data leaves at ninety days; what turns that claim into a

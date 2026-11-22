@@ -1,5 +1,8 @@
 -- Does the raw zone already hold the historical CSV?
--- Covers: EC23, EC24   Lot: L1   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-L1, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EC23, B3-EC24.
 --
 -- THE one definition of "the history is already in the raw zone". preflight
 -- reads it to refuse a second bootstrap; nothing else may ask the question its

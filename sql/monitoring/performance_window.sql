@@ -1,5 +1,8 @@
 -- The performance of the model in service, on the knowledge axis (EC40, EC41).
--- Covers: EC40, EC41   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC40, B4-EC41.
 --
 -- ON label_ts AND NEVER ON txn_ts, which is the decision of
 -- sql/reports/daily_verdicts.sql, taken here for the same reason: the verdicts
@@ -19,7 +22,7 @@
 -- triggered by that figure would answer the wrong question, since no model can
 -- refit its way out of a ceiling.
 --
--- The trigger of C6 therefore reads recall_flagged. recall_alerted is measured
+-- The trigger of B4-C6 therefore reads recall_flagged. recall_alerted is measured
 -- beside it as the diagnostic: the two apart means the capacity is binding,
 -- the two together means the model is.
 --

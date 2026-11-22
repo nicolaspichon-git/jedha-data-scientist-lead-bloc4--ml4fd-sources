@@ -1,8 +1,9 @@
 """The shape of the real-time DAG, read from its source.
 
-Covers: EI06, EC09, EC14, EC23
-Lot: N7
-Competency: C5
+Block: B3, B4.
+Lot: B3-N7, B4-L0.
+Competency: B3-C5.
+Covers: B3-EI06, B3-EC09, B3-EC14, B3-EC23.
 
 Airflow is not installed in the authoring environment, so this reads the file.
 A weaker test than running the DAG, and still the one that catches what matters

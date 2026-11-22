@@ -1,8 +1,9 @@
 """The gate S2 passes through before it trains on anything.
 
-Covers: EC09, EC14
-Lot: M1
-Competency: C3, C5
+Block: B3, B4.
+Lot: B3-M1, B4-L0.
+Competency: B3-C3, B3-C5.
+Covers: B3-EC09, B3-EC14.
 
 Two kinds of health, and the second is the one nobody thinks of.
 
@@ -95,9 +96,10 @@ def verdict(report: WindowReport, min_positives: int) -> list[str]:
     A list rather than the first reason found: knowing that a window is both
     unlabelled AND incomplete is more useful than learning it twice.
 
-    Covers: EC09, EC14
-    Lot: M1
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-M1, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC09, B3-EC14.
     """
     reasons: list[str] = []
 

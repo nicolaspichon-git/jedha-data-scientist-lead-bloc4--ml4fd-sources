@@ -1,8 +1,9 @@
 """The dry run of the purge, by hand. Nothing is deleted.
 
-Covers: EC26, EI13
-Lot: Q2
-Competency: C5
+Block: B3, B4.
+Lot: B3-Q2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC26, B3-EI13.
 
 WHY A RUNNER OF ITS OWN. S5 is the only destructive process of the project, and
 at 90 days of retention with three batches loaded yesterday the real purge
@@ -11,7 +12,7 @@ tried is one that is discovered in production -- so this shows what would go,
 on today's boundary or on a chosen one, and shows the refusals and the guard.
 
 --before OVERRIDES THE BOUNDARY, for every store at once. It is a tool of
-demonstration and of trial, not a parameter of production: the DAG of Q5 does
+demonstration and of trial, not a parameter of production: the DAG of B3-Q5 does
 not expose it, because a parameter of a demonstration left in an orchestrator
 ends up being used.
 
@@ -78,7 +79,7 @@ def main(argv=None) -> int:
     print(purge.render(report))
     print()
     if report["rows"]:
-        print("Pour supprimer : .\\fd-manager.ps1 purge -Apply  (lot Q3)")
+        print("Pour supprimer : .\\fd-manager.ps1 purge -Apply")
     return 0
 
 

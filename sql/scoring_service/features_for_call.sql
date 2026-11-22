@@ -1,5 +1,8 @@
 -- The feature row of one API call, computed where the definition lives.
--- Covers: EC16, EE07   Lot: L5   Competency: C2, C3
+-- Block: B4.
+-- Lot: B4-L5.
+-- Competency: B4-C2, B4-C3.
+-- Covers: B4-EC14, B4-EC16, B3-EE07.
 --
 -- IN SQL AND NOT IN PYTHON, which is the one decision of this file. The batch
 -- path reads sql/scoring/rows_to_score.sql, whose txn_hour and txn_weekday are

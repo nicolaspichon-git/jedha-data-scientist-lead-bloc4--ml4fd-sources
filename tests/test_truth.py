@@ -1,4 +1,10 @@
-"""Ground truth: the verdict, its knowledge date, and the blind band."""
+"""Ground truth: the verdict, its knowledge date, and the blind band.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 import datetime as dt
 
 import pytest

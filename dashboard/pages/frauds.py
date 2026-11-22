@@ -1,8 +1,9 @@
 """The alerts of a calendar period, as the analyst reviews them.
 
-Covers: EE03, EC17
-Lot: R3, R8
-Competency: C4
+Block: B3, B4.
+Lot: B3-R3, B3-R8, B4-L0.
+Competency: B3-C4.
+Covers: B3-EE03, B3-EC17.
 
 The rows are those of the morning reports of the same days -- same query, same
 windows end to end, same order -- so the page and the documents never disagree.

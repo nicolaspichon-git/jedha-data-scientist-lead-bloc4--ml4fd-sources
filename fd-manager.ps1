@@ -355,8 +355,8 @@ switch ($Task) {
             @{ n = 'drift';        d = 'the injected amount drift: show it, set it (-Factor N), lift it (-Off)' }
             @{ n = 'replay';       d = 'replay a batch: .\fd-manager.ps1 replay -Batch <uuid>' }
             @{ n = 'forget';       d = 'forget a failed batch: forget -Batch <uuid> [-Apply]' }
-            @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8501) [-Stop]' }
-            @{ n = 'scoring-service'; d = 'start the scoring service (http://localhost:5001/docs) [-Stop]' }
+            @{ n = 'dashboard';    d = 'start the dashboard (http://localhost:8502) [-Stop]' }
+            @{ n = 'scoring-service'; d = 'start the scoring service (http://localhost:8012/docs) [-Stop]' }
             @{ n = 'tasklog';      d = 'show the last log: .\fd-manager.ps1 tasklog -TaskId backfill_features' }
             @{ n = 'dag-test';     d = 'run one task live: .\fd-manager.ps1 dag-test -TaskId preflight' }
             @{ n = 'test';         d = 'unit tests, with no database and no Airflow' }
@@ -502,20 +502,20 @@ switch ($Task) {
         Write-Host ""
         & docker compose ps
         Write-Host ""
-        Write-Host "Airflow    : http://localhost:8080   (admin / admin)" -ForegroundColor Cyan
-        Write-Host "MLflow     : http://localhost:5000" -ForegroundColor Cyan
-        Write-Host "Streamlit  : http://localhost:8501   (fd_dashboard, lecture seule)" -ForegroundColor Cyan
+        Write-Host "Airflow    : http://localhost:8082   (admin / admin)" -ForegroundColor Cyan
+        Write-Host "MLflow     : http://localhost:8002" -ForegroundColor Cyan
+        Write-Host "Streamlit  : http://localhost:8502   (fd_dashboard, lecture seule)" -ForegroundColor Cyan
         # THE PUBLISHED PORT AND NOT THE CONTAINER'S. The producer listens on
-        # 4000 and compose publishes 8801 to the loopback; the scheduler reaches
-        # it on producer:4000 inside the network, a browser on 8801 outside.
+        # 4000 and compose publishes 8802 to the loopback; the scheduler reaches
+        # it on producer:4000 inside the network, a browser on 8802 outside.
         # Printing both is the point: confusing the two costs a quarter of an hour.
-        Write-Host "Producer   : http://localhost:8801/current-transactions" -ForegroundColor Cyan
+        Write-Host "Producer   : http://localhost:8802/current-transactions" -ForegroundColor Cyan
         Write-Host "             (producer:4000 depuis les conteneurs)" -ForegroundColor DarkGray
         if (-not $env:FD_DASHBOARD_PASSWORD) {
             Write-Host "  FD_DASHBOARD_PASSWORD est vide : le tableau de bord ne pourra pas se connecter." -ForegroundColor Yellow
             Write-Host "  .\fd-manager.ps1 setup   puis   .\fd-manager.ps1 init" -ForegroundColor Yellow
         }
-        Write-Host "PostgreSQL : localhost:5432" -ForegroundColor Cyan
+        Write-Host "PostgreSQL : localhost:8432" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "Pour consulter la base :  .\fd-manager.ps1 psql"
         Write-Host ""
@@ -677,7 +677,7 @@ switch ($Task) {
             & docker compose exec -T airflow-scheduler bash -c $cmd
         }
         Write-Host ""
-        Write-Host "admin / admin   sur http://localhost:8080" -ForegroundColor Green
+        Write-Host "admin / admin   sur http://localhost:8082" -ForegroundColor Green
         Write-Host ""
     }
 
@@ -1595,7 +1595,7 @@ LIMIT  14;
             & docker compose up -d --build --force-recreate dashboard
         }
         Write-Host ""
-        Write-Host "Tableau de bord : http://localhost:8501" -ForegroundColor Cyan
+        Write-Host "Tableau de bord : http://localhost:8502" -ForegroundColor Cyan
         Write-Host "  connecte en fd_dashboard : lecture de fd_reports, fd_frauds, fd_transactions et quelques autres, rien de plus"
         Write-Host "  journaux :  .\fd-manager.ps1 logs -Service dashboard"
         Write-Host ""
@@ -1635,10 +1635,10 @@ LIMIT  14;
             & docker compose up -d --build --force-recreate scoring-service
         }
         Write-Host ""
-        Write-Host "Service de scoring : http://localhost:5001" -ForegroundColor Cyan
-        Write-Host "  contrat    : http://localhost:5001/openapi.json"
-        Write-Host "  doc lisible: http://localhost:5001/docs"
-        Write-Host "  etat       : http://localhost:5001/health   (dit la version servie)"
+        Write-Host "Service de scoring : http://localhost:8012" -ForegroundColor Cyan
+        Write-Host "  contrat    : http://localhost:8012/openapi.json"
+        Write-Host "  doc lisible: http://localhost:8012/docs"
+        Write-Host "  etat       : http://localhost:8012/health   (dit la version servie)"
         Write-Host "  (scoring-service:5000 depuis les conteneurs)" -ForegroundColor DarkGray
         Write-Host "  connecte en fd_scoring_service : trois colonnes de fd_transactions en lecture," -ForegroundColor DarkGray
         Write-Host "  fd_scoring_service_calls en ajout seul, rien de plus" -ForegroundColor DarkGray
@@ -1860,7 +1860,7 @@ LIMIT  14;
 
         Write-Host ""
         Write-Host "=== L5 : le service de scoring, tel qu'il repond"
-        # On the HOST too: it calls the service on 127.0.0.1:5001.
+        # On the HOST too: it calls the service on 127.0.0.1:8012.
         & python tools/check_l5.py
 
         Write-Host ""
@@ -1925,7 +1925,7 @@ LIMIT  14;
         }
         Invoke-Step 'service de scoring reel (L5)' {
             # On the HOST, like check_s6: there is no Docker inside a container,
-            # and the service answers on 127.0.0.1:5001 here.
+            # and the service answers on 127.0.0.1:8012 here.
             & python tools/check_l5.py
         }
         Invoke-Step 'absence de fuite du verdict' {

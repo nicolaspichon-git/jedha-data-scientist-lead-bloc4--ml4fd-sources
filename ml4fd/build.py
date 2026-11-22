@@ -1,8 +1,9 @@
 """Building the training set, and registering what was built.
 
-Covers: EC05, EC23, EI04
-Lot: M3
-Competency: C1, C2, C5
+Block: B3, B4.
+Lot: B3-M3, B4-L0.
+Competency: B3-C1, B3-C2, B3-C5.
+Covers: B3-EC05, B3-EC23, B3-EI04.
 
 PostgreSQL to Parquet: the transfer between two stores of distinct natures that
 EC05 asks for, and the reason the dataset is an ARTEFACT rather than a transient
@@ -65,9 +66,10 @@ def build(conn: "psycopg.Connection", recipe: datasets.Recipe,
     after two files had been written -- and a message naming the empty side is
     more use than a constraint violation.
 
-    Covers: EC05, EC23
-    Lot: M3
-    Competency: C2, C5
+    Block: B3, B4.
+    Lot: B3-M3, B4-L0.
+    Competency: B3-C2, B3-C5.
+    Covers: B3-EC05, B3-EC23.
     """
     import pandas as pd
 
@@ -147,9 +149,10 @@ def build_or_reuse(conn: "psycopg.Connection", recipe: datasets.Recipe,
     This is what makes the construction idempotent (EC23) and what gives
     versioning a purpose: one versions in order to find again.
 
-    Covers: EC23
-    Lot: M2
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-M2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC23.
     """
     datasets.assert_cut_off_usable(recipe.cut_off, label_horizon,
                                    recipe.include_stream)

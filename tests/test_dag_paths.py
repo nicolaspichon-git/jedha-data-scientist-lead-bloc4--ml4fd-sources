@@ -1,5 +1,10 @@
 """No tool decides on its own where the DAG files are.
 
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+
 The repo keeps them in airflow/dags; docker-compose.yml mounts that directory
 at /opt/airflow/dags, which is NOT under the project root the tools are given
 inside the scheduler. A tool that builds the path from its root therefore works

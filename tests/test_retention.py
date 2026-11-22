@@ -11,9 +11,10 @@ volume added to docker-compose.yml, must appear in governance.yml's retention
 section -- as a duration or as a store that is kept with its reason -- or a test
 here fails. Nobody has to remember.
 
-Covers: EC16, EC19, EI12
-Lot: Q0
-Competency: C1, C5
+Block: B3, B4.
+Lot: B3-Q0, B4-L0.
+Competency: B3-C1, B3-C5.
+Covers: B3-EC16, B3-EC19, B3-EI12.
 """
 from __future__ import annotations
 

@@ -1,5 +1,8 @@
 -- Give fd_scoring_service its password, from .env. Run by `fd-manager init`.
--- Covers: EC22   Lot: L5   Competency: C3, C5
+-- Block: B4.
+-- Lot: B4-L5.
+-- Competency: B4-C3, B4-C5.
+-- Covers: B4-EC22.
 --
 -- The same arrangement as dashboard_password.sql, for the same reasons, and
 -- that file carries the full reasoning: kept out of sql/ddl because everything

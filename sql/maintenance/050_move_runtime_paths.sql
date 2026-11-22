@@ -1,6 +1,9 @@
 -- Carry the RECORDED paths across the move of reports/ and datasets/ under
 -- runtime/ (S6/R13).
--- Covers: EC23, EC24   Lot: R13   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R13, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC23, B3-EC24.
 --
 -- WHY A ROW HAS TO FOLLOW A DIRECTORY. Two tables store an absolute path, and
 -- both are read to find a file that must be there:

@@ -1,8 +1,9 @@
 """The state of the chain, as the pipeline owner reads it.
 
-Covers: EC14
-Lot: R6
-Competency: C4
+Block: B3, B4.
+Lot: B3-R6, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC14.
 
 The controls are N9's own -- health.check(), what raise_and_notify_ops
 runs every minute -- not a second set. ml4fd/dashboard.operations_view()

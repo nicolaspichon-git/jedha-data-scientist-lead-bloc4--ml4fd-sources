@@ -1,8 +1,9 @@
 """Validation, in two deliberately separated classes.
 
-Covers: EC20, EC21
-Lot: L2
-Competency: C5
+Block: B3, B4.
+Lot: B3-L2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC20, B3-EC21.
 
 EC20 looks at one field at a time; EC21 looks at the relation between fields of
 one record. fd_quarantine.reason_class keeps that separation visible in the data,
@@ -123,9 +124,10 @@ class SourceProfile:
                       which is two real events. Rejecting it would throw away
                       legitimate transactions.
 
-    Covers: EC20, EC21
-    Lot: N2
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-N2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC20, B3-EC21.
     """
     name: str
     mandatory: tuple[str, ...]
@@ -274,9 +276,10 @@ def check_clock(record: dict[str, str], line_no: int, our_ms: int,
     suspend while CLOCK_REALTIME does -- and not the server. The remedy is the
     same either way, so this function attributes no cause.
 
-    Covers: EC20, EC26
-    Lot: N2
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-N2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC20, B3-EC26.
     """
     raw = record.get("current_time", "").strip()
     if not raw:
@@ -306,9 +309,10 @@ def check_fields(record: dict[str, str], line_no: int, max_amount: float,
     useful with all its reasons, and UNIQUE (batch_id, line_no, reason_code)
     allows several rows for one line.
 
-    Covers: EC20
-    Lot: L2
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-L2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC20.
     """
     out: list[Reject] = []
     def add(code, detail=None):
@@ -366,9 +370,10 @@ def check_record(record: dict[str, str], line_no: int,
     quarantine every row -- which is exactly the trap this signature makes
     explicit rather than hiding.
 
-    Covers: EC21
-    Lot: L2
-    Competency: C5
+   Block: B3, B4.
+    Lot: B3-L2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC21.
     """
     out: list[Reject] = []
     def add(code, detail=None):
@@ -412,9 +417,10 @@ def profile_gap(records: Iterable[dict[str, str]], systematic_share: float,
       "sporadic"   -- a record defect: quarantine it
       "absent"     -- the two columns agree
 
-    Covers: EC21
-    Lot: L2
-    Competency: C1, C5
+   Block: B3, B4.
+    Lot: B3-L2, B4-L0.
+    Competency: B3-C1, B3-C5.
+    Covers: B3-EC21.
     """
     gaps: collections.Counter[int] = collections.Counter()
     seen = 0
@@ -453,9 +459,10 @@ def validate_batch(records: Iterable[tuple[int, dict[str, str]]],
     Uniqueness cannot be judged one record at a time, so it is held here rather
     than in check_fields().
 
-    Covers: EC20, EC21
-    Lot: L2
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-L2, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC20, B3-EC21.
     """
     seen: set[str] = set()
     for line_no, record in records:

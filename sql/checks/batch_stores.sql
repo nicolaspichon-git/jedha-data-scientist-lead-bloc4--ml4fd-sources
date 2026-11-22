@@ -1,6 +1,9 @@
 -- What one batch holds, store by store. Needs fd_ingest: fd_purge may not read
 -- fd_transactions, by design.
--- Covers: EC18, EC23   Lot: Q7   Competency: C4, C5
+-- Block: B3, B4.
+-- Lot: B3-Q7, B4-L0.
+-- Competency: B3-C4, B3-C5.
+-- Covers: B3-EC18, B3-EC23.
 --
 -- SCALAR SUBQUERIES, NO JOIN. batch_id is a key of none of these tables; a
 -- join on it is one-to-many, and an aggregate taken after one counts rows per

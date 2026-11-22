@@ -1,8 +1,9 @@
 """The four queries of the morning report, read as text.
 
-Covers: EE04, EI04, EI08, EC17
-Lot: P1
-Competency: C5
+Block: B3, B4.
+Lot: B3-P1, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE04, B3-EI04, B3-EI08, B3-EC17.
 
 PostgreSQL is not in the authoring environment, so these read the SQL. A
 weaker test than running it, and still the one that catches what matters here:

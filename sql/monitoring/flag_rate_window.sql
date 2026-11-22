@@ -1,5 +1,8 @@
 -- The flag rate of the model over a window, on the payment axis (EC39).
--- Covers: EC39   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC39.
 --
 -- THE PREDICTION DRIFT THAT HAS A CONSEQUENCE. A score distribution can move
 -- without changing anything an operator feels; the share of transactions the

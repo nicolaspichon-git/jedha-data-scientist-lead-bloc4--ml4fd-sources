@@ -1,8 +1,9 @@
 """R7: the rejections page -- F07.3, counts only, a closed vocabulary.
 
-Covers: EC15, EC22
-Lot: R7
-Competency: C4
+Block: B3, B4.
+Lot: B3-R7, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC15, B3-EC22.
 
 fd_dashboard reads five columns of the quarantine. Neither payload -- the raw
 rejected record -- nor reason_detail, which for a duplicate IS the trans_num.

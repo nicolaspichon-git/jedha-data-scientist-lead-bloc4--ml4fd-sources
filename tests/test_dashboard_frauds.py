@@ -1,8 +1,9 @@
 """R3, R8, R11: the frauds page -- the alerts, and their notification.
 
-Covers: EE03, EC17
-Lot: R3
-Competency: C4
+Block: B3, B4.
+Lot: B3-R3, B4-L0.
+Competency: B3-C4.
+Covers: B3-EE03, B3-EC17.
 
 The DAY shown is a calendar day in the declared zone, like the report's; the
 CAPACITY is N5's rolling 24 hours. A capacity reached is a decision of the

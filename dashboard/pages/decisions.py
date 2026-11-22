@@ -1,12 +1,13 @@
 """The decisions served, the pipeline's and the third parties', as one journal.
 
-Covers: EC16, EC19
-Lot: L5
-Competency: C3
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C3.
+Covers: B4-EC16, B4-EC19.
 
 Reads fd_scoring_decisions, the view 195_scoring_decisions.sql puts over
 fd_scores and fd_scoring_service_calls. For a day the view existed and nothing
-read it, which is how a journal becomes decoration: EC19 asks that every call
+read it, which is how a journal becomes decoration: B4-EC19 asks that every call
 and its answer be persisted, and a journal nobody can read is a claim nobody
 can check.
 

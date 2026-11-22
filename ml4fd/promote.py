@@ -1,11 +1,14 @@
 """Whether a newly trained model ever reaches production.
 
-Covers: EC34, EC35, EC36   Lot: L3   Competency: C5
+Block: B4.
+Lot: B4-L3.
+Competency: B4-C5.
+Covers: B4-EC34, B4-EC35, B4-EC36.
 
-REGISTERING IS NOT PROMOTING, and until L3 only the first existed. Every run of
+REGISTERING IS NOT PROMOTING, and until B4-L3 only the first existed. Every run of
 S2 registers a version, and ml4fd/score.py resolved the HIGHEST version number
 -- so a retraining served its own result, better or worse. Automating the
-retraining on top of that, which L4 does, would have automated the serving of
+retraining on top of that, which B4-L4 does, would have automated the serving of
 an unvetted model.
 
 THE DECISION IS A PURE FUNCTION. decide() takes figures and returns a verdict:

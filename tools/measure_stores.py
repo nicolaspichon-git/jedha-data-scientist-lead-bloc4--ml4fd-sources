@@ -4,11 +4,12 @@
     python tools/measure_stores.py            # writes TYPOLOGY.md
     python tools/measure_stores.py --print    # to standard output only
 
-Covers: EC01, EC03
-Lot: L8
-Competency: C1
+Block: B3, B4.
+Lot: B3-L8, B4-L0.
+Competency: B3-C1.
+Covers: B3-EC01, B3-EC03.
 
-Why a script rather than a written table: EC01 asks for the typology of each
+Why a script rather than a written table: B3-EC01 asks for the typology of each
 source and each store, and EC03 for the storage volume per store in steady
 state. Neither can be honestly answered before the data is loaded, and a figure
 typed once drifts the moment a column is added. Measured, they cannot.
@@ -17,7 +18,7 @@ The source is read from the CSV, the stores from the live database. Needs the
 database up and loaded; run it after .\\fd-manager.ps1 load.
 
 Code and comments in English; the generated document stays in French, since it
-is read alongside D0 and D1.
+is read alongside B3-D0 and B3-D1.
 """
 from __future__ import annotations
 
@@ -80,8 +81,8 @@ def render(settings, source, stores, columns) -> str:
     out = ["# Typologie et volumétrie des magasins", "",
            "> Document **généré** par `tools/measure_stores.py`, par la mesure et non "
            "par estimation. Ne pas éditer à la main.",
-           "> Couvre **EC01** (typologie de chaque source et de chaque magasin) et "
-           "**EC03** (volumétrie de stockage par magasin).", "",
+           "> Couvre **B3-EC01** (typologie de chaque source et de chaque magasin) et "
+           "**B3-EC03** (volumétrie de stockage par magasin).", "",
            "## 1. La source", "",
            "| | |", "| --- | --- |",
            "| Fichier | `.local_cache/fraudTest.csv` \\[R3\\] |",
@@ -158,7 +159,7 @@ def main() -> int:
     # fd_ingest and not fd_report, deliberately: fd_report has NO access to
     # fd_raw_events, because the raw payloads still carry names, addresses and
     # cardholder numbers. Granting the reporting role access to measure a row
-    # count would undo what EC17 is for. The measurement reads counts and sizes,
+    # count would undo what B3-EC17 is for. The measurement reads counts and sizes,
     # never contents.
     with db.connect("fd_ingest", settings) as conn:
         with conn.cursor() as cur:

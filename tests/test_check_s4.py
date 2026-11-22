@@ -1,8 +1,9 @@
 """The checker of S4: what it finds, and what it refuses to call verified.
 
-Covers: EC14, EC23, EC27
-Lot: P5
-Competency: C5
+Block: B3, B4.
+Lot: B3-P5, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC14, B3-EC23, B3-EC27.
 
 A CONTROL THAT CANNOT FAIL PROVES NOTHING, so each finding is built here on
 purpose: a document missing from the disk, a document whose bytes no longer
@@ -109,11 +110,11 @@ def _document(tmp_path, day="2026-11-16", text="# rapport\n"):
 def test_a_matching_document_and_matching_counts_pass(tmp_path):
     path, digest = _document(tmp_path)
     rows = _rows(tmp_path, [_row(digest=digest, path=str(path))])
-    assert rows["P3 chaque ligne a son document sur le disque"] \
+    assert rows["B3-P3 chaque ligne a son document sur le disque"] \
         == ("0 absent", "0 absent")
-    assert rows["P3 empreinte du document egale content_digest"] \
+    assert rows["B3-P3 empreinte du document egale content_digest"] \
         == ("0 ecart", "0 ecart")
-    assert rows["P2 les decomptes egalent ce que les requetes rendent"] \
+    assert rows["B3-P2 les decomptes egalent ce que les requetes rendent"] \
         == ("0 divergence", "0 divergence")
 
 
@@ -124,7 +125,7 @@ def test_a_document_missing_from_the_disk_is_caught(tmp_path):
     M8 paid for with a whole dataset."""
     rows = _rows(tmp_path, [_row(digest="a" * 64,
                                  path=str(tmp_path / "absent.md"))])
-    expected, actual = rows["P3 chaque ligne a son document sur le disque"]
+    expected, actual = rows["B3-P3 chaque ligne a son document sur le disque"]
     assert expected == "0 absent"
     assert actual.startswith("1 absent")
     assert "2026-11-16" in actual
@@ -135,7 +136,7 @@ def test_a_document_that_no_longer_matches_its_digest_is_caught(tmp_path):
     version of it. Either way the registry can no longer be trusted."""
     path, _ = _document(tmp_path)
     rows = _rows(tmp_path, [_row(digest="b" * 64, path=str(path))])
-    expected, actual = rows["P3 empreinte du document egale content_digest"]
+    expected, actual = rows["B3-P3 empreinte du document egale content_digest"]
     assert expected == "0 ecart"
     assert actual.startswith("1 ecart")
 
@@ -147,7 +148,7 @@ def test_a_count_that_drifted_is_caught_and_named(tmp_path):
     rows = _rows(tmp_path, [_row(digest=digest, path=str(path), alerts=44)],
                  counts={"n_payments": 7200, "n_alerts": 12,
                          "n_verdicts": 7200, "n_pending": 7200})
-    expected, actual = rows["P2 les decomptes egalent ce que les requetes rendent"]
+    expected, actual = rows["B3-P2 les decomptes egalent ce que les requetes rendent"]
     assert expected == "0 divergence"
     assert "n_alerts" in actual
     assert "44" in actual and "12" in actual
@@ -162,7 +163,7 @@ def test_a_window_that_cannot_be_rebuilt_is_a_criterion_and_not_a_traceback(
     rows = _rows(tmp_path, [_row(
         digest=digest, path=str(path),
         known_at=dt.datetime(2026, 11, 16, 12, tzinfo=PARIS))])
-    expected, actual = rows["P3 fenetre coherente avec la journee couverte"]
+    expected, actual = rows["B3-P3 fenetre coherente avec la journee couverte"]
     assert expected == "0 impossible"
     assert actual.startswith("1 impossible")
     assert "precedes the end" in actual
@@ -188,33 +189,33 @@ def test_an_empty_journal_is_unverified_and_never_passed(tmp_path):
     expected, actual = rows["info empreinte du document contre fd_reports"]
     assert expected == "mesure"
     assert "NON VERIFIE" in actual
-    assert "P3 empreinte du document egale content_digest" not in rows
+    assert "B3-P3 empreinte du document egale content_digest" not in rows
 
 
 # --- the declarations --------------------------------------------------------
 
 def test_the_cadence_of_the_dag_is_held_to_the_declaration(tmp_path):
     rows = _rows(tmp_path, [])
-    assert rows["P4 cadence de dag_daily"] == ("0 6 * * *", "0 6 * * *")
+    assert rows["B3-P4 cadence de dag_daily"] == ("0 6 * * *", "0 6 * * *")
 
 
 def test_a_dag_that_stopped_catching_up_is_caught(tmp_path):
     """catchup=True is the exception of this project and must stay deliberate:
     without it a missed morning is lost for good."""
     rows = _rows(tmp_path, [])
-    assert rows["P4 dag_daily rattrape les matins manques"] == ("oui", "oui")
+    assert rows["B3-P4 dag_daily rattrape les matins manques"] == ("oui", "oui")
 
 
 def test_a_cadence_that_drifts_from_governance_fails(tmp_path):
     rows = _rows(tmp_path, [], report_schedule="37 6 * * *")
-    expected, actual = rows["P4 cadence de dag_daily"]
+    expected, actual = rows["B3-P4 cadence de dag_daily"]
     assert expected == "37 6 * * *"
     assert actual == "0 6 * * *"
 
 
 def test_a_report_root_outside_the_project_is_caught(tmp_path):
     rows = _rows(tmp_path, [], report_root="/tmp/ailleurs")
-    expected, actual = rows["P2 racine des rapports declaree"]
+    expected, actual = rows["B3-P2 racine des rapports declaree"]
     assert expected == "sous le projet"
     assert actual.startswith("AILLEURS")
 
@@ -223,7 +224,7 @@ def test_a_report_root_outside_the_project_is_caught(tmp_path):
 
 def test_an_unreadable_manifest_is_reported_and_not_hidden(tmp_path):
     rows = _rows(tmp_path, [], reference=None)
-    assert "INDISPONIBLE" in rows["info reference de M5"][1]
+    assert "INDISPONIBLE" in rows["info reference de B3-M5"][1]
 
 
 def test_the_reference_figures_are_shown_when_the_manifest_reads(tmp_path):
@@ -232,8 +233,8 @@ def test_the_reference_figures_are_shown_when_the_manifest_reads(tmp_path):
         "precision": 0.5292096219931272, "alerts_per_day": 41.61,
         "base_rate_test": 0.004072})
     assert rows["info recette de reference"][1] == "8813b096e2e4"
-    assert rows["info rappel mesure par M5 sur le jeu de test"][1] == "0.7512"
-    assert rows["info alertes/jour prevues par M6"][1] == "41.6"
+    assert rows["info rappel mesure par B3-M5 sur le jeu de test"][1] == "0.7512"
+    assert rows["info alertes/jour prevues par B3-M6"][1] == "41.6"
 
 
 # --- the exit code follows the verdict ---------------------------------------
@@ -276,7 +277,7 @@ def test_a_block_that_returns_early_does_not_swallow_the_rest(tmp_path):
     assert "info rapports enregistres sur 30 jours" in rows
     # ...and everything declared AFTER it is reached.
     assert "info recette de reference" in rows
-    assert "info rappel mesure par M5 sur le jeu de test" in rows
+    assert "info rappel mesure par B3-M5 sur le jeu de test" in rows
 
 
 # --- the layout of the container ----------------------------------------------
@@ -304,16 +305,16 @@ def test_the_dag_is_found_where_the_container_mounts_it(tmp_path, monkeypatch):
     with this whole file green."""
     project, _ = _container(tmp_path, monkeypatch)
     rows = _rows(tmp_path, [], root=project)
-    assert rows["P4 cadence de dag_daily"] == ("0 6 * * *", "0 6 * * *")
-    assert rows["P4 dag_daily rattrape les matins manques"] == ("oui", "oui")
-    assert "P4 DAG dag_daily" not in rows
-    assert "P4 repertoire des DAG" not in rows
+    assert rows["B3-P4 cadence de dag_daily"] == ("0 6 * * *", "0 6 * * *")
+    assert rows["B3-P4 dag_daily rattrape les matins manques"] == ("oui", "oui")
+    assert "B3-P4 DAG dag_daily" not in rows
+    assert "B3-P4 repertoire des DAG" not in rows
 
 
 def test_a_dag_missing_from_a_found_directory_names_the_directory(
         tmp_path, monkeypatch):
     project, dags = _container(tmp_path, monkeypatch, with_dag=False)
-    expected, actual = _rows(tmp_path, [], root=project)["P4 DAG dag_daily"]
+    expected, actual = _rows(tmp_path, [], root=project)["B3-P4 DAG dag_daily"]
     assert expected == "present"
     assert str(dags) in actual
 
@@ -323,8 +324,8 @@ def test_no_dag_directory_names_where_it_looked(tmp_path, monkeypatch):
 
     monkeypatch.setattr(config, "DAG_DIRS", ("airflow/dags", "/nowhere/dags"))
     rows = _rows(tmp_path, [], root=tmp_path)
-    expected, actual = rows["P4 repertoire des DAG"]
+    expected, actual = rows["B3-P4 repertoire des DAG"]
     assert expected == "trouve"
     assert "/nowhere/dags" in actual
     # And it does not then blame the DAG itself.
-    assert "P4 DAG dag_daily" not in rows
+    assert "B3-P4 DAG dag_daily" not in rows

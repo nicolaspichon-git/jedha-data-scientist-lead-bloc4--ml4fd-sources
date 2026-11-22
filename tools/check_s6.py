@@ -1,8 +1,9 @@
-"""Acceptance criteria of S6 that SQL cannot reach: the RUNNING container.
+"""Acceptance criteria of B3-S6 that SQL cannot reach: the RUNNING container.
 
-Covers: EC19, EC27
-Lot: R5
-Competency: C3, C4, C5
+Block: B3, B4.
+Lot: B3-R5, B4-L0.
+Competency: B3-C3, B3-C4, B3-C5.
+Covers: B3-EC19, B3-EC27.
 
 sql/checks/s6_acceptance.sql says what fd_dashboard IS in the catalogue. This
 says what the dashboard SERVICE is -- not as docker-compose.yml declares it
@@ -15,9 +16,9 @@ it, read three ways:
                      the session is, whether a write into reports/ is refused
                      by the kernel, whether the latest document is the one
                      Airflow wrote and at the same path;
-  the host           whether the page is served at 127.0.0.1:8501.
+  the host           whether the page is served at 127.0.0.1:8502.
 
-The plan of S6 (7.4) names the trap this exists for: reusing the
+The plan of B3-S6 (7.4) names the trap this exists for: reusing the
 x-airflow-common anchor hands the container the owner's password and the
 pepper, and nothing on the page would show it.
 
@@ -41,7 +42,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SERVICE = "dashboard"
 PROBE = ["docker", "compose", "exec", "-T", SERVICE,
          "python", "/opt/project/dashboard/probe.py"]
-HEALTH = "http://127.0.0.1:8501/_stcore/health"
+HEALTH = "http://127.0.0.1:8502/_stcore/health"
 EXPECTED_MOUNTS = {"/opt/project/dashboard", "/opt/project/ml4fd",
                    "/opt/project/sql", "/opt/project/governance.yml",
                    "/opt/project/runtime/reports"}
@@ -73,7 +74,7 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
     """Yield (criterion, expected, actual). `run` and `get` are injectable so
     the logic is testable without Docker."""
     container = run(["docker", "compose", "ps", "-q", SERVICE]).strip()
-    yield ("R4 service dashboard en marche", "oui",
+    yield ("B3-R4 service dashboard en marche", "oui",
            "oui" if container else "NON : .\\fd-manager.ps1 dashboard")
     if not container:
         return
@@ -82,53 +83,53 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
     config, host = info["Config"], info["HostConfig"]
     env = dict(item.partition("=")[::2] for item in config.get("Env") or [])
 
-    yield ("R4 etat de sante Docker", "healthy",
+    yield ("B3-R4 etat de sante Docker", "healthy",
            ((info.get("State") or {}).get("Health") or {}).get("Status", "aucun"))
-    yield ("R4 utilisateur declare de l'image", "non root",
+    yield ("B3-R4 utilisateur declare de l'image", "non root",
            "non root" if config.get("User") not in ("", "root", "0", None)
            else "ROOT")
-    yield ("R4 capacites Linux retirees", "ALL",
+    yield ("B3-R4 capacites Linux retirees", "ALL",
            ",".join(host.get("CapDrop") or []) or "aucune")
-    yield ("R4 elevation de privileges interdite", "oui",
+    yield ("B3-R4 elevation de privileges interdite", "oui",
            "oui" if "no-new-privileges:true" in (host.get("SecurityOpt") or [])
            else "non")
 
     bindings = [b for spec in (host.get("PortBindings") or {}).values()
                 for b in (spec or [])]
-    yield ("R4 port publie sur cette machine seulement", "127.0.0.1:8501",
+    yield ("B3-R4 port publie sur cette machine seulement", "127.0.0.1:8502",
            ", ".join("%s:%s" % (b.get("HostIp") or "0.0.0.0", b.get("HostPort"))
                      for b in bindings) or "aucun")
 
     mounts = info.get("Mounts") or []
-    yield ("R4 montages en lecture seule", "%d sur %d" % (len(mounts), len(mounts)),
+    yield ("B3-R4 montages en lecture seule", "%d sur %d" % (len(mounts), len(mounts)),
            "%d sur %d" % (sum(1 for m in mounts if not m.get("RW")), len(mounts)))
-    yield ("R4 montages attendus, et seulement eux", "oui",
+    yield ("B3-R4 montages attendus, et seulement eux", "oui",
            "oui" if {m.get("Destination") for m in mounts} == EXPECTED_MOUNTS
            else "non : %s" % sorted({m.get("Destination") for m in mounts}
                                      ^ EXPECTED_MOUNTS))
 
     owner = dotenv(env_file)
-    yield ("R4 poivre absent de l'environnement", "absent",
+    yield ("B3-R4 poivre absent de l'environnement", "absent",
            "PRESENT" if "ML4FD_PEPPER" in env else "absent")
-    yield ("R4 mot de passe du proprietaire absent de l'environnement", "absent",
+    yield ("B3-R4 mot de passe du proprietaire absent de l'environnement", "absent",
            "PRESENT" if owner.get("POSTGRES_PASSWORD")
            and owner["POSTGRES_PASSWORD"] in env.values() else "absent")
-    yield ("R4 POSTGRES_USER du service", "fd_dashboard",
+    yield ("B3-R4 POSTGRES_USER du service", "fd_dashboard",
            env.get("POSTGRES_USER", "absent"))
 
     try:
         seen = json.loads(run(PROBE).strip().splitlines()[-1])
     except Exception as problem:
-        yield ("R5 sonde interieure", "executee", "ECHEC : %s" % problem)
+        yield ("B3-R5 sonde interieure", "executee", "ECHEC : %s" % problem)
         return
 
-    yield ("R5 processus non root (uid vu de l'interieur)", "non root",
+    yield ("B3-R5 processus non root (uid vu de l'interieur)", "non root",
            "non root" if seen.get("uid") else "ROOT")
-    yield ("R5 ecriture dans reports/ refusee par le noyau", "refusee",
+    yield ("B3-R5 ecriture dans reports/ refusee par le noyau", "refusee",
            seen.get("reports_write", "?").split(" ")[0])
-    yield ("R5 ecriture dans ml4fd/ refusee par le noyau", "refusee",
+    yield ("B3-R5 ecriture dans ml4fd/ refusee par le noyau", "refusee",
            seen.get("ml4fd_write", "?").split(" ")[0])
-    yield ("R5 identite de la session PostgreSQL", "fd_dashboard",
+    yield ("B3-R5 identite de la session PostgreSQL", "fd_dashboard",
            seen.get("session_user") or seen.get("session_error", "?")[:80])
 
     latest = seen.get("latest_report")
@@ -136,22 +137,22 @@ def criteria(run=docker, get=fetch, env_file: Path = ROOT / ".env"):
         yield ("info dernier rapport", "mesure", "aucun rapport produit")
     elif latest:
         yield ("info dernier rapport", "mesure", latest["day"])
-        yield ("R5 dernier rapport conforme a son empreinte", "conforme",
+        yield ("B3-R5 dernier rapport conforme a son empreinte", "conforme",
                latest["verdict"])
-        yield ("R5 dernier rapport lu au chemin ou Airflow l'a ecrit", "oui",
+        yield ("B3-R5 dernier rapport lu au chemin ou Airflow l'a ecrit", "oui",
                "non" if latest["relocated"] else "oui")
 
-    yield ("R5 page servie, vue de l'interieur", "ok", seen.get("health", "?"))
+    yield ("B3-R5 page servie, vue de l'interieur", "ok", seen.get("health", "?"))
     try:
         outside = get(HEALTH)
     except Exception as problem:
         outside = "injoignable (%s)" % type(problem).__name__
-    yield ("R5 page servie, vue de cette machine", "ok", outside)
+    yield ("B3-R5 page servie, vue de cette machine", "ok", outside)
 
 
 def main() -> int:
     print("")
-    print("Criteres d'acceptation de S6 que SQL n'atteint pas : le conteneur reel")
+    print("Criteres d'acceptation de B3-S6 que SQL n'atteint pas : le conteneur reel")
     print("")
     try:
         rows = list(criteria())

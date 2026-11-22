@@ -1,5 +1,8 @@
 -- The mornings with no report. MUST RETURN ZERO ROWS.
--- Covers: EC14   Lot: P3   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-P3, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14.
 --
 -- A wrong report is seen; an absent one is not. This is EC14 -- detect the
 -- absence -- applied to the one deliverable of this project that a human reads.

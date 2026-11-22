@@ -1,21 +1,22 @@
-"""L5: the scoring service. `gunicorn app:app`, behind compose.
+"""B4-L5: the scoring service. `gunicorn app:app`, behind compose.
 
-Covers: EC15, EC16, EC17, EC19, EC20, EC21, EC23
-Lot: L5
-Competency: C3
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C3.
+Covers: B4-EC15, B4-EC16, B4-EC17, B4-EC19, B4-EC20, B4-EC21, B4-EC23.
 
 THIN ON PURPOSE. Every decision lives in ml4fd/serve.py, where pytest can hold
 it without a web framework; this file routes, declares the request and the
 response, and chooses the status code. The dashboard is arranged the same way
 and for the same reason.
 
-THE CONTRACT IS PUBLISHED BY THE FRAMEWORK, which is what EC17 asks for:
+THE CONTRACT IS PUBLISHED BY THE FRAMEWORK, which is what B4-EC17 asks for:
 FastAPI derives an OpenAPI document from the models below and serves it at
 /openapi.json, with a readable rendering at /docs. So the specification cannot
 describe a route that does not exist or a field the service does not read --
 it is generated from the code that answers, not written beside it.
 
-THE CHAMPION IS RESOLVED BY THE SAME PATH AS L3. score.load() reads the alias
+THE CHAMPION IS RESOLVED BY THE SAME PATH AS B4-L3. score.load() reads the alias
 from the registry BEFORE consulting its cache, so a promotion is picked up on
 the next call without this service having to be restarted or to remember
 anything. That is the defect the plan calls "l'alias qui ne reveille pas le
@@ -71,7 +72,7 @@ class Payment(BaseModel):
 class Decision(BaseModel):
     """The answer. The figures and the sentence sit side by side: a caller that
     needs the number must not have to parse French, and a reader using an
-    assistive technology must not have to compare two numbers (EC15)."""
+    assistive technology must not have to compare two numbers (B4-EC15)."""
 
     call_id: int
     decision: str
@@ -87,7 +88,7 @@ class BatchRow(BaseModel):
     """One already-prepared row. The pipeline holds a pseudonymised
     transaction with its features computed at ingestion, never a card number:
     it CANNOT build a Payment, and sending raw records over HTTP would make
-    EC17 worse rather than better. Hence a second entry point."""
+    B4-EC17 worse rather than better. Hence a second entry point."""
 
     txn_id: str = Field(description="Identifiant de la transaction.")
     features: dict[str, Any] = Field(
@@ -138,7 +139,12 @@ def _scorer():
 
 @app.get("/health", summary="Etat du service et version du modele servi")
 def health() -> dict:
-    """Covers: EC21."""
+    """
+    Block: B4.
+    Lot: B4-L5.
+    Competency: ?.
+    Covers: B4-EC21.
+    """
     scorer, problem = _scorer()
     return serve.health(scorer, problem)
 
@@ -156,11 +162,16 @@ def root() -> dict:
                                           "nomme chaque champ en cause."},
                      503: {"description": "Aucun modele en service."}})
 def post_score(payment: Payment) -> JSONResponse:
-    """Covers: EC15, EC16, EC19, EC20."""
+    """
+    Block: B4.
+    Lot: B4-L5.
+    Competency: B4-C2, B4-C3.
+    Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20.
+    """
     settings = _settings()
     payload = payment.model_dump()
 
-    # VALIDATED BY US AND NOT ONLY BY THE SCHEMA. pydantic checks shapes; EC20
+    # VALIDATED BY US AND NOT ONLY BY THE SCHEMA. pydantic checks shapes; B4-EC20
     # asks for an explicit error, and "amt: string expected" does not say that
     # fifty thousand is the maximum the pipeline accepts. Every problem is
     # returned at once -- see serve.problems.
@@ -198,7 +209,11 @@ def post_score(payment: Payment) -> JSONResponse:
                                           "recette en service."},
                      503: {"description": "Aucun modele en service."}})
 def post_score_batch(batch: Batch) -> JSONResponse:
-    """The pipeline's entry point. Covers: EC16, EC19.
+    """The pipeline's entry point.
+    Block: B4.
+    Lot: B4-L5.
+    Competency: ?.
+    Covers: B4-EC16, B4-EC19.
 
     WHY IT EXISTS BESIDE /score. fd_transactions holds no cc_num and no home
     location -- transform.py consumes them at the raw boundary and never writes

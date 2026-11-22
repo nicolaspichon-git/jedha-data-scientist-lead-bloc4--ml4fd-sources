@@ -1,5 +1,8 @@
 -- The journal of the monitoring measurements: one row per figure measured.
--- Covers: EC40, EC42, EC45   Lot: L4   Competency: C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C6.
+-- Covers: B4-EC40, B4-EC42, B4-EC45.
 --
 -- WHY A TABLE AND NOT A REPORT FILE. Evidently produces an HTML report, and a
 -- report answers "is it drifting now". EC45 asks the other question -- has it
@@ -51,7 +54,7 @@ CREATE TABLE IF NOT EXISTS fd_monitoring (
     -- version. The two are read together, so both need naming.
     model_version  text         NOT NULL,
 
-    -- WHICH CONTROL: the four families of C6. The inputs moving away from the
+    -- WHICH CONTROL: the four families of B4-C6. The inputs moving away from the
     -- training reference, the predictions moving, the measured performance
     -- against the specification, and the quality of what the stream delivers.
     control        text         NOT NULL,

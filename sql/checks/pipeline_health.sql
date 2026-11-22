@@ -1,5 +1,8 @@
 -- The facts about the recent runs of one DAG. ONE ROW, never a judgement.
--- Covers: EC14   Lot: N9   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-N9, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14.
 --
 -- Gathered here, judged in ml4fd/health.py -- the same split as M1's guard:
 -- inspect_window() collects, verdict() decides. The decision is then a pure

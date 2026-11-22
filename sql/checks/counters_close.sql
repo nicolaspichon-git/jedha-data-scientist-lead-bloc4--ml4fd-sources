@@ -1,5 +1,8 @@
 -- Counter closure. MUST return zero rows.
--- Covers: EC20, EC22   Lot: L2   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-L2, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EC20, B3-EC22.
 
 -- count(DISTINCT line_no) and not count(*): one line can fail several checks
 -- and therefore hold several rows in fd_quarantine, each with its own reason

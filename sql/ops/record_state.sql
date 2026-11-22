@@ -1,5 +1,8 @@
 -- Record a control's new state, AFTER the message went out.
--- Covers: EC14   Lot: N9   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-N9, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14.
 --
 -- One row per control and not one per transition: this is a state, not a
 -- journal. The history of the messages is fd_ops_notifications (S6/R9), one

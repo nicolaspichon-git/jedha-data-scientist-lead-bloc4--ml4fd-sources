@@ -1,5 +1,8 @@
--- Every call to the scoring API, and the answer it received. Covers: EC19, EC17
--- Lot: L5 (ajoute le 20/11/2026)   Competency: C3, C4
+-- Every call to the scoring API, and the answer it received.
+-- Block: B4.
+-- Lot: B4-L5 (ajoute le 20/11/2026).
+-- Competency: B4-C3, B4-C4.
+-- Covers: B4-EC19, B4-EC17.
 --
 -- WHY NOT fd_scores, which already holds a score, a threshold and a decision.
 -- Its primary key is txn_id and it carries
@@ -14,7 +17,7 @@
 -- whoever asked? A single table would have to drop the foreign key, and with
 -- it the guarantee that every scored transaction exists.
 --
--- WHAT IS KEPT OF THE INPUT, and EC17 decides it, not convenience. The caller
+-- WHAT IS KEPT OF THE INPUT, and B4-EC17 decides it, not convenience. The caller
 -- sends a cardholder number and a home location; neither reaches this table.
 --   client_key          : the HMAC of the card number with the pepper, the same
 --                         pseudonym ml4fd/transform.py writes to

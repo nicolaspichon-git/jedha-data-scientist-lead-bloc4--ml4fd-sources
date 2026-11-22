@@ -1,4 +1,10 @@
-"""Choosing the operating threshold. Pure arithmetic, so it is all testable."""
+"""Choosing the operating threshold. Pure arithmetic, so it is all testable.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 import pytest
 
 from ml4fd.threshold import GRID, Point, choose, render, sweep

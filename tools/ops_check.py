@@ -1,8 +1,9 @@
 """The four pipeline controls, run by hand, with or without notifying.
 
-Covers: EC14
-Lot: N9
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-N9, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EC14.
 
 WHY THIS EXISTS BESIDE THE DAG TASK. The DAG runs the controls every minute and
 notifies on a CHANGE of state, which is the right behaviour for a channel and

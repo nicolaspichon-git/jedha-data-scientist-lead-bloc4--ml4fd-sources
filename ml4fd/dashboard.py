@@ -1,8 +1,9 @@
 """The reads behind the dashboard of S6. NOTHING HERE IMPORTS STREAMLIT.
 
-Covers: EE03, EC14, EC17
-Lot: R1
-Competency: C4
+Block: B3, B4.
+Lot: B3-R1, B4-L0, B4-L4.
+Competency: B3-C4, B4-C6.
+Covers: B3-EE03, B3-EC14, B3-EC17, B4-EC45, B4-EC49.
 
 THE DASHBOARD DECIDES NOTHING. Every decision it shows was taken elsewhere and
 persisted (P5): the alert by the scoring, the notification by N5, the report by
@@ -920,9 +921,10 @@ def monitoring_view(conn, settings, first: dt.date | None = None,
                     now: dt.datetime | None = None) -> dict:
     """Everything the monitoring page shows, for days first..last.
 
-    Covers: EC45, EC49
-    Lot: L4
-    Competency: C6
+    Block: B4.
+    Lot: B4-L4.
+    Competency: B4-C6.
+    Covers: B4-EC45, B4-EC49.
     """
     last = last or today(settings, now)
     first = first or last - dt.timedelta(days=MONITORING_DEFAULT_DAYS - 1)

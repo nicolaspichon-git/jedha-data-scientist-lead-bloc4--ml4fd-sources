@@ -1,20 +1,21 @@
 """One morning report, produced by hand.
 
-Covers: EE04, EI04
-Lot: P2
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-P2, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EE04, B3-EI04.
 
-WHY THIS EXISTS RATHER THAN A DAG. The DAG is lot P4. What P1 and P2 have to
+WHY THIS EXISTS RATHER THAN A DAG. The DAG is lot B3-P4. What B3-P1 and B3-P2 have to
 show is that the four queries, the assembly and the rendering produce a document
 an analyst can read -- which is about content, not orchestration. This runner
-exercises exactly that chain, and P4 will wrap the same functions without
-rewriting any of them. The same reasoning as tools/ingest_once.py in N2.
+exercises exactly that chain, and B3-P4 will wrap the same functions without
+rewriting any of them. The same reasoning as tools/ingest_once.py in B3-N2.
 
 THE WINDOW IS BUILT FROM A DATE AND THE DECLARED ZONE, never from the clock: the
 calendar day given on the command line, from midnight to midnight in
 report.timezone, with the knowledge instant at the end of it unless one is
 given. A replay of 3 November therefore produces the document of 3 November,
-which is the criterion of P2 and the central trap of S4.
+which is the criterion of B3-P2 and the central trap of B3-S4.
 
 Usage, from the scheduler container:
     python3 /opt/project/tools/daily_report.py [--date 2026-11-16]

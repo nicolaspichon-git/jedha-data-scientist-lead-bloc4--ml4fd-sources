@@ -1,8 +1,9 @@
 """The scenarios N4 scores, and the one that is easy to get silently wrong.
 
-Covers: EI04, EC24
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5.
+Covers: B3-EI04, B3-EC24.
 
 The arithmetic of the measurement is threshold.point_at, already covered. What
 is tested here is the construction of the frames to score -- because a

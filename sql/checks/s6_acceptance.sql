@@ -1,5 +1,8 @@
 -- Acceptance criteria of S6: what fd_dashboard IS, read in the catalogue.
--- Covers: EC19, EC27   Lot: R5   Competency: C4, C5
+-- Block: B3, B4.
+-- Lot: B3-R5, B4-L0.
+-- Competency: B3-C4, B3-C5.
+-- Covers: B3-EC19, B3-EC27.
 --
 -- READ IN THE CATALOGUE, NOT IN THE DDL. 140_dashboard_role.sql says what the
 -- role was meant to be; this says what PostgreSQL will actually let it do --

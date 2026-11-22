@@ -1,6 +1,9 @@
 """Judge the newest registered model against the champion, and move the alias.
 
-Covers: EC34, EC36, EC37   Lot: L3   Competency: C5
+Block: B4.
+Lot: B4-L3.
+Competency: B4-C5.
+Covers: B4-EC34, B4-EC36, B4-EC37.
 
 REGISTERING IS NOT PROMOTING. Every run of S2 registers a version; this
 command and dag_train's challenge_and_promote are the two things that put one
@@ -22,7 +25,7 @@ must be rows NEITHER model was fitted on. The candidate's own test split does
 not qualify: a retraining on fresher data moves the boundary, so part of its
 test set sits inside the champion's training period -- and the champion would
 score those rows from memory. Comparing there would favour the champion by
-construction, every time, and would block exactly the retraining L4 exists to
+construction, every time, and would block exactly the retraining B3-L4 exists to
 automate.
 
 So the comparison runs on the candidate's test split RESTRICTED to the rows

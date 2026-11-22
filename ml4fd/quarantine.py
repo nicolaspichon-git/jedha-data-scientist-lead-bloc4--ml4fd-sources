@@ -1,8 +1,9 @@
 """What becomes of invalid records.
 
-Covers: EC22
-Lot: L2
-Competency: C5
+Block: B3, B4.
+Lot: B3-L2, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC22.
 
 A rejected record is neither dropped nor corrected: it is kept with its reason,
 in a store that F07.3 can report a breakdown over. One line can hold several
@@ -86,9 +87,10 @@ def rejected_lines(conn: "psycopg.Connection", batch_id) -> set[int]:
     per reason -- UNIQUE (batch_id, line_no, reason_code) -- so a line with two
     defects appears twice.
 
-    Covers: EC14, EC23
-    Lot: N7
-    Competency: C3
+    Block: B3, B4.
+    Lot: B3-N7, B4-L0.
+    Competency: B3-C3.
+    Covers: B3-EC14, B3-EC23.
     """
     from ml4fd import db
 
@@ -100,9 +102,10 @@ def rejected_lines(conn: "psycopg.Connection", batch_id) -> set[int]:
 def breakdown(conn: "psycopg.Connection", batch_id) -> list[tuple]:
     """Rejects per class and per reason. Feeds F07.3.
 
-    Covers: EC15
-    Lot: L2
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-L2, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EC15.
     """
     with conn.cursor() as cur:
         cur.execute(

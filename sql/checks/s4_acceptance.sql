@@ -1,6 +1,8 @@
 -- The acceptance criteria of S4, lots P1 to P5. Every verdict must read OK.
--- Covers: EE04, EI02, EI03, EI04, EI08, EC14, EC23, EC27
--- Lot: P5   Competency: C1, C4, C5
+-- Block: B3, B4.
+-- Lot: B3-P5, B4-L0.
+-- Competency: B3-C1, B3-C4, B3-C5.
+-- Covers: B3-EE04, B3-EI02, B3-EI03, B3-EI04, B3-EI08, B3-EC14, B3-EC23, B3-EC27.
 --
 -- THE DECISIVE ONE IS CRITERION 5, and it is the only criterion in this project
 -- that ONLY TIME MAKES POSSIBLE: past the declared verdict delay, no

@@ -1,6 +1,9 @@
 -- Measured storage volume per store. Feeds EC03, which can only be satisfied
 -- once the data is actually loaded.
--- Covers: EC01, EC03   Lot: L8   Competency: C1
+-- Block: B3, B4.
+-- Lot: B3-L8, B4-L0.
+-- Competency: B3-C1.
+-- Covers: B3-EC01, B3-EC03.
 
 SELECT c.relname                                     AS store,
        to_char(c.reltuples::bigint, 'FM999G999G999')  AS estimated_rows,

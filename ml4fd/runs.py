@@ -1,8 +1,9 @@
 """Run journal.
 
-Covers: EC12
-Lot: L7
-Competency: C4
+Block: B3, B4.
+Lot: B3-L7, B4-L0.
+Competency: B3-C4.
+Covers: B3-EC12.
 
 One row per run in fd_pipeline_runs, written as the facts become known rather
 than all at once at the end: a run that dies mid-chain still leaves a row saying
@@ -114,9 +115,10 @@ def abandon(conn: "psycopg.Connection", run_id: str) -> int:
 def digest(conn: "psycopg.Connection") -> dict[str, tuple[int, str]]:
     """Digest of each store, to compare a replay against its original.
 
-    Covers: EC23, EC24
-    Lot: L6
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-L6, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC23, B3-EC24.
     """
     from ml4fd import db
     return {store: (rows, dig)

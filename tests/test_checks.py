@@ -1,4 +1,10 @@
-"""The two validation classes, and the trap that separates them."""
+"""The two validation classes, and the trap that separates them.
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 
 from ml4fd import checks
 

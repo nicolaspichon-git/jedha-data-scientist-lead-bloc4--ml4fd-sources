@@ -1,6 +1,9 @@
 -- The verdicts that fell over a period, by the model version that scored the
 -- payment, beside what M5 measured for that version's recipe (S6/R10).
--- Covers: EE04, EI02, EI03   Lot: R10   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-R10, B4-L0.
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EE04, B3-EI02, B3-EI03.
 --
 -- ON THE KNOWLEDGE AXIS, like section 3 of the report (daily_verdicts.sql):
 -- the period is the one in which the verdicts BECAME KNOWN, label_ts, and they

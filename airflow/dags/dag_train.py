@@ -1,21 +1,22 @@
 """S2 -- training the fraud scoring model. Weekly.
 
-Covers: EI06, EC08, EC09, EC31
-Lot: M7 (EC31 ajoute en L4, 20/11/2026)
-Competency: C3, C5
+Block: B3, B4.
+Lot: B3-M7, B4-L0.
+Competency: B4-C3, B4-C5.
+Covers: B3-EE09, B3-EI06, B3-EC08, B3-EC09, B4-EC31.
 
-EC31 ASKS FOR A RETRAINING THAT RUNS WITHOUT A HAND ON IT, and since
+B4-EC31 ASKS FOR A RETRAINING THAT RUNS WITHOUT A HAND ON IT, and since
 2026-11-20 this DAG is that: guard, dataset, fit, registration, and -- as of
 challenge_and_promote -- the gate and the alias. Nothing in the chain waits for
 a command to be typed. The mark was missing rather than the implementation.
 
-C5 JOINS THE LINE FOR THE SAME REASON. The C3 beside it belongs to EC08 and
-EC09, which are marks of the referential this project grew out of and which the
+B4-C5 JOINS THE LINE FOR THE SAME REASON. B4-C3 beside it belongs to B4-EC08 and
+B4-EC09, which are marks of the referential this project grew out of and which the
 requirements document has since renumbered -- see TRACEABILITY.md, section
 "Marques en desaccord". They are left as they are rather than guessed at: the
-re-pointing is one pass over 303 marks and does not belong in a lot about EC31.
+re-pointing is one pass over 303 marks and does not belong in a lot about B4-EC31.
 
-M1 to M8: the guard, the cut-off and recipe, the dataset with its temporal
+B3-M1 to B3-M8: the guard, the cut-off and recipe, the dataset with its temporal
 split, the fit with its honest report, the threshold chosen off the test set,
 the registration in MLflow, and the manifest that keeps the chain readable even
 if the tracking server is gone.
@@ -45,12 +46,12 @@ DAG_ID = "dag_train"
 
 @dag(
     dag_id=DAG_ID,
-    description="S2: weekly training of the fraud scoring model",
+    description="B3-S2: weekly training of the fraud scoring model",
     schedule="0 3 * * 1",               # Monday, 03:00 -- a distinct cadence (EI06)
     start_date=pendulum.datetime(2026, 1, 5, tz="Europe/Paris"),
     catchup=False,
     max_active_runs=1,
-    tags=["S2", "BC03", "C2", "C3", "C5"],
+    tags=["BC03", "B3-S2", "B3-C2", "B3-C3", "B3-C5"],
     default_args={"retries": 0},
 )
 def train_model():
@@ -87,9 +88,10 @@ def train_model():
     def resolve_cut_off() -> str:
         """The cut-off of this run, from the run and never from the clock.
 
-        Covers: EI02, EC23
-        Lot: M2 (revu en L4, 20/11/2026)
-        Competency: C5
+        Block: B3, B4.
+        Lot: B3-M2, B4-L0.
+        Competency: B3-C5.
+        Covers: B3-EI02, B3-EC23.
         """
         from airflow.operators.python import get_current_context
 
@@ -158,9 +160,10 @@ def train_model():
 
             .\fd-manager.ps1 train -Drop txn_hour,txn_weekday
 
-        Covers: EC05, EC23, EI04
-        Lot: N4
-        Competency: C1, C5
+        Block: B3, B4.
+        Lot: B3-N4, B4-L0.
+        Competency: B3-C1, B3-C5.
+        Covers: B3-EC05, B3-EC23, B3-EI04.
         """
         from airflow.operators.python import get_current_context
 
@@ -215,9 +218,10 @@ def train_model():
         ingestion there distorts the published metrics most directly, and the
         horizon check covers the whole span anyway.
 
-        Covers: EC09, EC14
-        Lot: M1
-        Competency: C3, C5
+        Block: B3, B4.
+        Lot: B3-M1, B4-L0.
+        Competency: B3-C3, B3-C5.
+        Covers: B3-EC09, B3-EC14.
         """
         import datetime as _dt
 
@@ -237,9 +241,10 @@ def train_model():
     def build_dataset(cut_off: str, features: list, _report: dict) -> dict:
         """Build the dataset, or find the one this recipe already produced.
 
-        Covers: EC05, EC23, EI04
-        Lot: M3, M4
-        Competency: C1, C2, C5
+        Block: B3, B4.
+        Lot: B3-M3, B3-M4, B4-L0.
+        Competency: B3-C1, B3-C2, B3-C5.
+        Covers: B3-EC05, B3-EC23, B3-EI04.
         """
         import datetime as _dt
 
@@ -297,9 +302,10 @@ def train_model():
     def fit_model(cut_off: str, features: list, dataset: dict) -> dict:
         """Fit on the dataset, and report what may be reported.
 
-        Covers: EE08, EI04
-        Lot: M5
-        Competency: C2, C5
+        Block: B3, B4.
+        Lot: B3-M5, B4-L0.
+        Competency: B3-C2, B3-C5.
+        Covers: B3-EE08, B3-EI04.
         """
         import datetime as _dt
         from pathlib import Path
@@ -390,9 +396,10 @@ def train_model():
         registration, not the fit -- and the manifest written next to the model
         still carries the whole chain.
 
-        Covers: EE09, EI06
-        Lot: M7
-        Competency: C1, C3, C4
+        Block: B3, B4.
+        Lot: B3-M7, B4-L0.
+        Competency: B3-C1, B3-C3, B3-C4.
+        Covers: B3-EE09, B3-EI06.
         """
         import json
         import os
@@ -446,9 +453,10 @@ def train_model():
         Marking them success would make a loop that decided nothing look in the
         interface exactly like one that promoted.
 
-        Covers: EC33, EC34, EC36, EC37
-        Lot: L4
-        Competency: C5, C6
+        Block: B4.
+        Lot: B4-L4.
+        Competency: B4-C5, B4-C6.
+        Covers: B4-EC33, B4-EC34, B4-EC36, B4-EC37.
         """
         import os
 

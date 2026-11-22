@@ -1,8 +1,9 @@
 """What the scoring refuses, and what it reads from the model rather than itself.
 
-Covers: EE09, EI04, EC23, EC24
-Lot: N4
-Competency: C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C5, B4-C4.
+Covers: B3-EE09, B3-EI04, B3-EC23, B3-EC24, B4-EC28.
 
 Neither MLflow nor scikit-learn is needed here: what is tested is the contract
 around the model -- where the feature order comes from, where the threshold

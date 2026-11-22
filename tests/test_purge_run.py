@@ -1,8 +1,9 @@
 """S5 / Q3: the purge itself. Rows leave the database here.
 
-Covers: EE05, EI11, EC19, EC26
-Lot: Q3
-Competency: C2, C3
+Block: B3, B4.
+Lot: B3-Q3, B4-L0.
+Competency: B3-C2, B3-C3.
+Covers: B3-EE05, B3-EI11, B3-EC19, B3-EC26.
 
 Everything in Q2 counted. This lot destroys, and these tests hold the five
 decisions that separate it from an ordinary DELETE:

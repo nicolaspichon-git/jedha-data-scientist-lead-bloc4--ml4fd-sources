@@ -1,8 +1,9 @@
 """R2: the morning page -- notices before the document, figures from the row.
 
-Covers: EE03, EC14
-Lot: R2
-Competency: C4
+Block: B3, B4.
+Lot: B3-R2, B4-L0.
+Competency: B3-C4.
+Covers: B3-EE03, B3-EC14.
 
 Streamlit cannot be installed where this is developed. So the page is tested
 twice over: what it shows is decided by ml4fd/dashboard.morning_view(), held

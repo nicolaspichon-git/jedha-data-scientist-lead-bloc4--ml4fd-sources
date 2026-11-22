@@ -1,8 +1,9 @@
 """Configuration: governance.yml and environment variables.
 
-Covers: EI12, EC19
-Lot: L0
-Competency: C4
+Block: B3, B4.
+Lot: B3-L0, B4-L0.
+Competency: B3-C4.
+Covers: B3-EI12, B3-EC19.
 
 Durations that outlast the demonstration itself (verdict delay, retention) live
 here and nowhere else. Secrets never live in governance.yml: they come from the
@@ -105,7 +106,7 @@ class Settings:
     alert_capacity_per_day: int
     cost_false_alert: float
     validation_share: float
-    # L3, the promotion gate. Read here like every other decision
+    # B4-L3, the promotion gate. Read here like every other decision
     # of governance.yml, so a caller asks a field and not a file.
     champion_alias: str
     promotion_significance: float
@@ -151,9 +152,10 @@ class Settings:
         historical labels and the real-time ones must sit on the same delay, or
         the blind band differs between training and scoring.
 
-        Covers: EI02, EI12
-        Lot: L5
-        Competency: C2
+        Block: B3, B4.
+        Lot: B3-L5, B4-L0.
+        Competency: B3-C2.
+        Covers: B3-EI02, B3-EI12.
         """
         if self.verdict_mode == "nominal":
             return dt.timedelta(days=self.verdict_delay_days)
@@ -171,9 +173,10 @@ class Settings:
         governance.yml so the demonstration value is never a figure somebody
         edited over the real one and forgot to put back.
 
-        Covers: EC39, EC45
-        Lot: L4
-        Competency: C6
+        Block: B4.
+        Lot: B4-L4.
+        Competency: B4-C6.
+        Covers: B4-EC39, B4-EC45.
         """
         return self._by_mode(
             dt.timedelta(minutes=self.monitoring_drift_window_minutes),
@@ -189,9 +192,10 @@ class Settings:
         between the published 0.751 and the floor of 0.60. Seven days is about
         210 frauds and a standard error of 0.030.
 
-        Covers: EC40
-        Lot: L4
-        Competency: C6
+        Block: B4.
+        Lot: B4-L4.
+        Competency: B4-C6.
+        Covers: B4-EC40.
         """
         return self._by_mode(
             dt.timedelta(days=self.monitoring_performance_window_days),
@@ -209,9 +213,10 @@ class Settings:
         DAG, and between the two edits the suite would be red. One switch has
         to move one thing.
 
-        Covers: EC32, EC33
-        Lot: L4
-        Competency: C5, C6
+        Block: B4.
+        Lot: B4-L4.
+        Competency: B4-C5, B4-C6.
+        Covers: B4-EC32, B4-EC33.
         """
         return self._by_mode(self.monitoring_schedule_nominal,
                              self.monitoring_schedule_demo)
@@ -226,9 +231,10 @@ class Settings:
         verdicts once at 02:00 while they fall due every 300 s -- the delay
         short, the labels never arriving, and nothing saying why.
 
-        Covers: EC41
-        Lot: L4
-        Competency: C4, C6
+        Block: B4.
+        Lot: B4-L4.
+        Competency: B4-C4, B4-C6.
+        Covers: B4-EC41.
         """
         return self._by_mode(self.verdict_schedule_nominal,
                              self.verdict_schedule_demo,
@@ -244,9 +250,10 @@ class Settings:
         The floor counts ROWS and not frauds, because a distribution test
         counts observations and not positives.
 
-        Covers: EC39, EC45
-        Lot: L4
-        Competency: C6
+        Block: B4.
+        Lot: B4-L4.
+        Competency: B4-C6.
+        Covers: B4-EC39, B4-EC45.
         """
         return self._by_mode(self.monitoring_drift_min_rows,
                              self.monitoring_demo_drift_min_rows)
@@ -279,10 +286,10 @@ class Settings:
                          % (name, chosen))
 
     def observed_per_day(self) -> int:
-        """Transactions N7 will actually see in a day, from its own settings.
+        """Transactions B3-N7 will actually see in a day, from its own settings.
 
         WHY THIS IS COMPUTED AND NOT NOTED IN A COMMENT. One call returns one
-        transaction and there is no queue behind it (N0), so the cadence times
+        transaction and there is no queue behind it (B3-N0), so the cadence times
         the calls per run IS the share of the stream that gets scored -- and
         ml4fd/threshold.py chose the threshold and the 60-alert capacity at
         API_TXN_PER_DAY = 7200. Lower this product and every published figure
@@ -292,9 +299,10 @@ class Settings:
         later edit to the cadence or to calls_per_run fails the suite instead of
         quietly invalidating the calibration.
 
-        Covers: EI04, EC24
-        Lot: N4
-        Competency: C5
+        Block: B3, B4.
+        Lot: B3-N4, B4-L0.
+        Competency: B3-C5.
+        Covers: B3-EI04, B3-EC24.
         """
         return self.calls_per_run * runs_per_day(self.realtime_schedule)
 
@@ -307,9 +315,10 @@ class Settings:
         method failed the first time -- after I had read the dataclass and
         written down that it was flat.
 
-        Covers: EI04
-        Lot: M5
-        Competency: C5
+        Block: B3, B4.
+        Lot: B3-M5, B4-L0.
+        Competency: B3-C5.
+        Covers: B3-EI04.
         """
         return self.rule_min_amount, self.rule_night_hours
 

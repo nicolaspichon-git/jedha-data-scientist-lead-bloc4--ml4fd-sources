@@ -1,5 +1,8 @@
 -- Dataset registry. A recipe's identity, and the base rate that reads with it.
--- Covers: EC05, EC23, EI10   Lot: M0   Competency: C1, C5
+-- Block: B3, B4.
+-- Lot: B3-M0, B4-L0.
+-- Competency: B3-C1, B3-C5.
+-- Covers: B3-EC05, B3-EC23, B3-EI10.
 --
 -- The primary key is the RECIPE DIGEST and not a version number: a version is a
 -- label stuck on afterwards, a digest is what lets the same recipe find the
@@ -49,7 +52,10 @@ GRANT SELECT, INSERT ON fd_datasets TO fd_ingest;
 GRANT SELECT ON fd_datasets TO fd_report;
 
 -- WHAT M5 MEASURED ON THE TEST SET, IN THE DATABASE (S6/R10).
--- Covers: EE04, EC23   Lot: R10 (S6)   Competency: C2, C4
+-- Block: B3, B4.
+-- Lot: B3-R10 (S6).
+-- Competency: B3-C2, B3-C4.
+-- Covers: B3-EE04, B3-EC23.
 --
 -- Until R10 the figures lived only in the recipe's run.json, beside the
 -- dataset: the morning report read the file, and a dashboard in another

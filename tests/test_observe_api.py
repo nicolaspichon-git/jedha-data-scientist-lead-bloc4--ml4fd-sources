@@ -1,8 +1,9 @@
 """What the N0 measurement log may contain.
 
-Covers: EC17
-Lot: N0
-Competency: C5
+Block: B3, B4.
+Lot: B3-N0, B4-L0.
+Competency: B3-C5.
+Covers: B3-EC17.
 
 WHY THIS FILE EXISTS. shape() was written to describe a response without
 copying what must not be copied, and the report has always consumed its output.

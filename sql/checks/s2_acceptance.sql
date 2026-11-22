@@ -1,5 +1,8 @@
 -- The acceptance criteria of S2, lots M0 to M4. Every verdict must read OK.
--- Covers: EC05, EC23, EI02, EI04   Lot: M8   Competency: C1, C2, C5
+-- Block: B3, B4.
+-- Lot: B3-M8, B4-L0.
+-- Competency: B3-C1, B3-C2, B3-C5.
+-- Covers: B3-EC05, B3-EC23, B3-EI02, B3-EI04.
 --
 -- The decisive one is the sixth: the registered counts must NOT EXCEED the rows
 -- whose verdict was attributable to the cut-off. If the build had filtered on

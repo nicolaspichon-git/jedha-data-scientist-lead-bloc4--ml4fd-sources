@@ -1,5 +1,8 @@
 -- The retraining requests the monitoring made, over the period (S6/R11).
--- Covers: EC33, EC49   Lot: L4   Competency: C5, C6
+-- Block: B4.
+-- Lot: B4-L4.
+-- Competency: B4-C5, B4-C6.
+-- Covers: B4-EC33, B4-EC49.
 --
 -- WHAT THIS SHOWS THAT NOTHING ELSE DOES: the join between an alert and a
 -- model. fd_monitoring says a control crossed its limit; fd_promotions says a

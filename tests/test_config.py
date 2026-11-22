@@ -1,5 +1,10 @@
 """Loading governance.yml for real.
 
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+
 THE GAP THIS FILE CLOSES. Every other test builds its objects by hand, so a
 Settings method reaching for an attribute that does not exist passed all 157 of
 them and failed in Airflow -- `AttributeError: 'Settings' object has no

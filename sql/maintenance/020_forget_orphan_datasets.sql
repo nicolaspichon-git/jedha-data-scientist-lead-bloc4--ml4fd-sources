@@ -1,5 +1,8 @@
 -- Forget the datasets whose Parquet files no longer exist.
--- Covers: EC23   Lot: M8   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-M8, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC23.
 --
 -- WHY THIS EXISTS. datasets.root was relative, so an Airflow task resolved it
 -- against /opt/airflow instead of the project: the rows were registered here

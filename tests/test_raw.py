@@ -1,4 +1,10 @@
-"""The batch identifier: what makes a retry harmless (EC23)."""
+"""The batch identifier: what makes a retry harmless (EC23).
+
+Block: B3, B4.
+Lot: B4-L0.
+Competency: ?.
+Covers: ?.
+"""
 import uuid
 
 from ml4fd import raw

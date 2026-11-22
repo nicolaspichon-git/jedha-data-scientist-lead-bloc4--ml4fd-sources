@@ -1,8 +1,9 @@
 """Writing the real verdict, and withholding it. No simulation.
 
-Covers: EE03, EI03, EI12, EC14, EC17, EC23
-Lot: N6
-Competency: C3, C4, C5
+Block: B3, B4.
+Lot: B3-N6, B4-L0.
+Competency: B3-C3, B3-C4, B3-C5.
+Covers: B3-EE03, B3-EI03, B3-EI12, B3-EC14, B3-EC17, B3-EC23.
 
 WHY THIS LOT IS THE MOST SENSITIVE OF S3. The API delivers is_fraud in the SAME
 payload as the features -- N0 measured it: 21 columns, is_fraud present as a
@@ -150,9 +151,10 @@ def write_due(conn, delay: dt.timedelta,
               source: str = "current-transactions") -> dict:
     """Write every missing verdict of the stream. Returns a report.
 
-    Covers: EI03, EC23
-    Lot: N6
-    Competency: C3
+    Block: B3, B4.
+    Lot: B3-N6.
+    Competency: B3-C3.
+    Covers: B3-EI03, B3-EC23.
     """
     awaiting = batches_awaiting(conn, source)
     report = {"batches": len(awaiting), "written": 0, "rows": 0}

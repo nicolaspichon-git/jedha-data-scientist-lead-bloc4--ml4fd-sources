@@ -1,5 +1,8 @@
 -- One scored transaction. Idempotent on (txn_id, model_version).
--- Covers: EC23, EC24   Lot: N4   Competency: C3
+-- Block: B3, B4.
+-- Lot: B3-N4, B4-L0.
+-- Competency: B3-C3.
+-- Covers: B3-EC23, B3-EC24.
 --
 -- DO NOTHING rather than DO UPDATE, and the choice is not a detail: scoring the
 -- same transaction twice with the same model version must yield the same score

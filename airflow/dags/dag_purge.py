@@ -1,8 +1,9 @@
 """S5 / Q5: the purge, once a week, on Sunday.
 
-Covers: EE06, EI06, EI11, EC09, EC14, EC19
-Lot: Q5
-Competency: C3, C4
+Block: B3, B4.
+Lot: B3-Q5, B4-L0.
+Competency: B3-C3, B3-C4.
+Covers: B3-EE06, B3-EI06, B3-EI11, B3-EC09, B3-EC14, B3-EC19.
 
 THE ONLY DAG OF THIS PROJECT THAT DESTROYS. Everywhere else a mistake is
 repaired by a replay; here it is permanent, and every choice below follows from
@@ -78,9 +79,10 @@ def _mark_failed(context) -> None:
     only what is still RUNNING, so a failure after close_run cannot overwrite a
     recorded success.
 
-    Covers: EC14
-    Lot: Q5
-    Competency: C4
+    Block: B3, B4.
+    Lot: B3-Q5, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EC14.
     """
     run_id = str(context.get("run_id", "?"))
     try:
@@ -121,9 +123,10 @@ def purge_beyond_retention():
         """Open the pipeline journal. Under fd_ingest: the journal is the
         pipeline's, and fd_purge may not write to it.
 
-        Covers: EC14
-        Lot: Q5
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-Q5, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC14.
         """
         from airflow.operators.python import get_current_context
 
@@ -145,9 +148,10 @@ def purge_beyond_retention():
         batch again immediately before deleting it -- which is the check that
         decides. Asking twice would double the cost of the one that does not.
 
-        Covers: EC26, EI13
-        Lot: Q5
-        Competency: C5
+        Block: B3, B4.
+        Lot: B3-Q5, B4-L0.
+        Competency: B3-C5.
+        Covers: B3-EC26, B3-EI13.
         """
         from airflow.operators.python import get_current_context
 
@@ -174,9 +178,10 @@ def purge_beyond_retention():
         may be legitimate -- a retention shortened on purpose -- but it is
         never a routine, and what tells the two apart is a human saying so.
 
-        Covers: EC26, EC09
-        Lot: Q5
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-Q5, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC26, B3-EC09.
         """
         from ml4fd import purge
 
@@ -203,9 +208,10 @@ def purge_beyond_retention():
         run that did it. A purge run by hand records a null there, which is a
         fact worth keeping rather than hiding behind an invented identifier.
 
-        Covers: EE05, EI11, EC19
-        Lot: Q5
-        Competency: C2, C3
+        Block: B3, B4.
+        Lot: B3-Q5, B4-L0.
+        Competency: B3-C2, B3-C3.
+        Covers: B3-EE05, B3-EI11, B3-EC19.
         """
         from airflow.operators.python import get_current_context
 
@@ -231,9 +237,10 @@ def purge_beyond_retention():
         deleted would be a figure invented to fill a column. What was deleted
         is in the purge marks of the batches themselves, and Q6 journals it.
 
-        Covers: EC14
-        Lot: Q5
-        Competency: C4
+        Block: B3, B4.
+        Lot: B3-Q5, B4-L0.
+        Competency: B3-C4.
+        Covers: B3-EC14.
         """
         from ml4fd import db, runs
 

@@ -1,5 +1,8 @@
 -- The fingerprint of ONE batch of the raw zone: what the API said, as stored.
--- Covers: EC23, EI12   Lot: Q1   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-Q1, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC23, B3-EI12.
 --
 -- ONE DEFINITION. The writers take it right after writing, the backfill takes
 -- it for the batches that predate the column, and the purge takes it again

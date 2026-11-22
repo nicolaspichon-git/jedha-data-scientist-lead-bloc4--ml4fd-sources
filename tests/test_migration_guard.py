@@ -1,8 +1,9 @@
 """A column that is not there yet says so, and says what to run.
 
-Covers: EC23, EI12
-Lot: Q2
-Competency: C4, C5
+Block: B3, B4.
+Lot: B3-Q2, B4-L0.
+Competency: B3-C4, B3-C5.
+Covers: B3-EC23, B3-EI12.
 
 WHAT THIS CAME FROM. The first real run of `fd-manager purge` ended in a
 driver traceback: `psycopg.errors.UndefinedColumn: column p.digests does not

@@ -1,5 +1,8 @@
 -- Every run our journal has left open, and whether anything can close it.
--- Covers: EC14   Lot: N9 (revu en Q6, puis le 20/11/2026)   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-N9, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14.
 --
 -- READ ONLY. sql/maintenance/030_close_abandoned_runs.sql closes what may be
 -- closed, and one looks before one touches.

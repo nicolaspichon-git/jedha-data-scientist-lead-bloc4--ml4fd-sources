@@ -1,5 +1,8 @@
 -- Raw zone. The payload exactly as received, one row per source line.
--- Covers: EC24   Lot: L1   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-L1, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EC24.
 --
 -- The (batch_id, line_no) uniqueness carries insert idempotency: re-inserting a
 -- batch that is already loaded cannot produce duplicates.

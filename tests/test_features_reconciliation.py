@@ -1,5 +1,10 @@
 """The six rulings that make both feature modes agree -- EE07.
 
+Block: B4.
+Lot: B4-L0.
+Competency: B4-C4.
+Covers: B4-EC28.
+
 The proof that the two SQL expressions agree needs a database and lives in
 sql/checks/reconcile_features.sql, run by `.\\fd-manager.ps1 check`. What runs here,
 anywhere and in milliseconds, is the layer underneath: the semantics the SQL

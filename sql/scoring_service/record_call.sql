@@ -1,5 +1,8 @@
 -- Record one API call and the answer it received, AFTER answering.
--- Covers: EC19   Lot: L5   Competency: C3, C4
+-- Block: B4.
+-- Lot: B4-L5.
+-- Competency: B4-C3, B4-C4.
+-- Covers: B4-EC19.
 --
 -- Append-only: 190_scoring_service_calls.sql revokes UPDATE and DELETE from fd_scoring_service, so an
 -- answer cannot be rewritten into one the service never gave.

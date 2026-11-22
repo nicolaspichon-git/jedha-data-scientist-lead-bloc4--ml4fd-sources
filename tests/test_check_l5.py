@@ -1,13 +1,14 @@
-"""L5: the acceptance of the scoring service -- the catalogue, and the service
+"""B4-L5: the acceptance of the scoring service -- the catalogue, and the service
 as it answers.
 
-Covers: EC15, EC16, EC19, EC20, EC21
-Lot: L5
-Competency: C2, C3, C5
+Block: B4.
+Lot: B4-L5.
+Competency: B4-C2, B4-C3, B4-C5.
+Covers: B4-EC15, B4-EC16, B4-EC19, B4-EC20, B4-EC21.
 
 check_l5.py cannot meet Docker nor the service here, so its logic is held
 against `docker inspect` output and HTTP answers shaped like the real ones: a
-sound service, and the three failures L5 actually met on 2026-11-20 -- the
+sound service, and the three failures B4-L5 actually met on 2026-11-20 -- the
 port already allocated, runtime/datasets not mounted, and the CONNECT
 privilege skipped by the DDL ordering.
 
@@ -51,7 +52,7 @@ def test_the_columns_expected_are_the_ones_the_ddl_grants():
             re.I):
         granted |= {name.strip() for name in group.split(",")}
     expected = re.search(
-        r"'L5 colonnes de fd_transactions lisibles',\s*'([^']+)'", SQL).group(1)
+        r"'B4-L5 colonnes de fd_transactions lisibles',\s*'([^']+)'", SQL).group(1)
     assert {name.strip() for name in expected.split(",")} == granted
 
 
@@ -122,7 +123,7 @@ def inspect(**changes):
         "HostConfig": {"CapDrop": ["ALL"],
                        "SecurityOpt": ["no-new-privileges:true"],
                        "PortBindings": {"5000/tcp": [{"HostIp": "127.0.0.1",
-                                                      "HostPort": "5001"}]}},
+                                                      "HostPort": "8012"}]}},
         "Mounts": [{"Destination": d, "RW": False}
                    for d in sorted(check_l5.EXPECTED_MOUNTS)],
         "State": {"Health": {"Status": "healthy"},
@@ -240,7 +241,7 @@ def test_a_stopped_service_says_how_to_start_it(tmp_path):
     run, get = answers(inspect(), running=False)
     rows = verdicts(run, get, tmp_path)
     assert len(rows) == 1
-    assert "fd-manager.ps1" in rows["L5 service de scoring en marche"][1]
+    assert "fd-manager.ps1" in rows["B4-L5 service de scoring en marche"][1]
 
 
 def test_the_missing_dataset_mount_is_caught(tmp_path):
@@ -256,17 +257,17 @@ def test_the_missing_dataset_mount_is_caught(tmp_path):
                                "recipe_digest": None,
                                "detail": "no run.json"})
     rows = verdicts(run, get, tmp_path)
-    assert "L5 montages attendus, et seulement eux" in failures(rows)
-    assert "L5 etat de sante lu de cette machine" in failures(rows)
-    assert "L5 le point de sante annonce la version servie" in failures(rows)
+    assert "B4-L5 montages attendus, et seulement eux" in failures(rows)
+    assert "B4-L5 etat de sante lu de cette machine" in failures(rows)
+    assert "B4-L5 le point de sante annonce la version servie" in failures(rows)
 
 
 def test_a_port_published_to_every_interface_is_caught(tmp_path):
     """The service holds three columns of fd_transactions and the pepper. A
     binding on 0.0.0.0 puts that on the network the host is on."""
     run, get = answers(inspect(HostConfig__PortBindings={
-        "5000/tcp": [{"HostIp": "", "HostPort": "5001"}]}))
-    assert ("L5 port publie sur cette machine seulement"
+        "5000/tcp": [{"HostIp": "", "HostPort": "8012"}]}))
+    assert ("B4-L5 port publie sur cette machine seulement"
             in failures(verdicts(run, get, tmp_path)))
 
 
@@ -275,7 +276,7 @@ def test_the_owners_password_in_the_environment_is_caught(tmp_path):
         "POSTGRES_USER=fd_scoring_service", "POSTGRES_PASSWORD=%s" % OWNER,
         "ML4FD_PEPPER=pepper-value"]))
     rows = verdicts(run, get, tmp_path)
-    assert ("L5 mot de passe du proprietaire absent de l'environnement"
+    assert ("B4-L5 mot de passe du proprietaire absent de l'environnement"
             in failures(rows))
 
 
@@ -285,7 +286,7 @@ def test_the_pepper_is_required_here_unlike_the_dashboard(tmp_path):
     stop joining and nothing says so."""
     run, get = answers(inspect(Config__Env=["POSTGRES_USER=fd_scoring_service"]))
     rows = verdicts(run, get, tmp_path)
-    assert ("L5 poivre present, car le pseudonyme doit etre le meme"
+    assert ("B4-L5 poivre present, car le pseudonyme doit etre le meme"
             in failures(rows))
 
 
@@ -299,7 +300,7 @@ def test_a_service_that_names_one_bad_field_at_a_time_is_caught(tmp_path):
             return 422, {"detail": [{"loc": ["body", "amt"], "msg": "x"}]}
         return original(url, body, timeout)
     rows = verdicts(run, one_at_a_time, tmp_path)
-    assert "L5 les trois champs en cause nommes d'un coup" in failures(rows)
+    assert "B4-L5 les trois champs en cause nommes d'un coup" in failures(rows)
 
 
 def test_a_decision_without_its_model_identity_is_caught(tmp_path):
@@ -309,21 +310,21 @@ def test_a_decision_without_its_model_identity_is_caught(tmp_path):
                        decision={k: v for k, v in DECISION.items()
                                  if k not in ("model_version", "recipe_digest")})
     rows = verdicts(run, get, tmp_path)
-    assert ("L5 la reponse porte les chiffres et l'identite du modele"
+    assert ("B4-L5 la reponse porte les chiffres et l'identite du modele"
             in failures(rows))
 
 
 def test_a_sentence_that_replaces_the_figures_is_not_enough(tmp_path):
-    """EC15 asks for the sentence BESIDE the figures. An answer with no
+    """B4-EC15 asks for the sentence BESIDE the figures. An answer with no
     sentence fails, and so does one that leaks the card number into it."""
     run, get = answers(inspect(), decision=dict(DECISION, texte=""))
-    assert ("L5 sortie textuelle presente a cote des chiffres"
+    assert ("B4-L5 sortie textuelle presente a cote des chiffres"
             in failures(verdicts(run, get, tmp_path)))
 
     run, get = answers(inspect(), decision=dict(
         DECISION, texte="Transaction acceptee pour la carte %s, sans suite."
                         % check_l5.OUTSIDE_THE_CORPUS))
-    assert ("L5 la phrase ne reproduit pas le numero de carte"
+    assert ("B4-L5 la phrase ne reproduit pas le numero de carte"
             in failures(verdicts(run, get, tmp_path)))
 
 
@@ -331,7 +332,7 @@ def test_a_flagged_that_disagrees_with_its_threshold_is_caught(tmp_path):
     """The invariant fd_scores and fd_scoring_service_calls both carry, checked
     in the answer as well: the two cannot disagree anywhere."""
     run, get = answers(inspect(), decision=dict(DECISION, flagged=True))
-    assert ("L5 flagged est bien score >= threshold"
+    assert ("B4-L5 flagged est bien score >= threshold"
             in failures(verdicts(run, get, tmp_path)))
 
 
@@ -343,7 +344,7 @@ def test_a_batch_answered_out_of_order_is_caught(tmp_path):
         "model_version": SERVED, "recipe_digest": "93d16ede", "threshold": 0.86,
         "decisions": [{"txn_id": "check-l5-b", "score": 0.2, "flagged": False},
                       {"txn_id": "check-l5-a", "score": 0.1, "flagged": False}]})
-    assert ("L5 les decisions reviennent dans l'ordre envoye"
+    assert ("B4-L5 les decisions reviennent dans l'ordre envoye"
             in failures(verdicts(run, get, tmp_path)))
 
 
@@ -351,19 +352,19 @@ def test_a_batch_over_the_ceiling_must_be_refused_whole(tmp_path):
     """Scoring half a batch and then failing would leave fd_scores with a
     partial batch nobody asked for."""
     run, get = answers(inspect(), rows_over_cap=200)
-    assert ("L5 un lot au-dela du plafond refuse en entier"
+    assert ("B4-L5 un lot au-dela du plafond refuse en entier"
             in failures(verdicts(run, get, tmp_path)))
 
 
 def test_a_batch_naming_another_model_than_the_health_endpoint_is_caught(tmp_path):
     """fd_scores records the version per row and they must all agree. Two
-    entry points announcing two versions is the coupling L5 removed, coming
+    entry points announcing two versions is the coupling B4-L5 removed, coming
     back inside the service."""
     run, get = answers(inspect(), batch={
         "model_version": "4", "recipe_digest": "93d16ede", "threshold": 0.86,
         "decisions": [{"txn_id": "check-l5-a", "score": 0.1, "flagged": False},
                       {"txn_id": "check-l5-b", "score": 0.2, "flagged": False}]})
-    assert ("L5 le lot nomme le modele une fois pour toutes"
+    assert ("B4-L5 le lot nomme le modele une fois pour toutes"
             in failures(verdicts(run, get, tmp_path)))
 
 
@@ -392,7 +393,7 @@ def test_a_stale_service_serving_the_previous_model_is_caught(tmp_path):
     and serves the old model until the next restart."""
     run, get = answers(inspect(), alias="8")
     rows = verdicts(run, get, tmp_path)
-    assert ("L5 promotion sans redemarrage, le conteneur est anterieur"
+    assert ("B4-L5 promotion sans redemarrage, le conteneur est anterieur"
             in failures(rows))
 
 
@@ -401,9 +402,9 @@ def test_the_clause_is_demonstrated_only_when_the_container_is_the_older(tmp_pat
     equality of the versions IS the clause."""
     run, get = answers(inspect())
     rows = verdicts(run, get, tmp_path)
-    assert ("L5 promotion sans redemarrage, le conteneur est anterieur"
+    assert ("B4-L5 promotion sans redemarrage, le conteneur est anterieur"
             in rows)
-    assert rows["L5 promotion sans redemarrage, le conteneur est anterieur"] \
+    assert rows["B4-L5 promotion sans redemarrage, le conteneur est anterieur"] \
         == ("oui", "oui")
 
 
@@ -415,11 +416,11 @@ def test_a_container_younger_than_the_promotion_proves_nothing(tmp_path):
         "Health": {"Status": "healthy"},
         "StartedAt": "2026-11-21T06:00:00.000000000Z"}))
     rows = verdicts(run, get, tmp_path)
-    assert "L5 promotion sans redemarrage" in rows
-    expected, actual = rows["L5 promotion sans redemarrage"]
+    assert "B4-L5 promotion sans redemarrage" in rows
+    expected, actual = rows["B4-L5 promotion sans redemarrage"]
     assert expected == "mesure"
     assert "ne prouve rien" in actual
-    assert ("L5 promotion sans redemarrage, le conteneur est anterieur"
+    assert ("B4-L5 promotion sans redemarrage, le conteneur est anterieur"
             not in rows)
 
 
@@ -435,8 +436,8 @@ def test_no_promotion_yet_is_not_a_failure(tmp_path):
             return "\n"
         return original(args)
     rows = verdicts(no_promotion, get, tmp_path)
-    assert rows["L5 promotion sans redemarrage"][0] == "mesure"
-    assert "non demontrable" in rows["L5 promotion sans redemarrage"][1]
+    assert rows["B4-L5 promotion sans redemarrage"][0] == "mesure"
+    assert "non demontrable" in rows["B4-L5 promotion sans redemarrage"][1]
     assert failures(rows) == []
 
 
@@ -503,8 +504,8 @@ def test_a_detail_that_is_a_sentence_does_not_crash_the_check(tmp_path):
             return 503, {"detail": "aucun modele en service"}
         return original(url, body, timeout)
     rows = verdicts(run, sentence, tmp_path)
-    assert "L5 requete non conforme refusee" in rows
-    assert rows["L5 les trois champs en cause nommes d'un coup"][1] == "0"
+    assert "B4-L5 requete non conforme refusee" in rows
+    assert rows["B4-L5 les trois champs en cause nommes d'un coup"][1] == "0"
 
 
 def test_a_health_that_is_not_an_object_does_not_crash_the_check(tmp_path):
@@ -512,8 +513,8 @@ def test_a_health_that_is_not_an_object_does_not_crash_the_check(tmp_path):
     expected."""
     run, get = answers(inspect(), health="service indisponible")
     rows = verdicts(run, get, tmp_path)
-    assert rows["L5 etat de sante lu de cette machine"][1] == "injoignable"
-    assert "L5 le point de sante annonce la version servie" in failures(rows)
+    assert rows["B4-L5 etat de sante lu de cette machine"][1] == "injoignable"
+    assert "B4-L5 le point de sante annonce la version servie" in failures(rows)
 
 
 def test_the_catch_all_does_not_blame_docker_for_anything(monkeypatch, capsys):
@@ -540,7 +541,7 @@ def test_both_shapes_of_the_422_are_read(tmp_path):
             return 422, REFUSED_BY_PYDANTIC
         return original(url, body, timeout)
     rows = verdicts(run, pydantic, tmp_path)
-    assert rows["L5 les trois champs en cause nommes d'un coup"][1] == "3"
+    assert rows["B4-L5 les trois champs en cause nommes d'un coup"][1] == "3"
     assert failures(rows) == []
 
 

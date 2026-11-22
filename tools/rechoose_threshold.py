@@ -1,10 +1,11 @@
 """Re-choose the operating threshold on the distribution the STREAM produces.
 
-Covers: EE08, EI04, EC09, EC24
-Lot: N4
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-N4, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EE08, B3-EI04, B3-EC09, B3-EC24.
 
-THE PROBLEM, MEASURED. M6 swept the grid on the last slice of the training
+THE PROBLEM, MEASURED. B3-M6 swept the grid on the last slice of the training
 period and, under the capacity policy, kept the highest recall whose volume
 stays under 60 alerts a day. That gave 0.93, for 38.5 alerts a day. But the
 sweep ran on a distribution where txn_hour was the hour of the PAYMENT. On the
@@ -19,8 +20,8 @@ a lower threshold would flag more, catch more fraud, and still stay under 60.
 WHY A PROBE IS REFITTED HERE RATHER THAN REUSING THE REGISTERED MODEL. The
 threshold must be chosen on scores the model has NOT seen in training. The
 validation slice sits inside the registered model's training data, so scoring it
-with that model would choose a threshold on memorised rows -- the very trap M6
-avoided. S2 did not keep the probe's scores, so re-choosing a threshold
+with that model would choose a threshold on memorised rows -- the very trap B3-M6
+avoided. B3-S2 did not keep the probe's scores, so re-choosing a threshold
 honestly costs one fit on the earlier part of the training period. That is the
 price, and it is announced rather than dodged.
 
@@ -28,7 +29,7 @@ AND IT IS NEVER CHOSEN ON THE TEST SET. A threshold tuned on test makes the
 published recall optimistic by construction, and no metric in the report would
 reveal it.
 
-REPEATED, because one permutation is one draw: the measurement of N4 showed a
+REPEATED, because one permutation is one draw: the measurement of B3-N4 showed a
 single draw moving the permuted precision by 0.070, about two sigma. So the
 sweep is run on several clock-permuted validations and the chosen thresholds are
 reported as a distribution.
@@ -281,7 +282,7 @@ def render(payload, current, proposed, tally, at_proposed, tables, n_validation,
     gains = [table.difference for table in tables]
 
     lines = [
-        "# N4 --- le seuil rechoisi sur la distribution du flux",
+        "# B3-N4 --- le seuil rechoisi sur la distribution du flux",
         "",
         "Recette `%s`. Politique **%s**, capacite **%d** alertes/jour."
         % (payload["dataset"]["version"], settings.threshold_policy,
@@ -352,8 +353,8 @@ def render(payload, current, proposed, tally, at_proposed, tables, n_validation,
         "",
         "**Ce seuil n'est pas inscrit dans `governance.yml` par cet outil.** Le "
         "seuil opérant vit dans le manifeste de la version de modele, que seul "
-        "S2 ecrit : le porter ici reviendrait a avoir deux sources de verite. "
-        "Pour l'appliquer, il faut que M6 le choisisse, donc que S2 balaie sur "
+        "B3-S2 ecrit : le porter ici reviendrait a avoir deux sources de verite. "
+        "Pour l'appliquer, il faut que B3-M6 le choisisse, donc que B3-S2 balaie sur "
         "une validation a pendule rompue --- ce qui est la decision a prendre, "
         "et non un effet de bord d'une mesure.",
         "",
@@ -361,14 +362,14 @@ def render(payload, current, proposed, tally, at_proposed, tables, n_validation,
         "deux cotes.** Confronter un modele bien regle a un modele au seuil "
         "perime ne mesure pas les modeles, il mesure le reglage.",
         "",
-        "**L'hypothese de M6 est reconduite telle quelle, et elle reste une "
+        "**L'hypothese de B3-M6 est reconduite telle quelle, et elle reste une "
         "hypothese.** Le seuil est choisi sur les scores d'une SONDE ajustee "
         "sur les 80 % les plus anciens de l'entrainement, puis applique aux "
         "scores du modele ajuste sur la totalite. On suppose les deux "
         "distributions assez proches pour que le seuil se transporte. C'est le "
         "compromis usuel --- l'alternative serait de publier un modele ajuste "
         "sur 80 % des donnees --- mais c'est une supposition, pas un resultat, "
-        "et elle vaut ici exactement comme en M6.",
+        "et elle vaut ici exactement comme en B3-M6.",
     ]
     return "\n".join(lines) + "\n"
 

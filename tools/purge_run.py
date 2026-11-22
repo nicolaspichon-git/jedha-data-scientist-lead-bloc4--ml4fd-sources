@@ -1,8 +1,9 @@
 """Carry out the purge. ROWS LEAVE THE DATABASE HERE.
 
-Covers: EE05, EI11, EC19, EC26
-Lot: Q3
-Competency: C2, C3
+Block: B3, B4.
+Lot: B3-Q3, B4-L0.
+Competency: B3-C2, B3-C3.
+Covers: B3-EE05, B3-EI11, B3-EC19, B3-EC26.
 
 A RUNNER OF ITS OWN, and not a --apply of the dry run. A destructive command
 that is one flag away from a harmless one gets typed by mistake eventually;

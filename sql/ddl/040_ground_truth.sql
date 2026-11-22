@@ -1,5 +1,8 @@
 -- Ground truth. The verdict and the date it became KNOWN.
--- Covers: EI01, EI02   Lot: L5   Competency: C2
+-- Block: B3, B4.
+-- Lot: B3-L5, B4-L0.
+-- Competency: B3-C2.
+-- Covers: B3-EI01, B3-EI02.
 --
 -- txn_ts is copied from fd_transactions. The redundancy is deliberate: a CHECK
 -- constraint cannot reference another table, so without the copy "label_ts is

@@ -1,8 +1,9 @@
 """A staging table usable any number of times in one transaction.
 
-Covers: EC23
-Lot: N6
-Competency: C2, C5
+Block: B3, B4.
+Lot: B3-N6, B4-L0.
+Competency: B3-C2, B3-C5.
+Covers: B3-EC23.
 
 THE DEFECT OF 2026-11-17, in dag_ingest_verdicts: `relation
 "tmp_fd_ground_truth" already exists`. The loaders created their staging table

@@ -1,8 +1,9 @@
 """The historical load is idempotent at the RUN level, not only the task level.
 
-Covers: EC23, EC24
-Lot: L1
-Competency: C2, C4
+Block: B3, B4.
+Lot: B3-L1, B4-L0.
+Competency: B3-C2, B3-C4.
+Covers: B3-EC23, B3-EC24.
 
 WHY THIS TEST EXISTS. raw.batch_id_for() derives the batch_id from the run_id,
 so a retried TASK writes nothing -- and that was read as "the load is

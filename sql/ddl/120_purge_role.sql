@@ -1,5 +1,8 @@
 -- The only role of the project that may destroy.
--- Covers: EC19, EI11   Lot: Q3   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-Q3, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC19, B3-EI11.
 --
 -- WHY A ROLE OF ITS OWN AND NOT A GRANT TO fd_ingest. The append-only property
 -- of the raw zone is a REVOCATION (060_roles_grants.sql): the role that writes

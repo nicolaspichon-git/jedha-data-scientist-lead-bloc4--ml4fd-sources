@@ -1,6 +1,9 @@
 """Measure a corpus, so governance.yml quotes facts and not recollections.
 
-Covers: EI04, EC05   Lot: L4   Competency: C1, C6
+Block: B3, B4.
+Lot: B3-L4, B4-L0.
+Competency: B3-C1, B3-C6.
+Covers: B3-EI04, B3-EC05.
 
 WHY A TOOL AND NOT A NOTEBOOK. Every number in governance.yml that reads
 "Measured:" was measured once, by hand, on fraudTest.csv -- the horizon, the
@@ -153,7 +156,7 @@ def main(argv=None) -> int:
             bad += facts["by_month"][month][1]
     print("    ordre de grandeur du lot de test : ~%d fraudes" % bad)
     print("    (sous 50, promote.py refuse de decider ; sous 30, le controle")
-    print("     de performance de L4 se declare unmeasurable)")
+    print("     de performance de B3-L4 se declare unmeasurable)")
     return 0
 
 

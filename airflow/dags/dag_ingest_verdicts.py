@@ -1,8 +1,9 @@
 """S3 / N6: write the withheld verdicts. A DAG of its own, deliberately.
 
-Covers: EE03, EI03, EI06, EI12, EC14, EC23
-Lot: N6
-Competency: C1, C3, C4
+Block: B3, B4.
+Lot: B3-N6, B4-L0.
+Competency: B3-C1, B3-C3, B3-C4.
+Covers: B3-EE03, B3-EI03, B3-EI06, B3-EI12, B3-EC14, B3-EC23.
 
 WHY A SEPARATE DAG, when the ingestion already had the payload in hand. The API
 delivers is_fraud in the SAME payload as the features -- so the label sits one
@@ -60,9 +61,10 @@ def write_verdicts():
     def write() -> dict:
         """Write every missing verdict of the stream, and count the band.
 
-        Covers: EI03, EI12, EC23
-        Lot: N6
-        Competency: C3, C4
+        Block: B3, B4.
+        Lot: B3-N6, B4-L0.
+        Competency: B3-C3, B3-C4.
+        Covers: B3-EI03, B3-EI12, B3-EC23.
         """
         from ml4fd import config, db, stream, verdicts
 

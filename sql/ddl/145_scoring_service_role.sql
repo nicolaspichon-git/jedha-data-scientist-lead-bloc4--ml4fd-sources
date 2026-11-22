@@ -1,5 +1,8 @@
--- The role of the scoring service. Covers: EC16, EC22, EC17
--- Lot: L5 (ajoute le 20/11/2026)   Competency: C3, C4
+-- The role of the scoring service.
+-- Block: B4.
+-- Lot: B4-L5 (ajoute le 20/11/2026).
+-- Competency: B4-C3, B4-C4.
+-- Covers: B4-EC16, B4-EC22, B4-EC17.
 --
 -- WHY 145 AND NOT 185, measured on the first real call, 2026-11-20 22:46:
 -- "permission denied for database -- User does not have CONNECT privilege".
@@ -20,7 +23,7 @@
 -- from the owner's privileges. So the service receives credentials of its own,
 -- from the environment, and the owner's never enter its container.
 --
--- WHAT IT MAY DO, and the list is short because the decoupling L5 is named for
+-- WHAT IT MAY DO, and the list is short because the decoupling B4-L5 is named for
 -- is a matter of privilege rather than of intention:
 --   * READ three columns of fd_transactions. The history features are defined
 --     over that table (sql/functions/fd_client_features.sql, ruling 3) and the
@@ -36,12 +39,12 @@
 --     because the code happens to.
 --   * it cannot read fd_raw_events or fd_quarantine, which hold the raw record
 --     of a payment -- the personal data the exploited layer was built to be
---     free of (EC17). A scoring service has no business there.
+--     free of (B4-EC17). A scoring service has no business there.
 --   * it cannot read fd_ground_truth. A service that could see the verdicts
 --     could be asked whether it was right, and that question belongs to the
 --     monitoring, over a window, not to a caller over one payment.
 --   * it cannot read fd_datasets or open a Parquet file: it loads its model
---     through MLflow, by the champion alias, like every other reader (L3).
+--     through MLflow, by the champion alias, like every other reader (B4-L3).
 
 DO $$
 BEGIN

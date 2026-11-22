@@ -1,12 +1,12 @@
-# A deployed, non-interactive configuration -- what EC27 requires for D3.
-# Covers: EC27
+# A deployed, non-interactive configuration -- what B3-EC27 requires for B3-D3.
+# Covers: B3-EC27
 #
 # Airflow as three services, following the official layout: init, scheduler,
 # webserver. "airflow standalone" was ruled out: it builds its own admin user
 # with a random password, and Airflow's own documentation calls it unsuitable
 # outside development. More importantly, a scheduler started in the background
 # of another process can die unnoticed -- and it is the scheduler that carries
-# the demonstration of C3.
+# the demonstration of B3-C3.
 
 # Docker Compose prefixes containers AND volumes with this name, so pgdata
 # here is aia-ml4fd_pgdata and NOT the aia-fraud-detection_pgdata of BC03
@@ -32,7 +32,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
     # Fixed, so webserver sessions survive a restart. A demonstration value:
     # to be externalised if the infrastructure ever leaves this machine.
-    AIRFLOW__WEBSERVER__SECRET_KEY: aia-ml4fd-demo
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:?AIRFLOW_SECRET_KEY is missing from .env -- run .\fd-manager.ps1 setup}
     PYTHONPATH: /opt/project
     # THE BUSINESS DATABASE, and it shares nothing with the metadata
     # connection above any more (L1). These three are what the ml4fd/
@@ -133,7 +133,12 @@ services:
       # after.
       - ./sql/initdb:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5432:5432"                      # the PostgreSQL protocol, not HTTP
+      # HOST PORTS ARE THE 8**2 FAMILY, every one of them: 8432, 8082, 8002,
+      # 8802, 8502, 8012. The BC03 stack publishes 5432, 8080, 5000 and 8501
+      # on this same machine, and the two must be able to run side by side.
+      # Only the HOST side moved; inside the network every service keeps its
+      # own port, so no endpoint in governance.yml changes.
+      - "8432:5432"                      # the PostgreSQL protocol, not HTTP
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -152,7 +157,7 @@ services:
       - |
         set -e
         airflow db migrate
-        airflow users create --username admin --password admin \
+        airflow users create --username admin --password "$$AIRFLOW_ADMIN_PASSWORD" \
           --firstname admin --lastname admin --role Admin \
           --email admin@example.com || true
 
@@ -172,7 +177,7 @@ services:
     restart: unless-stopped
     command: webserver
     ports:
-      - "8080:8080"
+      - "8082:8080"
 
   mlflow:
     build: ./mlflow
@@ -196,7 +201,7 @@ services:
     volumes:
       - mlruns:/mlruns
     ports:
-      - "5000:5000"
+      - "8002:5000"
 
   # THE DASHBOARD OF S6 (lot R4). The one container a browser talks to, so it
   # is built to be UNABLE rather than careful:
@@ -303,7 +308,7 @@ services:
       # Published to the loopback only: nothing outside this machine has
       # business reading a stream of cardholder names. The scheduler reaches it
       # on the CONTAINER port, 4000, inside the compose network.
-      - "127.0.0.1:8801:4000"
+      - "127.0.0.1:8802:4000"
     restart: unless-stopped
 
   dashboard:
@@ -324,7 +329,7 @@ services:
       - ./governance.yml:/opt/project/governance.yml:ro
       - ./runtime/reports:/opt/project/runtime/reports:ro
     ports:
-      - "127.0.0.1:8501:8501"
+      - "127.0.0.1:8502:8501"
     cap_drop:
       - ALL
     security_opt:
@@ -385,10 +390,10 @@ services:
       # stronger grant. Read-only: it opens a manifest, it never writes one.
       - ./runtime/datasets:/opt/project/runtime/datasets:ro
     # THIS MACHINE ONLY, like the dashboard. The service is reachable from the
-    # compose network as scoring-service:5000; a browser reaches it on 5001 to keep 5000
-    # free on the host, where it is taken on macOS and often elsewhere.
+    # compose network as scoring-service:5000; a browser reaches it on 8012,
+    # the 8**2 family of every host port of this stack (see postgres).
     ports:
-      - "127.0.0.1:5001:5000"
+      - "127.0.0.1:8012:5000"
     cap_drop:
       - ALL
     security_opt:

@@ -1,5 +1,8 @@
 -- The quarantined records beyond retention, by batch, with the batch fingerprint.
--- Covers: EC19, EC26   Lot: Q2   Competency: C5
+-- Block: B3, B4.
+-- Lot: B3-Q2, B4-L0.
+-- Competency: B3-C5.
+-- Covers: B3-EC19, B3-EC26.
 --
 -- WHY THIS STORE AT ALL, and why at the same duration as the raw zone.
 -- fd_quarantine.payload is the raw payload of a REJECTED record: the same

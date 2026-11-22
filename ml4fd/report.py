@@ -1,8 +1,9 @@
 """Assembling the morning report, and writing it as one dated document.
 
-Covers: EE04, EI04, EI08, EC14, EC17
-Lot: P2
-Competency: C2
+Block: B3, B4.
+Lot: B3-P2, B4-L0.
+Competency: B3-C2.
+Covers: B3-EE04, B3-EI04, B3-EI08, B3-EC14, B3-EC17.
 
 TWO AXES OF TIME, AND CONFUSING THEM WOULD MAKE THE REPORT FALSE. A transaction
 carries the date of the payment (txn_ts) and the date its verdict became known
@@ -143,7 +144,10 @@ def window_for(settings, day: dt.date,
     knowledge_at defaults to the end of the window: what was known when the
     day was over. dag_daily passes the end of its interval instead.
 
-    Covers: EE03   Lot: R1   Competency: C4
+    Block: B3, B4.
+    Lot: B3-R1, B4-L0.
+    Competency: B3-C4.
+    Covers: B3-EE03.
     """
     return span_for(settings, day, day, knowledge_at)
 
@@ -646,9 +650,10 @@ def record(conn, row: dict) -> None:
     the record leaves a document with no row, which the absence check DOES
     catch. One failure is silent, the other loud; the order picks the loud one.
 
-    Covers: EC14, EC23
-    Lot: P3
-    Competency: C2
+    Block: B3, B4.
+    Lot: B3-P3, B4-L0.
+    Competency: B3-C2.
+    Covers: B3-EC14, B3-EC23.
     """
     db.execute_file(conn, RECORD_SQL, **row)
 

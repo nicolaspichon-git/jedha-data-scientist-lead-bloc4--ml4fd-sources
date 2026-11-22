@@ -1,6 +1,9 @@
 -- Lines read and rejected by the stream over a calendar period, from the run
 -- COUNTERS. Read by the dashboard (R7).
--- Covers: EC14, EC15   Lot: R7, R8   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R7, B3-R8, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14, B3-EC15.
 --
 -- One table and no join. The rate could be computed by joining the quarantine
 -- to the runs on batch_id -- and batch_id is a key of neither: a replayed

@@ -1,8 +1,9 @@
 """R4: the service -- what the one container a browser talks to is given.
 
-Covers: EC19, EC27
-Lot: R4
-Competency: C3
+Block: B3, B4.
+Lot: B3-R4, B4-L0.
+Competency: B3-C3.
+Covers: B3-EC19, B3-EC27.
 
 The service could not be started where this is developed (Streamlit is not
 installable here). What these tests hold is its DECLARATION -- the compose
@@ -87,7 +88,7 @@ def test_reports_are_mounted_where_airflow_writes_them():
 
 
 def test_the_port_is_this_machine_only():
-    assert SERVICE["ports"] == ["127.0.0.1:8501:8501"]
+    assert SERVICE["ports"] == ["127.0.0.1:8502:8501"]
 
 
 def test_it_holds_no_privilege():
@@ -154,7 +155,7 @@ def test_the_manager_knows_the_service():
     # Always a new process: a mounted ml4fd/ is NOT re-imported by a running
     # Streamlit, and a page newer than its module fails (AttributeError).
     assert "docker compose up -d --build --force-recreate dashboard" in text
-    assert "http://localhost:8501" in text
+    assert "http://localhost:8502" in text
 
 
 def test_every_compose_service_can_be_named_to_the_manager():

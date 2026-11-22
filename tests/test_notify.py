@@ -1,8 +1,9 @@
 """What a notification may carry, and what the capacity now enforces.
 
-Covers: EE09, EI05, EC09, EC14, EC17
-Lot: N5
-Competency: C5
+Block: B3, B4.
+Lot: B3-N5, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE09, B3-EI05, B3-EC09, B3-EC14, B3-EC17.
 
 The channels and the lifecycle are exercised against a fake connection: the
 decisions worth testing -- which fields leave the system, what order the send

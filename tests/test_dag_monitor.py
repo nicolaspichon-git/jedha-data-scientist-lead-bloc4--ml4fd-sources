@@ -1,8 +1,9 @@
 """dag_monitor's declarations, checked against each other.
 
-Covers: EC33, EC39, EC45
-Lot: L4
-Competency: C5, C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C5, B4-C6.
+Covers: B4-EC33, B4-EC39, B4-EC45.
 
 WHY THIS FILE EXISTS, AND WHY IT EXISTS LATE. dag_ingest, dag_train, dag_daily
 and dag_purge each carried a source-level test; dag_monitor -- the DAG of the

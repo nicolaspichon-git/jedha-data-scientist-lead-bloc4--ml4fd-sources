@@ -1,5 +1,8 @@
 -- The journal of the operations channel: one row per message SENT.
--- Covers: EC14, EC17   Lot: R9 (S6)   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R9 (S6), B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EC14, B3-EC17.
 --
 -- WHY A JOURNAL NEXT TO fd_ops_state. fd_ops_state is a STATE, one row per
 -- control, overwritten at each transition: it says where a control stands and

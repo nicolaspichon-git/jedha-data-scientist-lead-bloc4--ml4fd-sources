@@ -1,8 +1,9 @@
 """The shape of the purge DAG, read from its source.
 
-Covers: EE06, EI06, EI11, EC09, EC14, EC19
-Lot: Q5
-Competency: C5
+Block: B3, B4.
+Lot: B3-Q5, B4-L0.
+Competency: B3-C5.
+Covers: B3-EE06, B3-EI06, B3-EI11, B3-EC09, B3-EC14, B3-EC19.
 
 Airflow is not installed in the authoring environment, so this reads the file.
 A weaker test than running the DAG, and still the one that catches what matters

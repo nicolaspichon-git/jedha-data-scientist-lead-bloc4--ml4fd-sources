@@ -11,15 +11,16 @@ runnable on its own inside the container; fd-manager.ps1 translates. Reading
 --off here and typing it at the manager would make PowerShell treat it as a
 positional argument.
 
-Covers: EC39, EC51
-Lot: L4
-Competency: C5, C6
+Block: B4.
+Lot: B4-L4.
+Competency: B4-C5, B4-C6.
+Covers: B4-EC39, B4-EC51.
 
 WHY THIS FILE EXISTS. governance.yml declared sources.drift_switch, the
 producer read it on every request, and NOTHING wrote it. A switch with a reader
-and no writer is a loop that works and cannot be shown, which the plan of L4
+and no writer is a loop that works and cannot be shown, which the plan of B4-L4
 calls out in those terms: without an injectable drift "la boucle fonctionne et
-reste indemontrable, ce qui, pour C6, revient au meme".
+reste indemontrable, ce qui, pour B4-C6, revient au meme".
 
 A DRIFT MUST ENTER AS DATA OR IT IS NOT A DRIFT. This writes a file; the
 producer then multiplies the amount of every transaction it serves, BEFORE the

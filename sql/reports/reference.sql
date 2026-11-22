@@ -1,6 +1,9 @@
 -- What M5 measured on the test set, for the comparison of section 3 and of the
 -- performance page (S6/R10). The latest recipe, as before R10.
--- Covers: EE04, EI02   Lot: R10   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-R10, B4-L0.
+-- Competency: B3-C4.
+-- Covers: B3-EE04, B3-EI02.
 --
 -- READ FROM THE DATABASE, no longer from run.json: the dashboard runs in a
 -- container that does not mount the datasets, and fd_dashboard reads these

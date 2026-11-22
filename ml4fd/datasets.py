@@ -1,8 +1,9 @@
 """Dataset recipes and the registry that makes their construction idempotent.
 
-Covers: EC05, EC23, EI10
-Lot: M0
-Competency: C1, C5
+Block: B3, B4.
+Lot: B3-M0, B4-L0.
+Competency: B3-C1, B3-C5.
+Covers: B3-EC05, B3-EC23, B3-EI10.
 
 A dataset's identity is the DIGEST OF ITS RECIPE, not a version number. A version
 is a label stuck on afterwards; a digest is what lets the same recipe find the
@@ -79,9 +80,10 @@ def without(dropped, features: tuple[str, ...] = FEATURES) -> tuple[str, ...]:
     train the full recipe under a digest that claims to be amputated, and no
     figure in the report would reveal it.
 
-    Covers: EC05, EC23, EI04
-    Lot: N4
-    Competency: C1, C5
+    Block: B3, B4.
+    Lot: B3-N4, B4-L0.
+    Competency: B3-C1, B3-C5.
+    Covers: B3-EC05, B3-EC23, B3-EI04.
     """
     if isinstance(dropped, str):
         dropped = dropped.split(",")
@@ -187,9 +189,10 @@ def parse_split_rule(rule: str) -> tuple[dt.datetime, dt.datetime]:
     than interpreted. A rule nobody can parse would silently become a rule
     nobody applied.
 
-    Covers: EE07
-    Lot: M4
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-M4, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EE07.
     """
     match = TEMPORAL_RULE.match(rule or "")
     if not match:
@@ -237,9 +240,10 @@ def assert_cut_off_usable(cut_off: dt.datetime, horizon: dt.datetime,
     INSIDE sql/datasets/training_set.sql rather than by the cut-off here -- the
     guard moves, it does not disappear. Without it, nothing changes.
 
-    Covers: EC14
-    Lot: M1 (revu en L4, 20/11/2026)
-    Competency: C5
+    Block: B3, B4.
+    Lot: B3-M1, B4-L0.
+    Competency: B3-C5.
+    Covers: B3-EC14.
     """
     if cut_off.tzinfo is None:
         raise ValueError("cut_off must be timezone-aware")
@@ -283,9 +287,10 @@ def register(conn: "psycopg.Connection", recipe: Recipe, root: str | Path,
     holds no positive -- the December case, which no amount of row counting would
     have caught.
 
-    Covers: EC23
-    Lot: M0
-    Competency: C1
+    Block: B3, B4.
+    Lot: B3-M0, B4-L0.
+    Competency: B3-C1.
+    Covers: B3-EC23.
     """
     train_path, test_path = recipe.paths(root)
     rate_train = n_train_pos / n_train if n_train else 0.0

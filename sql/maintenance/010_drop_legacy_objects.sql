@@ -1,5 +1,8 @@
 -- One-off cleanup: the roles and tables left by the pre-fd_ naming.
--- Lot: L0   Competency: C4
+-- Block: B3, B4.
+-- Lot: B3-L0, B4-L0.
+-- Competency: B3-C4.
+-- Covers: U/D.
 --
 -- Run it with:  .\fd-manager.ps1 cleanup
 --

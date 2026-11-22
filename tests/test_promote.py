@@ -1,6 +1,9 @@
-"""L3: the gate between a model that is REGISTERED and one that is SERVED.
+"""B4-L3: the gate between a model that is REGISTERED and one that is SERVED.
 
-Covers: EC34, EC35, EC36   Lot: L3   Competency: C5
+Block: B4.
+Lot: B4-L3.
+Competency: B4-C5.
+Covers: B4-EC34, B4-EC35, B4-EC36.
 
 WHAT THESE TESTS ARE FOR. The refusals are the branches that matter, and a
 live run almost never produces them: a retraining on the same data gives a
@@ -102,7 +105,7 @@ def test_the_first_model_is_refused_when_the_policy_forbids_it():
 # --- the paired comparison ----------------------------------------------------
 
 def test_a_champion_without_a_comparison_is_never_overtaken():
-    """Promoting without comparing is the defect L3 removes, so the absence of
+    """Promoting without comparing is the defect B4-L3 removes, so the absence of
     a table is a refusal and not a shortcut."""
     decision = promote.decide(CANDIDATE, CHAMPION, None, POLICY)
     assert not decision.promoted
@@ -315,7 +318,7 @@ def test_moving_the_alias_passes_the_version_as_text():
 
 def test_scoring_refuses_to_serve_when_nothing_is_promoted():
     """NO FALLBACK TO THE NEWEST VERSION, and this test is what holds that in
-    place: a fallback would restore exactly the defect L3 removes."""
+    place: a fallback would restore exactly the defect B4-L3 removes."""
     with pytest.raises(LookupError) as raised:
         score.champion_version(_Client(), "fraud_scoring", "champion")
     message = str(raised.value)
@@ -329,7 +332,7 @@ def test_scoring_resolves_the_promoted_version():
         client, "fraud_scoring", "champion") == "la version 7"
 
 
-# --- L4: the candidate the loop judges is the one the loop produced -----------
+# --- B4-L4: the candidate the loop judges is the one the loop produced -----------
 
 class _Version:
     def __init__(self, version, run_id):
@@ -379,7 +382,7 @@ def test_the_run_id_is_compared_as_text():
     assert registry.version_of_run(client, 1234).version == "5"
 
 
-# --- L4: the loop closes, and closes on the same orchestration ----------------
+# --- B4-L4: the loop closes, and closes on the same orchestration ----------------
 
 def test_the_candidate_already_in_service_is_not_a_refusal():
     """A NON-DECISION IS NOT False. Nothing is recorded and the champion stays,

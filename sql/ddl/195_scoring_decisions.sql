@@ -1,5 +1,8 @@
--- Every decision the model served, whoever asked. Covers: EC19
--- Lot: L5 (20/11/2026)   Competency: C3, C4
+-- Every decision the model served, whoever asked.
+-- Block: B4.
+-- Lot: B4-L5 (20/11/2026).
+-- Competency: B4-C3, B4-C4.
+-- Covers: B4-EC19.
 --
 -- WHY A VIEW AND NOT A THIRD TABLE. A decision is recorded ONCE, by whoever
 -- holds the data that makes it re-derivable:

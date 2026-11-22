@@ -1,5 +1,8 @@
 -- Carry the journal of the scoring service across its rename.
--- Covers: EC19   Lot: L5 (20/11/2026)   Competency: C4
+-- Block: B4.
+-- Lot: B4-L5.
+-- Competency: B4-C3.
+-- Covers: B4-EC19.
 --
 -- WHY A MIGRATION AND NOT JUST A NEW NAME IN THE DDL. Every DDL of this
 -- project is replayable, which it achieves with CREATE TABLE IF NOT EXISTS --
