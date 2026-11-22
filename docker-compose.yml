@@ -1,5 +1,5 @@
 # A deployed, non-interactive configuration -- what B3-EC27 requires for B3-D3.
-# Covers: B3-EC27
+# Covers: B3-EC27.
 #
 # Airflow as three services, following the official layout: init, scheduler,
 # webserver. "airflow standalone" was ruled out: it builds its own admin user
