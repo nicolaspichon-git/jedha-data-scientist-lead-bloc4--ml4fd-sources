@@ -1,5 +1,5 @@
 ---
-version: v01
+version: v02
 locale: fr
 tags:
   - _RNCP38777
@@ -14,7 +14,7 @@ tags:
 
 # 0. Introduction
 
-> *Nicolas Pichon --- AIA RNCP 38777 / BC04 / Requirements / v01 --- 2026/11/26.*
+> *Nicolas Pichon --- AIA RNCP 38777 / BC04 / Requirements / v02 --- 2026/11/26.*
 ---
 
 ## 0.1. Contexte
@@ -22,7 +22,12 @@ tags:
 L'objectif de ce document est de présenter l'exercice de réalisation d'une solution d'apprentissage automatique pour la détection automatique de fraude bancaire \[R2\].
 
 ## 0.2. Enoncé
-...
+
+Il s'agit de prolonger les exercices de détection automatique de fraude par carte bancaire présentés en BC02 et BC03. Après avoir abordé le sujet en tant qu'*architecte de données* pour le système de données de *Stripe*, dans BC02, puis en tant qu'*ingénieur de données* dans BC03, je propose de continuer la mise en place du système de détection de fraude du point de vue du *Data Scientist* et du *MLOps* : 
+- découpler le service de scoring de fraude et l'application en production,
+- automatiser la surveillance des performances du modèle en production,
+- automatiser le réentrainement du modèle en cas de détection de dérive,
+- automatiser le déploiement d'un  nouveau modèle.
 
 ### 0.2.7. Livrables
 
@@ -145,10 +150,6 @@ Les exigences ci-dessous sont celles qu'introduisent les compétences B4-C1 à B
 - (19) B4-EC50 : \[R1\] prévoit « un questionnement complémentaire \[...\] pour évaluer les compétences qui ne sont pas couvertes par le projet ». La matrice sert à montrer ce que le projet couvre, et donc à circonscrire ce qui restera à démontrer à l'oral. Reprise de B3-EC07 ( dossier BC03).
 
 ---
-
-## 0.4. Périmètre
-
-...
 
 
 ---
