@@ -151,9 +151,6 @@ Les exigences ci-dessous sont celles qu'introduisent les compétences B4-C1 à B
 
 ---
 
-
----
-
 ## Annexe : Compétences à démontrer
 
 Compétences à démontrer dans le réalisation de l'exercice. D'après \[R1\].

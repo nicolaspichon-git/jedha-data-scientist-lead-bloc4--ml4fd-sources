@@ -20,27 +20,22 @@ comment sa performance est surveillée, comment il est réentraîné sans interv
 
 ---
 
-## Ce que porte ce dépôt
+## Contenu du dépôt
 
-Deux boucles, délibérément tenues séparées.
+Mise en oeuvre des cycles *CI/CD* et *MLOps*.
 
-La **boucle du code** (B4-C4) est déclenchée par un *commit* : l'intégration
-continue construit, analyse et teste chaque modification, et la livraison
-continue publie les images. Son artefact est une version du service.
+###### CI/CD
+Le cycle est déclenché par un *commit* : l'intégration continue construit, analyse et teste chaque modification, et la livraison continue publie les images. Son artefact est une version du service.
 
-La **boucle du modèle** (B4-C5, B4-C6) est déclenchée par les données : la
-surveillance mesure la dérive et la performance, un seuil déclenche le
-réentraînement, et un modèle candidat n'est promu que s'il bat celui en service
-sur les critères du cahier des charges. Son artefact est une version de modèle
-dans le registre.
+###### MLOps
+Le cycle est déclenché par les données : la surveillance mesure la dérive et la performance, un seuil déclenche le
+réentraînement, le modèle candidat est promu s'il bat celui en service sur les critères du cahier des charges, et il est mise en service en cas de promotion. Son artefact est une version de modèle dans le registre.
 
-Elles se touchent en un seul point : le registre de modèles. Promouvoir un
-modèle y est un changement d'état, pas un redéploiement --- le chemin de
-scoring résout son modèle depuis le registre à chaque rafraîchissement.
+Les deux cycles partagent le registre des modèles : promouvoir un modèle provoque un changement d'état dans le registre, mais pas un redéploiement du service de scoring ; celui-ci résout son modèle depuis le registre à chaque rafraîchissement.
 
 ## Architecture
 
-Six services, un projet Docker Compose (`aia-ml4fd`) :
+Six services, un projet *Docker Compose* (`aia-ml4fd`) :
 
 | Service | Rôle | Publié sur |
 |---|---|---|
@@ -54,11 +49,11 @@ Six services, un projet Docker Compose (`aia-ml4fd`) :
 | `scoring-service` | le service de scoring, pour les tiers | http://127.0.0.1:8012/docs |
 
 Tous les ports publiés sur la machine sont de la famille **8\*\*2**, pour que la
-pile tourne à côté de celle de BC03, qui publie 5432, 8080, 5000 et 8501. Dans le
-réseau Compose, chaque service garde son port propre (`mlflow:5000`,
-`scoring-service:5000`, `producer:4000`…).
+pile puisse tourner parallèlement à celle de *BC03*, qui utilise les ports **8\*\*1**. 
+Au sein du réseau *Docker Compose*, chaque service garde son port propre (`mlflow:5000`,
+`scoring-service:5000`, `producer:4000`, …).
 
-L'unique instance PostgreSQL porte trois bases, chacune avec son propriétaire :
+L'unique instance *PostgreSQL* porte trois bases, chacune avec son propriétaire :
 
 - **`ml4fd-1`** --- les données métier : zone brute, quarantaine, transactions,
   vérité-terrain, *features*, scores, fraudes, rapports, exécutions ;
